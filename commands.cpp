@@ -1,6 +1,8 @@
 #include "commands.hpp"
 #include "crypto.hpp"
 #include "util.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdint.h>
 #include <algorithm>
 #include <string>
@@ -180,6 +182,7 @@ void init (const char* argv0, const char* keyfile)
 
 void keygen (const char* keyfile)
 {
+	umask(0077); // make sure key file is protected
 	std::ofstream	keyout(keyfile);
 	if (!keyout) {
 		perror(keyfile);
