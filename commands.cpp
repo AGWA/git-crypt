@@ -170,7 +170,9 @@ void init (const char* argv0, const char* keyfile)
 
 	// 3. Do a hard reset so any files that were previously checked out encrypted
 	//    will now be checked out decrypted.
-	if (system("git reset --hard") != 0) {
+	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
+	// just skip the reset.
+	if (system("! git show-ref HEAD > /dev/null || git reset --hard HEAD") != 0) {
 		std::clog << "git reset --hard failed\n";
 		std::exit(1);
 	}
