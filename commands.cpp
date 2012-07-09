@@ -33,24 +33,32 @@ void clean (const char* keyfile)
 		std::exit(1);
 	}
 
-	// Compute an HMAC of the file to use as the encryption nonce.  By using a hash of the file
-	// we ensure that the encryption is deterministic so git doesn't think the file has changed when it
-	// really hasn't.  Although this is not semantically secure under CPA, this still has some
-	// nice properties.  For instance, if a file changes just a tiny bit, the resulting ciphertext will
-	// be completely different, leaking no information.  Also, since we're using the output from a
-	// secure hash function plus a counter as the input to our block cipher, we should never have a situation
-	// where two different plaintext blocks get encrypted with the same CTR value.  A nonce will be reused
-	// only if the entire file is the same, which leaks no information except that the files are the same.
+	// Compute an HMAC of the file to use as the encryption nonce (IV) for CTR
+	// mode.  By using a hash of the file we ensure that the encryption is
+	// deterministic so git doesn't think the file has changed when it really
+	// hasn't.  CTR mode with a synthetic IV is provably semantically secure
+	// under deterministic CPA as long as the synthetic IV is derived from a
+	// secure PRF applied to the message.  Since HMAC-SHA1 is a secure PRF, this
+	// encryption scheme is semantically secure under deterministic CPA.
+	// 
+	// Informally, consider that if a file changes just a tiny bit, the IV will
+	// be completely different, resulting in a completely different ciphertext
+	// that leaks no information about the similarities of the plaintexts.  Also,
+	// since we're using the output from a secure hash function plus a counter
+	// as the input to our block cipher, we should never have a situation where
+	// two different plaintext blocks get encrypted with the same CTR value.  A
+	// nonce will be reused only if the entire file is the same, which leaks no
+	// information except that the files are the same.
 	//
-	// To prevent an attacker from building a dictionary of hash values and then looking up the
-	// nonce, which must be stored in the clear, to decrypt the ciphertext, we use an HMAC
-	// as opposed to a straight hash.
+	// To prevent an attacker from building a dictionary of hash values and then
+	// looking up the nonce (which must be stored in the clear to allow for
+	// decryption), we use an HMAC as opposed to a straight hash.
 	uint8_t		digest[12];
 	hmac_sha1_96(digest, file_data, file_len, keys.hmac, HMAC_KEY_LEN);
 
-	// Write a header that:
-	std::cout.write("\0GITCRYPT\0", 10); // identifies this as an encrypted file
-	std::cout.write(reinterpret_cast<char*>(digest), 12); // includes the nonce
+	// Write a header that...
+	std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
+	std::cout.write(reinterpret_cast<char*>(digest), 12); // ...includes the nonce
 
 	// Now encrypt the file and write to stdout
 	aes_ctr_state	state(digest, 12);
