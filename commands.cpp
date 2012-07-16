@@ -17,24 +17,43 @@ void clean (const char* keyfile)
 	keys_t		keys;
 	load_keys(keyfile, &keys);
 
-	// First read the entire file into a buffer (TODO: if the buffer gets big, use a temp file instead)
-	std::string	file_contents;
+	// Read the entire file
+
+	hmac_sha1_state	hmac(keys.hmac, HMAC_KEY_LEN);	// Calculate the file's SHA1 HMAC as we go
+	uint64_t	file_size = 0;	// Keep track of the length, make sure it doesn't get too big
+	std::string	file_contents;	// First 8MB or so of the file go here
+	std::fstream	temp_file;	// The rest of the file spills into a temporary file on disk
+	temp_file.exceptions(std::fstream::badbit);
+
 	char		buffer[1024];
-	while (std::cin) {
+
+	while (std::cin && file_size < MAX_CRYPT_BYTES) {
 		std::cin.read(buffer, sizeof(buffer));
-		file_contents.append(buffer, std::cin.gcount());
+
+		size_t	bytes_read = std::cin.gcount();
+
+		hmac.add(reinterpret_cast<unsigned char*>(buffer), bytes_read);
+		file_size += bytes_read;
+
+		if (file_size <= 8388608) {
+			file_contents.append(buffer, bytes_read);
+		} else {
+			if (!temp_file.is_open()) {
+				open_tempfile(temp_file, std::fstream::in | std::fstream::out | std::fstream::binary | std::fstream::app);
+			}
+			temp_file.write(buffer, bytes_read);
+		}
 	}
-	const uint8_t*	file_data = reinterpret_cast<const uint8_t*>(file_contents.data());
-	size_t		file_len = file_contents.size();
 
 	// Make sure the file isn't so large we'll overflow the counter value (which would doom security)
-	if (file_len > MAX_CRYPT_BYTES) {
+	if (file_size >= MAX_CRYPT_BYTES) {
 		std::clog << "File too long to encrypt securely\n";
 		std::exit(1);
 	}
 
-	// Compute an HMAC of the file to use as the encryption nonce (IV) for CTR
-	// mode.  By using a hash of the file we ensure that the encryption is
+
+	// We use an HMAC of the file as the encryption nonce (IV) for CTR mode.
+	// By using a hash of the file we ensure that the encryption is
 	// deterministic so git doesn't think the file has changed when it really
 	// hasn't.  CTR mode with a synthetic IV is provably semantically secure
 	// under deterministic CPA as long as the synthetic IV is derived from a
@@ -53,19 +72,37 @@ void clean (const char* keyfile)
 	// To prevent an attacker from building a dictionary of hash values and then
 	// looking up the nonce (which must be stored in the clear to allow for
 	// decryption), we use an HMAC as opposed to a straight hash.
-	uint8_t		digest[12];
-	hmac_sha1_96(digest, file_data, file_len, keys.hmac, HMAC_KEY_LEN);
+
+	uint8_t		digest[SHA1_LEN];
+	hmac.get(digest);
 
 	// Write a header that...
 	std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
-	std::cout.write(reinterpret_cast<char*>(digest), 12); // ...includes the nonce
+	std::cout.write(reinterpret_cast<char*>(digest), NONCE_LEN); // ...includes the nonce
 
 	// Now encrypt the file and write to stdout
-	aes_ctr_state	state(digest, 12);
-	for (size_t i = 0; i < file_len; i += sizeof(buffer)) {
-		size_t	block_len = std::min(sizeof(buffer), file_len - i);
-		state.process_block(&keys.enc, file_data + i, reinterpret_cast<uint8_t*>(buffer), block_len);
-		std::cout.write(buffer, block_len);
+	aes_ctr_state	state(digest, NONCE_LEN);
+
+	// First read from the in-memory copy
+	const uint8_t*	file_data = reinterpret_cast<const uint8_t*>(file_contents.data());
+	size_t		file_data_len = file_contents.size();
+	for (size_t i = 0; i < file_data_len; i += sizeof(buffer)) {
+		size_t	buffer_len = std::min(sizeof(buffer), file_data_len - i);
+		state.process(&keys.enc, file_data + i, reinterpret_cast<uint8_t*>(buffer), buffer_len);
+		std::cout.write(buffer, buffer_len);
+	}
+
+	// Then read from the temporary file if applicable
+	if (temp_file.is_open()) {
+		temp_file.seekg(0);
+		while (temp_file) {
+			temp_file.read(buffer, sizeof(buffer));
+
+			size_t buffer_len = temp_file.gcount();
+
+			state.process(&keys.enc, reinterpret_cast<uint8_t*>(buffer), reinterpret_cast<uint8_t*>(buffer), buffer_len);
+			std::cout.write(buffer, buffer_len);
+		}
 	}
 }
 
@@ -97,6 +134,7 @@ void diff (const char* keyfile, const char* filename)
 		perror(filename);
 		std::exit(1);
 	}
+	in.exceptions(std::fstream::badbit);
 
 	// Read the header to get the nonce and determine if it's actually encrypted
 	char		header[22];

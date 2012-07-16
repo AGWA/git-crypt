@@ -19,10 +19,13 @@ static void print_usage (const char* argv0)
 
 
 int main (int argc, const char** argv)
-{
+try {
 	// The following two lines are essential for achieving good performance:
 	std::ios_base::sync_with_stdio(false);
 	std::cin.tie(0);
+
+	std::cin.exceptions(std::ios_base::badbit);
+	std::cout.exceptions(std::ios_base::badbit);
 
 	if (argc < 3) {
 		print_usage(argv[0]);
@@ -46,6 +49,8 @@ int main (int argc, const char** argv)
 	}
 
 	return 0;
+} catch (const std::ios_base::failure& e) {
+	std::cerr << "git-crypt: I/O error: " << e.what() << std::endl;
 }
 
 

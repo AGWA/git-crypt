@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fstream>
 
 int exec_command (const char* command, std::string& output)
 {
@@ -47,5 +48,34 @@ std::string resolve_path (const char* path)
 	std::string	resolved_path(resolved_path_p);
 	free(resolved_path_p);
 	return resolved_path;
+}
+
+void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
+{
+	const char*	tmpdir = getenv("TMPDIR");
+	size_t		tmpdir_len;
+	if (tmpdir) {
+		tmpdir_len = strlen(tmpdir);
+	} else {
+		tmpdir = "/tmp";
+		tmpdir_len = 4;
+	}
+	char*		path = new char[tmpdir_len + 18];
+	strcpy(path, tmpdir);
+	strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
+	int		fd = mkstemp(path);
+	if (fd == -1) {
+		perror("mkstemp");
+		std::exit(9);
+	}
+	file.open(path, mode);
+	if (!file.is_open()) {
+		perror("open");
+		unlink(path);
+		std::exit(9);
+	}
+	unlink(path);
+	close(fd);
+	delete[] path;
 }
 

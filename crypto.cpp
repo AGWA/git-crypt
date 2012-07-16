@@ -43,7 +43,7 @@ aes_ctr_state::aes_ctr_state (const uint8_t* arg_nonce, size_t arg_nonce_len)
 	memset(otp, '\0', sizeof(otp));
 }
 
-void aes_ctr_state::process_block (const AES_KEY* key, const uint8_t* in, uint8_t* out, size_t len)
+void aes_ctr_state::process (const AES_KEY* key, const uint8_t* in, uint8_t* out, size_t len)
 {
 	for (size_t i = 0; i < len; ++i) {
 		if (byte_counter % 16 == 0) {
@@ -63,13 +63,27 @@ void aes_ctr_state::process_block (const AES_KEY* key, const uint8_t* in, uint8_
 	}
 }
 
-// Compute HMAC-SHA1-96 (i.e. first 96 bits of HMAC-SHA1) for the given buffer with the given key
-void hmac_sha1_96 (uint8_t* out, const uint8_t* buffer, size_t buffer_len, const uint8_t* key, size_t key_len)
+hmac_sha1_state::hmac_sha1_state (const uint8_t* key, size_t key_len)
 {
-	uint8_t	full_digest[20];
-	HMAC(EVP_sha1(), key, key_len, buffer, buffer_len, full_digest, NULL);
-	memcpy(out, full_digest, 12); // Truncate to first 96 bits
+	HMAC_Init(&ctx, key, key_len, EVP_sha1());
 }
+
+hmac_sha1_state::~hmac_sha1_state ()
+{
+	HMAC_cleanup(&ctx);
+}
+
+void hmac_sha1_state::add (const uint8_t* buffer, size_t buffer_len)
+{
+	HMAC_Update(&ctx, buffer, buffer_len);
+}
+
+void hmac_sha1_state::get (uint8_t* digest)
+{
+	unsigned int len;
+	HMAC_Final(&ctx, digest, &len);
+}
+
 
 // Encrypt/decrypt an entire input stream, writing to the given output stream
 void process_stream (std::istream& in, std::ostream& out, const AES_KEY* enc_key, const uint8_t* nonce)
@@ -79,7 +93,7 @@ void process_stream (std::istream& in, std::ostream& out, const AES_KEY* enc_key
 	uint8_t		buffer[1024];
 	while (in) {
 		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
-		state.process_block(enc_key, buffer, buffer, in.gcount());
+		state.process(enc_key, buffer, buffer, in.gcount());
 		out.write(reinterpret_cast<char*>(buffer), in.gcount());
 	}
 }
