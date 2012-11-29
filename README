@@ -1,0 +1,66 @@
+ABOUT GIT-CRYPT
+
+git-crypt enables transparent encryption and decryption of files in a
+git repository.  Files which you choose to protect are encrypted when
+committed, and decrypted when checked out.  git-crypt lets you freely
+share a repository containing a mix of public and private content.
+git-crypt gracefully degrades, so developers without the secret key can
+still clone and commit to a repository with encrypted files.  This lets
+you store your secret material (such as keys or passwords) in the same
+repository as your code, without requiring you to lock down your entire
+repository.
+
+git-crypt was written by Andrew Ayer <agwa at andrewayer dot name>.
+For more information, see <http://www.andrewayer.name/projects/git-crypt>.
+
+
+BUILDING GIT-CRYPT
+
+See below for dependencies.  The Makefile is tailored for g++.  If you
+have a different compiler, edit Makefile and change the CXX and CFLAGS
+variables.  This will be made easier in a future release.
+
+	$ make
+	$ cp git-crypt /usr/local/bin/
+
+It doesn't matter where you install the git-crypt binary - choose wherever
+is most convenient for you.
+
+
+DEPENDENCIES
+
+To use git-crypt, you need:
+
+	* OpenSSL
+	* For decrypted git diff output, Git 1.6.1 or later
+	* For decrypted git blame output, Git 1.7.2 or later
+
+
+USING GIT-CRYPT
+
+Generate a secret key:
+
+	$ git-crypt keygen /path/to/keyfile
+
+Configure a repository to use encryption:
+
+	$ cd repo
+	$ git-crypt init /path/to/keyfile
+
+Specify files to encrypt by creating a .gitattributes file:
+
+	secretfile: filter=git-crypt diff=git-crypt
+	*.key: filter=git-crypt diff=git-crypt
+
+Like a .gitignore file, it can match wildcards and should be checked
+into the repository.  Make sure you don't accidentally encrypt the
+.gitattributes file itself!
+
+Cloning a repository with encrypted files:
+
+	$ git clone /path/to/repo
+	$ cd repo
+	$ git-crypt init /path/to/keyfile
+
+That's all you need to do - after running git-crypt init, you can use
+git normally - encryption and decryption happen transparently.
