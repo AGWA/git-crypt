@@ -11,7 +11,7 @@ repository as your code, without requiring you to lock down your entire
 repository.
 
 git-crypt was written by Andrew Ayer <agwa at andrewayer dot name>.
-For more information, see <http://www.andrewayer.name/projects/git-crypt>.
+For more information, see <http://www.agwa.name/projects/git-crypt>.
 
 
 BUILDING GIT-CRYPT
