@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fstream>
@@ -82,11 +83,13 @@ void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	char*		path = new char[tmpdir_len + 18];
 	strcpy(path, tmpdir);
 	strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
+	mode_t		old_umask = umask(0077);
 	int		fd = mkstemp(path);
 	if (fd == -1) {
 		perror("mkstemp");
 		std::exit(9);
 	}
+	umask(old_umask);
 	file.open(path, mode);
 	if (!file.is_open()) {
 		perror("open");
