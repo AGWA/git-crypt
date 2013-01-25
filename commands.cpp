@@ -247,12 +247,13 @@ void init (const char* argv0, const char* keyfile)
 
 void keygen (const char* keyfile)
 {
-	umask(0077); // make sure key file is protected
+	mode_t		old_umask = umask(0077); // make sure key file is protected
 	std::ofstream	keyout(keyfile);
 	if (!keyout) {
 		perror(keyfile);
 		std::exit(1);
 	}
+	umask(old_umask);
 	std::ifstream	randin("/dev/random");
 	if (!randin) {
 		perror("/dev/random");
