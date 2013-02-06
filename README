@@ -49,8 +49,8 @@ Configure a repository to use encryption:
 
 Specify files to encrypt by creating a .gitattributes file:
 
-	secretfile: filter=git-crypt diff=git-crypt
-	*.key: filter=git-crypt diff=git-crypt
+	secretfile filter=git-crypt diff=git-crypt
+	*.key filter=git-crypt diff=git-crypt
 
 Like a .gitignore file, it can match wildcards and should be checked
 into the repository.  Make sure you don't accidentally encrypt the
