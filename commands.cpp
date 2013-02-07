@@ -180,6 +180,9 @@ void init (const char* argv0, const char* keyfile)
 		perror(keyfile);
 		std::exit(1);
 	}
+	
+	// 0. Check to see if HEAD exists.  See below why we do this.
+	bool		head_exists = system("git rev-parse HEAD >/dev/null 2>/dev/null") == 0;
 
 	// 1. Make sure working directory is clean
 	int		status;
@@ -188,8 +191,12 @@ void init (const char* argv0, const char* keyfile)
 	if (status != 0) {
 		std::clog << "git status failed - is this a git repository?\n";
 		std::exit(1);
-	} else if (!status_output.empty()) {
+	} else if (!status_output.empty() && head_exists) {
+		// We only care that the working directory is dirty if HEAD exists.
+		// If HEAD doesn't exist, we won't be resetting to it (see below) so
+		// it doesn't matter that the working directory is dirty.
 		std::clog << "Working directory not clean.\n";
+		std::clog << "Please commit your changes or 'git stash' them before setting up git-crypt.\n";
 		std::exit(1);
 	}
 
@@ -199,8 +206,8 @@ void init (const char* argv0, const char* keyfile)
 
 	// 2. Add config options to git
 
-	// git config --add filter.git-crypt.smudge "git-crypt smudge /path/to/key"
-	std::string	command("git config --add filter.git-crypt.smudge \"");
+	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
+	std::string	command("git config filter.git-crypt.smudge \"");
 	command += git_crypt_path;
 	command += " smudge ";
 	command += keyfile_path;
@@ -211,8 +218,8 @@ void init (const char* argv0, const char* keyfile)
 		std::exit(1);
 	}
 
-	// git config --add filter.git-crypt.clean "git-crypt clean /path/to/key"
-	command = "git config --add filter.git-crypt.clean \"";
+	// git config filter.git-crypt.clean "git-crypt clean /path/to/key"
+	command = "git config filter.git-crypt.clean \"";
 	command += git_crypt_path;
 	command += " clean ";
 	command += keyfile_path;
@@ -223,8 +230,8 @@ void init (const char* argv0, const char* keyfile)
 		std::exit(1);
 	}
 
-	// git config --add diff.git-crypt.textconv "git-crypt diff /path/to/key"
-	command = "git config --add diff.git-crypt.textconv \"";
+	// git config diff.git-crypt.textconv "git-crypt diff /path/to/key"
+	command = "git config diff.git-crypt.textconv \"";
 	command += git_crypt_path;
 	command += " diff ";
 	command += keyfile_path;
@@ -240,7 +247,7 @@ void init (const char* argv0, const char* keyfile)
 	//    will now be checked out decrypted.
 	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
 	// just skip the reset.
-	if (system("! git show-ref HEAD > /dev/null || git reset --hard HEAD") != 0) {
+	if (head_exists && system("git reset --hard HEAD") != 0) {
 		std::clog << "git reset --hard failed\n";
 		std::exit(1);
 	}
