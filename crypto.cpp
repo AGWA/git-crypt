@@ -15,6 +15,17 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with git-crypt.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Additional permission under GNU GPL version 3 section 7:
+ *
+ * If you modify the Program, or any covered work, by linking or
+ * combining it with the OpenSSL project's OpenSSL library (or a
+ * modified version of that library), containing parts covered by the
+ * terms of the OpenSSL or SSLeay licenses, the licensors of the Program
+ * grant you additional permission to convey the resulting work.
+ * Corresponding Source for a non-source form of such a combination
+ * shall include the source code for the parts of OpenSSL used as well
+ * as that of the covered work.
  */
 
 #define _BSD_SOURCE
