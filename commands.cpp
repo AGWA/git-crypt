@@ -195,10 +195,13 @@ void init (const char* argv0, const char* keyfile)
 	// 0. Check to see if HEAD exists.  See below why we do this.
 	bool		head_exists = system("git rev-parse HEAD >/dev/null 2>/dev/null") == 0;
 
-	// 1. Make sure working directory is clean
+	// 1. Make sure working directory is clean (ignoring untracked files)
+	// We do this because we run 'git reset --hard HEAD' later and we don't
+	// want the user to lose any changes.  'git reset' doesn't touch
+	// untracked files so it's safe to ignore those.
 	int		status;
 	std::string	status_output;
-	status = exec_command("git status --porcelain", status_output);
+	status = exec_command("git status -uno --porcelain", status_output);
 	if (status != 0) {
 		std::clog << "git status failed - is this a git repository?\n";
 		std::exit(1);
