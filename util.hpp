@@ -35,7 +35,7 @@
 #include <ios>
 #include <iosfwd>
 
-int		exec_command (const char* command, std::string& output);
+int		exec_command (const char* command, std::ostream& output);
 std::string	resolve_path (const char* path);
 void		open_tempfile (std::fstream&, std::ios_base::openmode);
 

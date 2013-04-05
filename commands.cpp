@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <string>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <cstddef>
 #include <cstring>
@@ -193,19 +194,19 @@ void init (const char* argv0, const char* keyfile)
 	}
 	
 	// 0. Check to see if HEAD exists.  See below why we do this.
-	bool		head_exists = system("git rev-parse HEAD >/dev/null 2>/dev/null") == 0;
+	bool			head_exists = system("git rev-parse HEAD >/dev/null 2>/dev/null") == 0;
 
 	// 1. Make sure working directory is clean (ignoring untracked files)
-	// We do this because we run 'git reset --hard HEAD' later and we don't
-	// want the user to lose any changes.  'git reset' doesn't touch
+	// We do this because we run 'git checkout -f HEAD' later and we don't
+	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
 	// untracked files so it's safe to ignore those.
-	int		status;
-	std::string	status_output;
+	int			status;
+	std::stringstream	status_output;
 	status = exec_command("git status -uno --porcelain", status_output);
 	if (status != 0) {
 		std::clog << "git status failed - is this a git repository?\n";
 		std::exit(1);
-	} else if (!status_output.empty() && head_exists) {
+	} else if (status_output.peek() != -1 && head_exists) {
 		// We only care that the working directory is dirty if HEAD exists.
 		// If HEAD doesn't exist, we won't be resetting to it (see below) so
 		// it doesn't matter that the working directory is dirty.
@@ -214,11 +215,19 @@ void init (const char* argv0, const char* keyfile)
 		std::exit(1);
 	}
 
+	// 2. Determine the path to the top of the repository.  We pass this as the argument
+	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
+	// mucked with the git config.)
+	std::stringstream	cdup_output;
+	if (exec_command("git rev-parse --show-cdup", cdup_output) != 0) {
+		std::clog << "git rev-parse --show-cdup failed\n";
+		std::exit(1);
+	}
+
+	// 3. Add config options to git
+
 	std::string	git_crypt_path(std::strchr(argv0, '/') ? resolve_path(argv0) : argv0);
 	std::string	keyfile_path(resolve_path(keyfile));
-
-
-	// 2. Add config options to git
 
 	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
 	std::string	command("git config filter.git-crypt.smudge \"");
@@ -257,13 +266,27 @@ void init (const char* argv0, const char* keyfile)
 	}
 
 
-	// 3. Do a hard reset so any files that were previously checked out encrypted
+	// 4. Do a force checkout so any files that were previously checked out encrypted
 	//    will now be checked out decrypted.
 	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
-	// just skip the reset.
-	if (head_exists && system("git reset --hard HEAD") != 0) {
-		std::clog << "git reset --hard failed\n";
-		std::exit(1);
+	// just skip the checkout.
+	if (head_exists) {
+		std::string	path_to_top;
+		std::getline(cdup_output, path_to_top);
+
+		command = "git checkout -f HEAD -- ";
+		if (path_to_top.empty()) {
+			command += ".";
+		} else {
+			command += path_to_top; // git rev-parse --show-cdup only outputs sequences of ../ so we
+						// don't need to worry about shell escaping :-)
+		}
+
+		if (system(command.c_str()) != 0) {
+			std::clog << "git checkout failed\n";
+			std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted\n";
+			std::exit(1);
+		}
 	}
 }
 

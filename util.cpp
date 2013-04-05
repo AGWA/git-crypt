@@ -40,7 +40,7 @@
 #include <errno.h>
 #include <fstream>
 
-int exec_command (const char* command, std::string& output)
+int exec_command (const char* command, std::ostream& output)
 {
 	int		pipefd[2];
 	if (pipe(pipefd) == -1) {
@@ -65,7 +65,7 @@ int exec_command (const char* command, std::string& output)
 	char		buffer[1024];
 	ssize_t		bytes_read;
 	while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-		output.append(buffer, bytes_read);
+		output.write(buffer, bytes_read);
 	}
 	close(pipefd[0]);
 	int		status = 0;
