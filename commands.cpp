@@ -230,11 +230,8 @@ void init (const char* argv0, const char* keyfile)
 	std::string	keyfile_path(resolve_path(keyfile));
 
 	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
-	std::string	command("git config filter.git-crypt.smudge \"");
-	command += git_crypt_path;
-	command += " smudge ";
-	command += keyfile_path;
-	command += "\"";
+	std::string	command("git config filter.git-crypt.smudge ");
+	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
 		std::clog << "git config failed\n";
@@ -242,11 +239,8 @@ void init (const char* argv0, const char* keyfile)
 	}
 
 	// git config filter.git-crypt.clean "git-crypt clean /path/to/key"
-	command = "git config filter.git-crypt.clean \"";
-	command += git_crypt_path;
-	command += " clean ";
-	command += keyfile_path;
-	command += "\"";
+	command = "git config filter.git-crypt.clean ";
+	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " clean " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
 		std::clog << "git config failed\n";
@@ -254,11 +248,8 @@ void init (const char* argv0, const char* keyfile)
 	}
 
 	// git config diff.git-crypt.textconv "git-crypt diff /path/to/key"
-	command = "git config diff.git-crypt.textconv \"";
-	command += git_crypt_path;
-	command += " diff ";
-	command += keyfile_path;
-	command += "\"";
+	command = "git config diff.git-crypt.textconv ";
+	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " diff " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
 		std::clog << "git config failed\n";
@@ -278,8 +269,7 @@ void init (const char* argv0, const char* keyfile)
 		if (path_to_top.empty()) {
 			command += ".";
 		} else {
-			command += path_to_top; // git rev-parse --show-cdup only outputs sequences of ../ so we
-						// don't need to worry about shell escaping :-)
+			command += escape_shell_arg(path_to_top);
 		}
 
 		if (system(command.c_str()) != 0) {

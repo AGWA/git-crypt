@@ -112,3 +112,17 @@ void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	delete[] path;
 }
 
+std::string	escape_shell_arg (const std::string& str)
+{
+	std::string	new_str;
+	new_str.push_back('"');
+	for (std::string::const_iterator it(str.begin()); it != str.end(); ++it) {
+		if (*it == '"' || *it == '\\' || *it == '$' || *it == '`') {
+			new_str.push_back('\\');
+		}
+		new_str.push_back(*it);
+	}
+	new_str.push_back('"');
+	return new_str;
+}
+
