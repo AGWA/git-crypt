@@ -282,6 +282,10 @@ void init (const char* argv0, const char* keyfile)
 
 void keygen (const char* keyfile)
 {
+	if (access(keyfile, F_OK) == 0) {
+		std::clog << keyfile << ": File already exists - please remove before continuing\n";
+		std::exit(1);
+	}
 	mode_t		old_umask = umask(0077); // make sure key file is protected
 	std::ofstream	keyout(keyfile);
 	if (!keyout) {
@@ -289,11 +293,16 @@ void keygen (const char* keyfile)
 		std::exit(1);
 	}
 	umask(old_umask);
-	std::ifstream	randin("/dev/random");
+	std::ifstream	randin;
+	randin.rdbuf()->pubsetbuf(0, 0); // disable vuffering so we don't take more entropy than needed
+	randin.open("/dev/random", std::ios::binary);
 	if (!randin) {
 		perror("/dev/random");
 		std::exit(1);
 	}
+	std::clog << "Generating key... this may take a while. Please type on the keyboard, move the\n";
+	std::clog << "mouse, utilize the disks, etc. to give the random number generator more entropy.\n";
+	std::clog.flush();
 	char		buffer[AES_KEY_BITS/8 + HMAC_KEY_LEN];
 	randin.read(buffer, sizeof(buffer));
 	if (randin.gcount() != sizeof(buffer)) {
