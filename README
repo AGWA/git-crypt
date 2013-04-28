@@ -52,10 +52,11 @@ git normally - encryption and decryption happen transparently.
 CURRENT STATUS
 
 The latest version of git-crypt is 0.3, released on 2013-04-05.
-git-crypt is not yet feature complete and the user experience is rough
-in places.  There may also be compatibility-breaking changes introduced
-before version 1.0.  That said, git-crypt is reliable and secure and
-used to protect content in real world repositories.
+git-crypt aims to be bug-free and reliable, meaning it shouldn't
+crash, malfunction, or expose your confidential data.  However,
+it has not yet reached maturity, meaning it is not as documented,
+featureful, or easy-to-use as it should be.  Additionally, there may be
+backwards-incompatible changes introduced before version 1.0.
 
 Development on git-crypt is currently focused on improving the user
 experience, especially around setting up repositories.  There are also
@@ -66,14 +67,14 @@ keys and keys encrypted with PGP.
 SECURITY
 
 git-crypt is more secure that other transparent git encryption systems.
-git-crypt encrypts files using AES-256 in CTR mode with a synthetic
-IV derived from the SHA-1 HMAC of the file.  This is provably
-semantically secure under deterministic chosen-plaintext attack.
-That means that although the encryption is deterministic (which is
-required so git can distinguish when a file has and hasn't changed),
-it leaks no information beyond whether two files are identical or not.
-Other proposals for transparent git encryption use ECB or CBC with no
-IV.  These systems are not semantically secure and leak information.
+git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
+derived from the SHA-1 HMAC of the file.  This is provably semantically
+secure under deterministic chosen-plaintext attack.  That means that
+although the encryption is deterministic (which is required so git can
+distinguish when a file has and hasn't changed), it leaks no information
+beyond whether two files are identical or not.  Other proposals for
+transparent git encryption use ECB or CBC with a fixed IV.  These systems
+are not semantically secure and leak information.
 
 The AES key is stored unencrypted on disk.  The user is responsible for
 protecting it and ensuring it's safely distributed only to authorized
