@@ -294,7 +294,7 @@ void keygen (const char* keyfile)
 	}
 	umask(old_umask);
 	std::ifstream	randin;
-	randin.rdbuf()->pubsetbuf(0, 0); // disable vuffering so we don't take more entropy than needed
+	randin.rdbuf()->pubsetbuf(0, 0); // disable buffering so we don't take more entropy than needed
 	randin.open("/dev/random", std::ios::binary);
 	if (!randin) {
 		perror("/dev/random");
