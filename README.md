@@ -1,4 +1,5 @@
-ABOUT GIT-CRYPT
+GIT-CRYPT
+===============
 
 git-crypt enables transparent encryption and decryption of files in a
 git repository.  Files which you choose to protect are encrypted when
@@ -15,25 +16,26 @@ For more information, see <http://www.agwa.name/projects/git-crypt>.
 
 
 BUILDING GIT-CRYPT
-
+------------------
 See the INSTALL file.
 
 
 USING GIT-CRYPT
+---------------
 
 Generate a secret key:
 
-	$ git-crypt keygen /path/to/keyfile
+    git-crypt keygen /path/to/keyfile
 
 Configure a repository to use encryption:
 
-	$ cd repo
-	$ git-crypt init /path/to/keyfile
+    cd repo
+    git-crypt init /path/to/keyfile
 
 Specify files to encrypt by creating a .gitattributes file:
 
-	secretfile filter=git-crypt diff=git-crypt
-	*.key filter=git-crypt diff=git-crypt
+    secretfile filter=git-crypt diff=git-crypt
+    *.key filter=git-crypt diff=git-crypt
 
 Like a .gitignore file, it can match wildcards and should be checked
 into the repository.  Make sure you don't accidentally encrypt the
@@ -41,15 +43,16 @@ into the repository.  Make sure you don't accidentally encrypt the
 
 Cloning a repository with encrypted files:
 
-	$ git clone /path/to/repo
-	$ cd repo
-	$ git-crypt init /path/to/keyfile
+    git clone /path/to/repo
+    cd repo
+    git-crypt init /path/to/keyfile
 
 That's all you need to do - after running git-crypt init, you can use
 git normally - encryption and decryption happen transparently.
 
 
 CURRENT STATUS
+--------------
 
 The latest version of git-crypt is 0.3, released on 2013-04-05.
 git-crypt aims to be bug-free and reliable, meaning it shouldn't
@@ -65,6 +68,7 @@ keys and keys encrypted with PGP.
 
 
 SECURITY
+--------
 
 git-crypt is more secure that other transparent git encryption systems.
 git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
@@ -83,6 +87,7 @@ with a passphrase.
 
 
 LIMITATIONS
+-----------
 
 git-crypt is not designed to encrypt an entire repository.  Not only does
 that defeat the aim of git-crypt, which is the ability to selectively
