@@ -1,5 +1,5 @@
 GIT-CRYPT
-===============
+=========
 
 git-crypt enables transparent encryption and decryption of files in a
 git repository.  Files which you choose to protect are encrypted when
@@ -15,12 +15,12 @@ git-crypt was written by Andrew Ayer <agwa at andrewayer dot name>.
 For more information, see <http://www.agwa.name/projects/git-crypt>.
 
 
-Building GIT-CRYPT
+Building git-crypt
 ------------------
 See the [INSTALL.md](INSTALL.md) file.
 
 
-Using GIT-CRYPT
+Using git-crypt
 ---------------
 
 Generate a secret key:
