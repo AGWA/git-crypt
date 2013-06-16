@@ -47,14 +47,14 @@ Cloning a repository with encrypted files:
     cd repo
     git-crypt init /path/to/keyfile
 
-That's all you need to do - after running git-crypt init, you can use
+That's all you need to do - after running `git-crypt init`, you can use
 git normally - encryption and decryption happen transparently.
 
 
 Current Status
 --------------
 
-The latest version of git-crypt is 0.3, released on 2013-04-05.
+The latest version of git-crypt is [0.3](NEWS.md), released on 2013-04-05.
 git-crypt aims to be bug-free and reliable, meaning it shouldn't
 crash, malfunction, or expose your confidential data.  However,
 it has not yet reached maturity, meaning it is not as documented,
