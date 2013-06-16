@@ -17,7 +17,7 @@ For more information, see <http://www.agwa.name/projects/git-crypt>.
 
 Building GIT-CRYPT
 ------------------
-See the INSTALL file.
+See the [INSTALL.md](INSTALL.md) file.
 
 
 Using GIT-CRYPT
