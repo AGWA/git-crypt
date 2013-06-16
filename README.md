@@ -15,12 +15,12 @@ git-crypt was written by Andrew Ayer <agwa at andrewayer dot name>.
 For more information, see <http://www.agwa.name/projects/git-crypt>.
 
 
-BUILDING GIT-CRYPT
+Building GIT-CRYPT
 ------------------
 See the INSTALL file.
 
 
-USING GIT-CRYPT
+Using GIT-CRYPT
 ---------------
 
 Generate a secret key:
@@ -51,7 +51,7 @@ That's all you need to do - after running git-crypt init, you can use
 git normally - encryption and decryption happen transparently.
 
 
-CURRENT STATUS
+Current Status
 --------------
 
 The latest version of git-crypt is 0.3, released on 2013-04-05.
@@ -67,7 +67,7 @@ plans to add additional key management schemes, such as passphrase-derived
 keys and keys encrypted with PGP.
 
 
-SECURITY
+Security
 --------
 
 git-crypt is more secure that other transparent git encryption systems.
@@ -86,7 +86,7 @@ people.  A future version of git-crypt may support encrypting the key
 with a passphrase.
 
 
-LIMITATIONS
+Limitations
 -----------
 
 git-crypt is not designed to encrypt an entire repository.  Not only does
