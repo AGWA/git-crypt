@@ -32,6 +32,7 @@
 #include "util.hpp"
 #include <cstring>
 #include <iostream>
+#include <openssl/err.h>
 
 static void print_usage (const char* argv0)
 {
@@ -62,6 +63,7 @@ try {
 		return 2;
 	}
 
+	ERR_load_crypto_strings();
 
 	if (strcmp(argv[1], "init") == 0 && argc == 3) {
 		init(argv[0], argv[2]);
