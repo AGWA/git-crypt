@@ -81,6 +81,7 @@ try {
 	return 0;
 } catch (const std::ios_base::failure& e) {
 	std::cerr << "git-crypt: I/O error: " << e.what() << std::endl;
+	return 1;
 }
 
 
