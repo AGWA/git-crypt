@@ -42,6 +42,8 @@
 #include <iostream>
 #include <cstddef>
 #include <cstring>
+#include <openssl/rand.h>
+#include <openssl/err.h>
 
 // Encrypt contents of stdin and write to stdout
 void clean (const char* keyfile)
@@ -293,21 +295,17 @@ void keygen (const char* keyfile)
 		std::exit(1);
 	}
 	umask(old_umask);
-	std::ifstream	randin;
-	randin.rdbuf()->pubsetbuf(0, 0); // disable buffering so we don't take more entropy than needed
-	randin.open("/dev/random", std::ios::binary);
-	if (!randin) {
-		perror("/dev/random");
-		std::exit(1);
-	}
-	std::clog << "Generating key... this may take a while. Please type on the keyboard, move the\n";
-	std::clog << "mouse, utilize the disks, etc. to give the random number generator more entropy.\n";
+
+	std::clog << "Generating key...\n";
 	std::clog.flush();
-	char		buffer[AES_KEY_BITS/8 + HMAC_KEY_LEN];
-	randin.read(buffer, sizeof(buffer));
-	if (randin.gcount() != sizeof(buffer)) {
-		std::clog << "Premature end of random data.\n";
+	unsigned char	buffer[AES_KEY_BITS/8 + HMAC_KEY_LEN];
+	if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
+		while (unsigned long code = ERR_get_error()) {
+			char	error_string[120];
+			ERR_error_string_n(code, error_string, sizeof(error_string));
+			std::clog << "Error: " << error_string << '\n';
+		}
 		std::exit(1);
 	}
-	keyout.write(buffer, sizeof(buffer));
+	keyout.write(reinterpret_cast<const char*>(buffer), sizeof(buffer));
 }
