@@ -1,22 +1,24 @@
-DEPENDENCIES
+Dependencies
+------------
 
 To use git-crypt, you need:
 
-	* Git 1.6.0 or newer
-	* OpenSSL
-	* For decrypted git diff output, Git 1.6.1 or newer
-	* For decrypted git blame output, Git 1.7.2 or newer
+*   Git 1.6.0 or newer
+*   OpenSSL
+*   For decrypted git diff output, Git 1.6.1 or newer
+*   For decrypted git blame output, Git 1.7.2 or newer
 
 To build git-crypt, you need a C++ compiler and OpenSSL development
 headers.
 
 
-BUILDING GIT-CRYPT
+Building GIT-CRYPT
+------------------
 
 The Makefile is tailored for g++, but should work with other compilers.
 
-	$ make
-	$ cp git-crypt /usr/local/bin/
+    make
+    cp git-crypt /usr/local/bin/
 
 It doesn't matter where you install the git-crypt binary - choose wherever
 is most convenient for you.
