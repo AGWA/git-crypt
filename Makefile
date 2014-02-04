@@ -1,9 +1,9 @@
 CXX := c++
 CXXFLAGS := -Wall -pedantic -ansi -Wno-long-long -O2
-LDFLAGS := -lcrypto
+LDFLAGS := -lcrypto -lwsock32
 PREFIX := /usr/local
 
-OBJFILES = git-crypt.o commands.o crypto.o util.o
+OBJFILES = git-crypt.o commands.o crypto.o util.o util_win32.o
 
 all: git-crypt
 

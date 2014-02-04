@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright 2012 Andrew Ayer
  *
  * This file is part of git-crypt.
@@ -38,7 +38,11 @@
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
+#ifdef __WIN32__
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
 
 void load_keys (const char* filepath, keys_t* keys)
 {
