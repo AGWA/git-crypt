@@ -21,4 +21,7 @@ clean:
 install:
 	install -m 755 git-crypt $(PREFIX)/bin/
 
-.PHONY: all clean install
+strip:
+	strip git-crypt.exe
+
+.PHONY: all clean install strip

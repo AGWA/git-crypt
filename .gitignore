@@ -1,3 +1,4 @@
 *.o
 *.exe
 git-crypt
+SET.bat

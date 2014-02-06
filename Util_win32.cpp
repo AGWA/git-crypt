@@ -29,7 +29,6 @@
  * as that of the covered work.
  */
 
-#ifdef __WIN32__
 #undef __STRICT_ANSI__ //needed for _fullpath
 #include "util.hpp"
 #include <windows.h>
@@ -45,11 +44,8 @@
 int LaunchChildProcess(HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
-				const std::string command);
+				const char* command);
 void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output);
-void ArgvQuote (const std::string& Argument,
-				std::string& CommandLine,
-				bool Force);
 int mkstemp(char *name);
 void DisplayError(LPCSTR wszPrefix);
 
@@ -92,12 +88,8 @@ int exec_command (const char* command, std::ostream& output)
 	// inherited. 
 	if (!CloseHandle(hOutputReadTmp)) DisplayError("CloseHandle");
 
-	// Prepare command argv
-	std::string cmd("sh.exe -c ");
-	ArgvQuote(std::string(command), cmd, FALSE);
-
-	// Launch child process with
-	int status = LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, cmd);
+	// Launch child process
+	int status = LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, command);
 
 	// Close pipe handles (do not continue to modify the parent).
 	// You need to make sure that no handles to the write end of the
@@ -119,10 +111,14 @@ std::string escape_shell_arg (const std::string& str)
 	std::string new_str;
 	new_str.push_back('"');
 	for (std::string::const_iterator it(str.begin()); it != str.end(); ++it) {
-		if (*it == '"' || *it == '\\' || *it == '$' || *it == '`') {
+		if (*it == '"' || *it == '$' || *it == '`') {
 			new_str.push_back('\\');
 		}
-		new_str.push_back(*it);
+		if (*it == '\\') {
+			new_str += '/';
+		} 
+		else
+			new_str.push_back(*it);
 	}
 	new_str.push_back('"');
 	return new_str;
@@ -172,11 +168,39 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	delete[] path;
 }
 
+char* str_replace(const char *string, const char *substr, const char *replacement)
+{
+
+	/* if either substr or replacement is NULL, duplicate string a let caller handle it */
+	if ( substr == NULL || replacement == NULL ) return strdup (string);
+
+	char* newstr = strdup (string);
+	char* head = newstr;
+	char* tok;
+	while ( (tok = strstr( head, substr )) )
+	{
+		char* oldstr = newstr;
+		newstr = (char *)malloc ( strlen ( oldstr ) - strlen ( substr ) + strlen ( replacement ) + 1 );
+		/*failed to alloc mem, free old string and return NULL */
+		if ( newstr == NULL ){
+			free (oldstr);
+			return NULL;
+		}
+		memcpy ( newstr, oldstr, tok - oldstr );
+		memcpy ( newstr + (tok - oldstr), replacement, strlen ( replacement ) );
+		memcpy ( newstr + (tok - oldstr) + strlen( replacement ), tok + strlen ( substr ), strlen ( oldstr ) - strlen ( substr ) - ( tok - oldstr ) );
+		memset ( newstr + strlen ( oldstr ) - strlen ( substr ) + strlen ( replacement ) , 0, 1 );
+		/* move back head right after the last replacement */
+		head = newstr + (tok - oldstr) + strlen( replacement );
+		free (oldstr);
+	}
+	return newstr;
+}
+
 int win32_system(const char* command)
 {
-	std::string cmd("sh.exe -c ");
-	ArgvQuote(std::string(command), cmd, FALSE);	
-	return LaunchChildProcess(NULL ,NULL ,NULL, cmd);
+	// >/dev/null TO >nul
+	return system(str_replace(command, "/dev/null", "nul"));
 }
 
 int mkstemp(char * filetemplate)
@@ -196,7 +220,7 @@ int mkstemp(char * filetemplate)
 int LaunchChildProcess(HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
-				const std::string command)
+				const char* command)
 {
 	PROCESS_INFORMATION pi;
 	STARTUPINFO si;
@@ -212,7 +236,7 @@ int LaunchChildProcess(HANDLE hChildStdOut,
 	si.hStdError  = hChildStdErr;
 
 	if ( CreateProcess(NULL,  /* module: null means use command line */
-						(LPSTR)command.c_str(),  /* modified command line */
+						(LPSTR)command,  /* modified command line */
 						NULL, /* thread handle inheritance */
 						NULL, /* thread handle inheritance */
 						TRUE, /* handles inheritable? */
@@ -228,7 +252,7 @@ int LaunchChildProcess(HANDLE hChildStdOut,
 	{
 		char error_msg[] = "Error launching process: ";
 		char buf[_MAX_PATH + sizeof(error_msg)];
-		snprintf(buf, sizeof buf, "%s%s%", error_msg, command.c_str());
+		snprintf(buf, sizeof buf, "%s%s%", error_msg, command);
 		DisplayError(buf);
 	}
 
@@ -265,90 +289,6 @@ void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output)
 }
 
 /*
- * ArgvQuote
- */
-void ArgvQuote (const std::string& Argument,
-				std::string& CommandLine,
-				bool Force )
-/***
- *
- * Routine Description:
- *
- * This routine appends the given argument to a command line such
- * that CommandLineToArgvW will return the argument string unchanged.
- * Arguments in a command line should be separated by spaces; this
- * function does not add these spaces.
- *
- * Arguments:
- *
- * Argument - Supplies the argument to encode.
- *
- * CommandLine - Supplies the command line to which we append the encoded argument string.
- *
- * Force - Supplies an indication of whether we should quote
- * the argument even if it does not contain any characters that would
- * ordinarily require quoting.
- *
- * Return Value:
- *
- * None.
- *
- * Environment:
- *
- * Arbitrary.
- *
- */
- {
-	//
-	// Unless we're told otherwise, don't quote unless we actually
-	// need to do so --- hopefully avoid problems if programs won't
-	// parse quotes properly
-	//
-	if (Force == false &&
-		Argument.empty () == false &&
-		Argument.find_first_of (" \t\n\v\"") == Argument.npos)
-	{
-		CommandLine.append (Argument);
-	}
-	else {
-		CommandLine.push_back ('"');
-		std::string::const_iterator It;
-		for (It = Argument.begin () ; ; ++It) {
-			unsigned NumberBackslashes = 0;
-			while (It != Argument.end () && *It == '\\') {
-				++It;
-				++NumberBackslashes;
-			}
-			if (It == Argument.end ()) {
-				//
-				// Escape all backslashes, but let the terminating
-				// double quotation mark we add below be interpreted
-				// as a metacharacter.
-				//
-				CommandLine.append (NumberBackslashes * 2, '\\');
-				 break;
-			}
-			else if (*It == '"') {
-				//
-				// Escape all backslashes and the following
-				// double quotation mark.
-				//
-				CommandLine.append (NumberBackslashes * 2 + 1, '\\');
-				CommandLine.push_back (*It);
-			}
-			else {
-				//
-				// Backslashes aren't special here.
-				//
-				CommandLine.append (NumberBackslashes, '\\');
-				CommandLine.push_back (*It);
-			}
-		}
-		CommandLine.push_back ('"');
-	}
-}
-
-/*
  * DisplayError
  * Displays the error number and corresponding message.
  */
@@ -375,5 +315,3 @@ void DisplayError(LPCSTR szPrefix)
 	LocalFree((HLOCAL)lpsz);
 	ExitProcess(-1);
 }
-
-#endif
