@@ -28,6 +28,7 @@
  * as that of the covered work.
  */
 
+
 #include "commands.hpp"
 #include "crypto.hpp"
 #include "util.hpp"
@@ -44,6 +45,12 @@
 #include <cstring>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+
+
+#ifdef __WIN32__
+#define system(a) win32_system(a)
+#endif
+
 
 // Encrypt contents of stdin and write to stdout
 void clean (const char* keyfile)
@@ -234,7 +241,7 @@ void init (const char* argv0, const char* keyfile)
 	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
 	std::string	command("git config filter.git-crypt.smudge ");
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge " + escape_shell_arg(keyfile_path));
-	
+
 	if (system(command.c_str()) != 0) {
 		std::clog << "git config failed\n";
 		std::exit(1);

@@ -1,19 +1,48 @@
+/*
+ * Copyright 2012 Andrew Ayer
+ * Copyright 2014 bySabi Files
+ *
+ * This file is part of git-crypt.
+ *
+ * git-crypt is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * git-crypt is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with git-crypt.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Additional permission under GNU GPL version 3 section 7:
+ *
+ * If you modify the Program, or any covered work, by linking or
+ * combining it with the OpenSSL project's OpenSSL library (or a
+ * modified version of that library), containing parts covered by the
+ * terms of the OpenSSL or SSLeay licenses, the licensors of the Program
+ * grant you additional permission to convey the resulting work.
+ * Corresponding Source for a non-source form of such a combination
+ * shall include the source code for the parts of OpenSSL used as well
+ * as that of the covered work.
+ */
+
 #ifdef __WIN32__
 #undef __STRICT_ANSI__ //needed for _fullpath
+#include "util.hpp"
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
 
 #include <cstdlib>
 #include <iostream>
-#include <sstream>
 #include <fstream>
+#include <sstream>
 
 
-#define unlink _unlink
-
-
-void LaunchChildProcess(HANDLE hChildStdOut,
+int LaunchChildProcess(HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
 				const std::string command);
@@ -23,9 +52,6 @@ void ArgvQuote (const std::string& Argument,
 				bool Force);
 int mkstemp(char *name);
 void DisplayError(LPCSTR wszPrefix);
-
-//do nothing on windows
-static inline mode_t umask(mode_t mask){ return -1; }
 
 
 int exec_command (const char* command, std::ostream& output)
@@ -42,7 +68,6 @@ int exec_command (const char* command, std::ostream& output)
 	// Create the child output pipe.
 	if (!CreatePipe(&hOutputReadTmp,&hOutputWrite,&sa,0))
 		DisplayError("CreatePipe");
-
 
 	// Create a duplicate of the output write handle for the std error
 	// write handle. This is necessary in case the child application
@@ -64,15 +89,15 @@ int exec_command (const char* command, std::ostream& output)
 		DisplayError("DuplicateHandle");
 
 	// Close inheritable copies of the handles you do not want to be
-	// inherited.
+	// inherited. 
 	if (!CloseHandle(hOutputReadTmp)) DisplayError("CloseHandle");
 
-	// Prepare command arg
+	// Prepare command argv
 	std::string cmd("sh.exe -c ");
-	ArgvQuote(command, cmd, TRUE);
+	ArgvQuote(std::string(command), cmd, FALSE);
 
-	// Launch child process with "cmd"
-	LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, cmd);
+	// Launch child process with
+	int status = LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, cmd);
 
 	// Close pipe handles (do not continue to modify the parent).
 	// You need to make sure that no handles to the write end of the
@@ -86,14 +111,21 @@ int exec_command (const char* command, std::ostream& output)
 
 	if (!CloseHandle(hOutputRead)) DisplayError("CloseHandle");
 
-	return 1;
+	return status;
 }
 
-std::string escape_shell_arg(const std::string& str)
+std::string escape_shell_arg (const std::string& str)
 {
-	std::string escape_str;
-	ArgvQuote(str, escape_str, TRUE);
-	return escape_str;
+	std::string new_str;
+	new_str.push_back('"');
+	for (std::string::const_iterator it(str.begin()); it != str.end(); ++it) {
+		if (*it == '"' || *it == '\\' || *it == '$' || *it == '`') {
+			new_str.push_back('\\');
+		}
+		new_str.push_back(*it);
+	}
+	new_str.push_back('"');
+	return new_str;
 }
 
 std::string resolve_path (const char* path)
@@ -130,27 +162,45 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 		unlink(path);
 		std::exit(9);
 	}
-	
-	// On windows we cannot remove open files. Then git-crypt.XXXXXX temporary files will
-	// remain on %TEMP% folder for manually remove. It´s not that bad cause 26 different name 
+
+	//FIXME
+	// On windows we cannot remove open files, git-crypt.XXXXXX temporary files will
+	// remain on %TEMP% folder for manual remove. It´s not that hard cause 26 different name 
 	// limit on windows mkstemp. 
 	// unlink(path);
-	close(fd);
+	// close(fd);
 	delete[] path;
+}
+
+int win32_system(const char* command)
+{
+	std::string cmd("sh.exe -c ");
+	ArgvQuote(std::string(command), cmd, FALSE);	
+	return LaunchChildProcess(NULL ,NULL ,NULL, cmd);
+}
+
+int mkstemp(char * filetemplate)
+{
+	// on windows _mktemp generate only 26 unique filename
+	char *filename = _mktemp(filetemplate);
+	if (filename == NULL) { 
+		return -1;
+	}
+	return open(filename, _O_RDWR |_O_BINARY | O_CREAT);
 }
 
 /*
  * LaunchChildProcess
  * Sets up STARTUPINFO structure, and launches redirected child.
  */
-void LaunchChildProcess(HANDLE hChildStdOut,
+int LaunchChildProcess(HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
 				const std::string command)
 {
 	PROCESS_INFORMATION pi;
 	STARTUPINFO si;
-	BOOL br = FALSE;
+	DWORD exit_code;
 	// Set up the start up info struct.
 	ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
 	ZeroMemory(&si, sizeof(STARTUPINFO));
@@ -161,28 +211,34 @@ void LaunchChildProcess(HANDLE hChildStdOut,
 	si.hStdInput  = hChildStdIn;
 	si.hStdError  = hChildStdErr;
 
-	br = CreateProcess(NULL,  /* module: null means use command line */
+	if ( CreateProcess(NULL,  /* module: null means use command line */
 						(LPSTR)command.c_str(),  /* modified command line */
 						NULL, /* thread handle inheritance */
 						NULL, /* thread handle inheritance */
 						TRUE, /* handles inheritable? */
-						CREATE_UNICODE_ENVIRONMENT,
+						CREATE_NO_WINDOW,
 						NULL, /* environment: use parent */
 						NULL, /* starting directory: use parent */
-						&si,&pi);
+						&si,&pi) )
 
-	if (br) {
+	{
 		WaitForSingleObject(pi.hProcess, INFINITE);
 	}
 	else
 	{
-		DisplayError("Error launching process");
+		char error_msg[] = "Error launching process: ";
+		char buf[_MAX_PATH + sizeof(error_msg)];
+		snprintf(buf, sizeof buf, "%s%s%", error_msg, command.c_str());
+		DisplayError(buf);
 	}
+
+	GetExitCodeProcess(pi.hProcess, &exit_code);
+
 	// Close any unnecessary handles.
 	if (!CloseHandle(pi.hProcess)) DisplayError("CloseHandle");
 	if (!CloseHandle(pi.hThread)) DisplayError("CloseHandle");
+	return exit_code;
 }
-
 
 /*
  * ReadAndHandleOutput
@@ -213,7 +269,7 @@ void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output)
  */
 void ArgvQuote (const std::string& Argument,
 				std::string& CommandLine,
-				bool Force)
+				bool Force )
 /***
  *
  * Routine Description:
@@ -263,7 +319,6 @@ void ArgvQuote (const std::string& Argument,
 				++It;
 				++NumberBackslashes;
 			}
-
 			if (It == Argument.end ()) {
 				//
 				// Escape all backslashes, but let the terminating
@@ -291,16 +346,6 @@ void ArgvQuote (const std::string& Argument,
 		}
 		CommandLine.push_back ('"');
 	}
-}
-
-int mkstemp(char * filetemplate)
-{
-	// on windows _mktemp generate only 26 unique filename
-	char *filename = _mktemp(filetemplate);
-	if (filename == NULL) { 
-		return -1;
-	}
-	return open(filename, _O_RDWR |_O_BINARY | O_CREAT);
 }
 
 /*

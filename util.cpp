@@ -28,7 +28,6 @@
  * as that of the covered work.
  */
 
-#ifndef __WIN32__
 #include "util.hpp"
 #include <string>
 #include <cstring>
@@ -126,5 +125,3 @@ std::string	escape_shell_arg (const std::string& str)
 	new_str.push_back('"');
 	return new_str;
 }
-
-#endif
