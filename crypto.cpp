@@ -55,7 +55,7 @@ void load_keys (const char* filepath, keys_t* keys)
 	file.read(buffer, sizeof(buffer));
 
 	if (file.gcount() != sizeof(buffer)) {
-		std::clog << filepath << ": Prematurrre end of key file\n";
+		std::clog << filepath << ": Premature end of key file\n";
 		std::exit(1);
 	}
 
