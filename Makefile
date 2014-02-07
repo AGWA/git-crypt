@@ -16,12 +16,16 @@ git-crypt: $(OBJFILES)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f *.o git-crypt git-crypt.exe
+	rm -f *.o git-crypt git-crypt.exe \
+	rm -fr test
 
 install:
 	install -m 755 git-crypt $(PREFIX)/bin/
 
+test:
+	./test.sh
+
 strip:
 	strip git-crypt.exe
 
-.PHONY: all clean install strip
+.PHONY: all clean install test strip

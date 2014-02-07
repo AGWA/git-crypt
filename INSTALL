@@ -30,5 +30,3 @@ BUILDING ON WINDOWS
 
 	$ make
 
-Need "msys" enviroment (sh.exe) to run.
-
