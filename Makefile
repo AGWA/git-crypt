@@ -9,6 +9,7 @@ INSTALL = install -m 755 git-crypt $(PREFIX)/bin/
 
 ifeq ($(OS),Windows_NT)
 	LDFLAGS = -llibeay32 -lwsock32
+	CXXFLAGS += -static-libgcc -static-libstdc++
 	OBJFILES = git-crypt.o commands.o crypto.o util_win32.o
 	INSTALL = cp git-crypt.exe $(PREFIX)/bin/
 endif
