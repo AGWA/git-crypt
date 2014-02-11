@@ -3,13 +3,14 @@ use strict;
 use warnings;
 use Cwd;
 use File::Path;
+use File::Copy;
 use Term::ANSIColor;
 use Digest::MD5 qw(md5);
 
 print "\n"."========= GIT-CRYPT TEST ========="."\n";
 
-
-my $dir=Cwd::cwd()."/test";
+my $cdir=Cwd::cwd();
+my $dir=$cdir."/test";
 
 ### Set test folder
 if ( -d $dir ) {
@@ -33,93 +34,99 @@ mkpath($repo) or die "Cannot create '$repo' : $!";
 chdir($repo);
 
 print "\n";
-my $out=`git init`; !($?) or die;
+my $out=`git init `; !($?) or die;
 print $out;
 
 ## put some files
-my $file1="crypto.hpp";
-my $file2="crypto.tgz";
+my @files_hpp=glob "$cdir/*.hpp";
+my @files_cpp=glob "$cdir/*.cpp";
 
-`curl -sS "https://raw.github.com/AGWA/git-crypt/master/crypto.hpp" > $file1`; !($?) or die;
-`tar -zcf $file2 $file1`; !($?) or die;
+foreach my $f (@files_hpp) { copy "$f", "." or die; }
+print "add: *.hpp files"."\n";
+foreach my $f (@files_cpp) { copy "$f", "." or die; } 
+print "add: *.cpp files"."\n"; 
 
-print "add file: ".$file1."\n";
-print "add file: ".$file2."\n";
+my $all_hpp = join ' ', @files_hpp;
+`tar -zcf "hpp.tgz" $all_hpp 2>&1`; !($?) or die;
+print "add: hpp.tgz file"."\n";
+my $all_cpp = join ' ', @files_cpp;
+`tar -zcf "cpp.tgz" $all_cpp 2>&1`; !($?) or die;
+print "add: cpp.tgz file"."\n";
 
 open (FILE, '>>.gitattributes');
 print FILE "*.hpp filter=git-crypt diff=git-crypt"."\n";
+print FILE "*.cpp filter=git-crypt diff=git-crypt"."\n";
 print FILE "*.tgz filter=git-crypt diff=git-crypt"."\n";
 close (FILE);
-print "set .gitattributes filter for: *.hpp *.tgz"."\n";
+print "set .gitattributes filter for: *.hpp *.cpp *.tgz"."\n";
 
-print "Initialized git-crypt repository"."\n";
-`git-crypt init ../$key`; !($?) or die;
+print "Initialized git-crypt repository with key: $dir/$key"."\n";
+`git-crypt init $dir/$key`; !($?) or die;
 
 print "git add & commit files"."\n";
 `git add --all`; !($?) or die;
 `git commit -m "test git-crypt"`; !($?) or die;
 
-
-### Clone git repository
-
 chdir($dir);
+
 
 print "\n"."======= CLONE GIT ENCRYPTED REPO ======="."\n";
 
 my $clonerepo="clonerepo";
 
 `git clone --quiet file://'$dir/$repo' $clonerepo`; !($?) or die;
-print "\n"."Clone Git repository in "."$dir/$clonerepo/"."\n";
+print "\n"."Clone Encrypted Git repository in "."$dir/$clonerepo/"."\n";
+
 
 
 ### TEST
-chdir("$dir/$clonerepo");
 
 ### Test#1
 ## isencrypted clone repo ?
 
+chdir("$dir/$clonerepo");
+
 print "\n"."======= TEST 1: isencrypted clone repo? ======="."\n";
+print "\n";
+
+my @all_files=glob("*.hpp *.cpp *.tgz");
+foreach my $file (@all_files) {
+	print "\"$file\" encrypted?: ";
+	if ( isencrypted($file) ){
+		print colored("OK", "green")."\n";
+	} else{
+		print colored("FAIL", "red")."\n";
+	}	
+}
 
 print "\n";
-if ( isencrypted($file1) ) {
-	print "\"$file1\" encrypted?: ".colored("OK", "green")."\n";
-} else {
-	print "\"$file1\" encrypted?: ".colored("FAIL", "red")."\n";
-}
-
-if ( isencrypted($file2) ) {
-	print "\"$file2\" encrypted?: ".colored("OK", "green")."\n";
-} else {
-	print "\"$file2\" encrypted?: ".colored("FAIL", "red")."\n";
-}
 
 
 ### Test#2
 ## decrypt clone repo
 
 print "\n"."======= TEST 2: decrypt clone repo ======="."\n";
-
-`git-crypt init ../$key`; !($?) or die;
-
-print "\n";
-if ( isdecrypted($file1) ) {
-	print "\"$file1\" decrypted?: ".colored("OK", "green")."\n";
-} else {
-	print "\"$file1\" decrypted?: ".colored("FAIL", "red")."\n";
-}
-
-if ( isdecrypted($file2) ) {
-	print "\"$file2\" decrypted?: ".colored("OK", "green")."\n";
-} else {
-	print "\"$file2\" decrypted?: ".colored("FAIL", "red")."\n";
-}
 print "\n";
 
+print "Initialized git-crypt repository with key: $dir/$key"."\n";
+`git-crypt init $dir/$key`; !($?) or die;
+
+print "\n";
+foreach my $file (@all_files) {
+	print "\"$file\" decrypted?: ";
+	if ( isdecrypted($file) ){
+		print colored("OK", "green")."\n";
+	} else{
+		print colored("FAIL", "red")."\n";
+	}	
+}
+
+print "\n";
 
 
 sub isencrypted {
 	my $crypthead="\x00GITCRYPT\x00";
-	my $file = shift;
+	my $file = "$dir/$clonerepo/".shift;
 	open (FILE, $file) or die "Can't open '$file' : $!";
 	binmode(FILE) or die "Can't binmode '$file' : $!";
 	my $filehead;
@@ -131,6 +138,7 @@ sub isencrypted {
 	}
 	return 0;
 }
+
 
 sub isdecrypted {
 	my $file = shift;
@@ -148,5 +156,63 @@ sub getmd5 {
 	close(FILE);
 	return md5($data);
 }
+
+
+=begin comment
+print "\n";
+if ( isencrypted($file1) ) {
+	print "\"$file1\" encrypted?: ".colored("OK", "green")."\n";
+} else {
+	print "\"$file1\" encrypted?: ".colored("FAIL", "red")."\n";
+}
+
+
+
+
+
+
+
+
+
+
+
+### Clone git repository
+
+chdir($dir);
+
+
+
+
+
+if ( isencrypted($file2) ) {
+	print "\"$file2\" encrypted?: ".colored("OK", "green")."\n";
+} else {
+	print "\"$file2\" encrypted?: ".colored("FAIL", "red")."\n";
+}
+
+
+
+
+print "\n";
+if ( isdecrypted($file1) ) {
+	print "\"$file1\" decrypted?: ".colored("OK", "green")."\n";
+} else {
+	print "\"$file1\" decrypted?: ".colored("FAIL", "red")."\n";
+}
+
+if ( isdecrypted($file2) ) {
+	print "\"$file2\" decrypted?: ".colored("OK", "green")."\n";
+} else {
+	print "\"$file2\" decrypted?: ".colored("FAIL", "red")."\n";
+}
+print "\n";
+
+
+
+
+
+
+=end comment
+=cut
 
 exit 0
