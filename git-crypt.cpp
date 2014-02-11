@@ -34,6 +34,11 @@
 #include <iostream>
 #include <openssl/err.h>
 
+#ifdef __WIN32__
+#include <io.h>
+#include <fcntl.h>
+#endif
+
 static void print_usage (const char* argv0)
 {
 	std::clog << "Usage: " << argv0 << " COMMAND [ARGS ...]\n";
@@ -57,6 +62,19 @@ try {
 
 	std::cin.exceptions(std::ios_base::badbit);
 	std::cout.exceptions(std::ios_base::badbit);
+
+#ifdef __WIN32__
+	int result = _setmode( _fileno(stdin), _O_BINARY );
+	if( result == -1 ) { 
+		std::cerr <<"Cannot set input mode to binary." <<std::endl; 
+		return 1;
+	}
+	result = _setmode( _fileno(stdout), _O_BINARY );
+	if( result == -1 )
+		{ std::cerr <<"Cannot set output mode to binary." <<std::endl; 
+		return 1;
+	}
+#endif
 
 	if (argc < 3) {
 		print_usage(argv[0]);

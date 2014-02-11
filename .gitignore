@@ -2,3 +2,5 @@
 *.exe
 git-crypt
 test/
+doit.sh
+

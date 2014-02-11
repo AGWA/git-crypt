@@ -5,9 +5,12 @@ PREFIX := /usr/local
 
 OBJFILES = git-crypt.o commands.o crypto.o util.o
 
+INSTALL = install -m 755 git-crypt $(PREFIX)/bin/
+
 ifeq ($(OS),Windows_NT)
 	LDFLAGS = -llibeay32 -lwsock32
 	OBJFILES = git-crypt.o commands.o crypto.o util_win32.o
+	INSTALL = cp git-crypt.exe $(PREFIX)/bin/
 endif
 
 all: git-crypt
@@ -20,7 +23,7 @@ clean:
 	rm -fr test
 
 install:
-	install -m 755 git-crypt $(PREFIX)/bin/
+	$(INSTALL)
 
 test:
 	./test.sh

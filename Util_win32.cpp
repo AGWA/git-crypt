@@ -252,7 +252,7 @@ int LaunchChildProcess(HANDLE hChildStdOut,
 	{
 		char error_msg[] = "Error launching process: ";
 		char buf[_MAX_PATH + sizeof(error_msg)];
-		snprintf(buf, sizeof buf, "%s%s%", error_msg, command);
+		snprintf(buf, sizeof buf, "%s%s", error_msg, command);
 		DisplayError(buf);
 	}
 
