@@ -168,6 +168,19 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	delete[] path;
 }
 
+void set_cin_cout_binary_mode()
+{
+	int result = _setmode( _fileno(stdin), _O_BINARY );
+	if( result == -1 ){
+		throw std::ios_base::failure("Cannot set input mode to binary."); 
+	}
+	result = _setmode( _fileno(stdout), _O_BINARY );
+	if( result == -1 ){
+		throw std::ios_base::failure("Cannot set output mode to binary.");
+	}
+}
+
+
 char* str_replace(const char *string, const char *substr, const char *replacement)
 {
 

@@ -170,7 +170,7 @@ void diff (const char* keyfile, const char* filename)
 	load_keys(keyfile, &keys);
 
 	// Open the file
-	std::ifstream	in(filename);
+	std::ifstream	in(filename, std::ios::binary);
 	if (!in) {
 		perror(filename);
 		std::exit(1);
