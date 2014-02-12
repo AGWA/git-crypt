@@ -28,6 +28,7 @@
  * as that of the covered work.
  */
 
+
 #include "commands.hpp"
 #include "crypto.hpp"
 #include "util.hpp"
@@ -45,6 +46,13 @@
 #include <openssl/rand.h>
 #include <openssl/err.h>
 
+#ifdef __WIN32__
+#define system(a) win32_system(a)
+#else
+typedef std::fstream temp_fstream;
+#endif
+
+
 // Encrypt contents of stdin and write to stdout
 void clean (const char* keyfile)
 {
@@ -56,7 +64,7 @@ void clean (const char* keyfile)
 	hmac_sha1_state	hmac(keys.hmac, HMAC_KEY_LEN);	// Calculate the file's SHA1 HMAC as we go
 	uint64_t	file_size = 0;	// Keep track of the length, make sure it doesn't get too big
 	std::string	file_contents;	// First 8MB or so of the file go here
-	std::fstream	temp_file;	// The rest of the file spills into a temporary file on disk
+	temp_fstream	temp_file;	// The rest of the file spills into a temporary file on disk
 	temp_file.exceptions(std::fstream::badbit);
 
 	char		buffer[1024];
@@ -163,7 +171,7 @@ void diff (const char* keyfile, const char* filename)
 	load_keys(keyfile, &keys);
 
 	// Open the file
-	std::ifstream	in(filename);
+	std::ifstream	in(filename, std::ios::binary);
 	if (!in) {
 		perror(filename);
 		std::exit(1);
@@ -234,7 +242,7 @@ void init (const char* argv0, const char* keyfile)
 	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
 	std::string	command("git config filter.git-crypt.smudge ");
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge " + escape_shell_arg(keyfile_path));
-	
+
 	if (system(command.c_str()) != 0) {
 		std::clog << "git config failed\n";
 		std::exit(1);
