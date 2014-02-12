@@ -125,4 +125,3 @@ std::string	escape_shell_arg (const std::string& str)
 	new_str.push_back('"');
 	return new_str;
 }
-
