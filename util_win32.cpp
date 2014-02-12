@@ -34,7 +34,6 @@
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
-
 #include <cstdlib>
 #include <ios>
 #include <iostream>
@@ -42,24 +41,24 @@
 #include <sstream>
 
 
-int LaunchChildProcess(HANDLE hChildStdOut,
+int	LaunchChildProcess (HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
 				const char* command);
-void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output);
-int mkstemp(char *name);
-void DisplayError(LPCSTR wszPrefix);
+void	ReadAndHandleOutput (HANDLE hPipeRead, std::ostream& output);
+int	mkstemp (char *name);
+void	DisplayError (LPCSTR wszPrefix);
 
 
 
-int exec_command (const char* command, std::ostream& output)
+int	exec_command (const char* command, std::ostream& output)
 {
-	HANDLE hOutputReadTmp,hOutputRead,hOutputWrite;
-	HANDLE hErrorWrite;
-	SECURITY_ATTRIBUTES sa;
+	HANDLE	hOutputReadTmp,hOutputRead,hOutputWrite;
+	HANDLE	hErrorWrite;
+	SECURITY_ATTRIBUTES	sa;
 
 	// Set up the security attributes struct.
-	sa.nLength= sizeof(SECURITY_ATTRIBUTES);
+	sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 	sa.lpSecurityDescriptor = NULL;
 	sa.bInheritHandle = TRUE;
 
@@ -91,7 +90,7 @@ int exec_command (const char* command, std::ostream& output)
 	if (!CloseHandle(hOutputReadTmp)) DisplayError("CloseHandle");
 
 	// Launch child process
-	int status = LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, command);
+	int	status = LaunchChildProcess(hOutputWrite ,NULL ,hErrorWrite, command);
 
 	// Close pipe handles (do not continue to modify the parent).
 	// You need to make sure that no handles to the write end of the
@@ -128,9 +127,9 @@ std::string escape_shell_arg (const std::string& str)
 
 std::string resolve_path (const char* path)
 {
-	char retname[_MAX_PATH];
+	char	retname[_MAX_PATH];
 	_fullpath(retname, path, _MAX_PATH);
-	return std::string(retname);;	
+	return std::string(retname);;
 }
 
 void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
@@ -157,13 +156,13 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 		_unlink(path);
 		std::exit(9);
 	}
-	// On windows we cannot remove open files. 
+	// on windows can´t  remove open files.
 	// unlink(path);
 	close(fd);
 	delete[] path;
 }
 
-temp_fstream::temp_fstream(): std::fstream(), fileName(NULL)
+temp_fstream::temp_fstream () : std::fstream(), fileName(NULL)
 {}
 
 void temp_fstream::open (const char *fname, std::ios_base::openmode mode)
@@ -172,42 +171,38 @@ void temp_fstream::open (const char *fname, std::ios_base::openmode mode)
 	std::fstream::open(fname, mode);
 }
 
-temp_fstream::~temp_fstream()
+temp_fstream::~temp_fstream ()
 {
-	if ( this->is_open() ) 
+	if (this->is_open()) 
 		this->close();
-	if ( fileName != NULL )
+	if (fileName != NULL)
 		_unlink(fileName);
 }
 
-void set_cin_cout_binary_mode()
+void set_cin_cout_binary_mode ()
 {
-	int result = _setmode( _fileno(stdin), _O_BINARY );
-	if( result == -1 ){
+	int	result = _setmode(_fileno(stdin), _O_BINARY );
+	if (result == -1)
 		throw std::ios_base::failure("Cannot set input mode to binary."); 
-	}
-	result = _setmode( _fileno(stdout), _O_BINARY );
-	if( result == -1 ){
+	result = _setmode(_fileno(stdout), _O_BINARY );
+	if ( result == -1)
 		throw std::ios_base::failure("Cannot set output mode to binary.");
-	}
 }
 
 
-char* str_replace(const char *string, const char *substr, const char *replacement)
+char* str_replace (const char *string, const char *substr, const char *replacement)
 {
-
 	/* if either substr or replacement is NULL, duplicate string a let caller handle it */
-	if ( substr == NULL || replacement == NULL ) return strdup (string);
-
-	char* newstr = strdup (string);
-	char* head = newstr;
-	char* tok;
+	if (substr == NULL || replacement == NULL) return strdup (string);
+	char*	newstr = strdup (string);
+	char*	head = newstr;
+	char*	tok;
 	while ( (tok = strstr( head, substr )) )
 	{
-		char* oldstr = newstr;
+		char*	oldstr = newstr;
 		newstr = (char *)malloc ( strlen ( oldstr ) - strlen ( substr ) + strlen ( replacement ) + 1 );
 		/*failed to alloc mem, free old string and return NULL */
-		if ( newstr == NULL ){
+		if ( newstr == NULL ) {
 			free (oldstr);
 			return NULL;
 		}
@@ -222,16 +217,16 @@ char* str_replace(const char *string, const char *substr, const char *replacemen
 	return newstr;
 }
 
-int win32_system(const char* command)
+int win32_system (const char* command)
 {
 	// >/dev/null TO >nul
 	return system(str_replace(command, "/dev/null", "nul"));
 }
 
-int mkstemp(char * filetemplate)
+int mkstemp (char * filetemplate)
 {
 	// on windows _mktemp generate only 26 unique filename
-	char *filename = _mktemp(filetemplate);
+	char*	filename = _mktemp(filetemplate);
 	if (filename == NULL) { 
 		return -1;
 	}
@@ -242,14 +237,14 @@ int mkstemp(char * filetemplate)
  * LaunchChildProcess
  * Sets up STARTUPINFO structure, and launches redirected child.
  */
-int LaunchChildProcess(HANDLE hChildStdOut,
+int LaunchChildProcess (HANDLE hChildStdOut,
 				HANDLE hChildStdIn,
 				HANDLE hChildStdErr,
 				const char* command)
 {
-	PROCESS_INFORMATION pi;
-	STARTUPINFO si;
-	DWORD exit_code;
+	PROCESS_INFORMATION	pi;
+	STARTUPINFO	si;
+	DWORD	exit_code;
 	// Set up the start up info struct.
 	ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
 	ZeroMemory(&si, sizeof(STARTUPINFO));
@@ -260,29 +255,27 @@ int LaunchChildProcess(HANDLE hChildStdOut,
 	si.hStdInput  = hChildStdIn;
 	si.hStdError  = hChildStdErr;
 
-	if ( CreateProcess(NULL,  /* module: null means use command line */
-						(LPSTR)command,  /* modified command line */
-						NULL, /* thread handle inheritance */
-						NULL, /* thread handle inheritance */
-						TRUE, /* handles inheritable? */
+	if (CreateProcess(NULL,	/* module: null means use command line */
+						(LPSTR)command,	/* modified command line */
+						NULL,	/* thread handle inheritance */
+						NULL,	/* thread handle inheritance */
+						TRUE,	/* handles inheritable? */
 						CREATE_NO_WINDOW,
-						NULL, /* environment: use parent */
-						NULL, /* starting directory: use parent */
-						&si,&pi) )
+						NULL,	/* environment: use parent */
+						NULL,	/* starting directory: use parent */
+						&si,&pi))
 
 	{
 		WaitForSingleObject(pi.hProcess, INFINITE);
 	}
 	else
 	{
-		char error_msg[] = "Error launching process: ";
-		char buf[_MAX_PATH + sizeof(error_msg)];
+		char	error_msg[] = "Error launching process: ";
+		char	buf[_MAX_PATH + sizeof(error_msg)];
 		snprintf(buf, sizeof buf, "%s%s", error_msg, command);
 		DisplayError(buf);
 	}
-
 	GetExitCodeProcess(pi.hProcess, &exit_code);
-
 	// Close any unnecessary handles.
 	if (!CloseHandle(pi.hProcess)) DisplayError("CloseHandle");
 	if (!CloseHandle(pi.hThread)) DisplayError("CloseHandle");
@@ -293,12 +286,12 @@ int LaunchChildProcess(HANDLE hChildStdOut,
  * ReadAndHandleOutput
  * Monitors handle for input. Exits when child exits or pipe breaks.
  */
-void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output)
+void ReadAndHandleOutput (HANDLE hPipeRead, std::ostream& output)
 {
-	UCHAR lpBuffer[256];
-	DWORD nBytesRead;
+	UCHAR	lpBuffer[256];
+	DWORD	nBytesRead;
 
-	while(TRUE)
+	while (TRUE)
 	{
 		memset(lpBuffer, 0, sizeof(lpBuffer));
 		if (!ReadFile(hPipeRead,lpBuffer,sizeof(lpBuffer),&nBytesRead,NULL) || !nBytesRead)
@@ -308,7 +301,6 @@ void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output)
 			else
 				DisplayError("ReadFile"); // Something bad happened.
 		}
-
 		output.write((const char *)lpBuffer, nBytesRead);	
 	}
 }
@@ -317,11 +309,11 @@ void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output)
  * DisplayError
  * Displays the error number and corresponding message.
  */
-void DisplayError(LPCSTR szPrefix)
+void DisplayError (LPCSTR szPrefix)
 {
-	LPSTR lpsz = NULL;
-	DWORD cch = 0;
-	DWORD dwError = GetLastError();
+	LPSTR	lpsz = NULL;
+	DWORD	cch = 0;
+	DWORD	dwError = GetLastError();
 
 	cch = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER
 					| FORMAT_MESSAGE_FROM_SYSTEM

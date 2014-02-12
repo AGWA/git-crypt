@@ -64,7 +64,7 @@ void clean (const char* keyfile)
 	hmac_sha1_state	hmac(keys.hmac, HMAC_KEY_LEN);	// Calculate the file's SHA1 HMAC as we go
 	uint64_t	file_size = 0;	// Keep track of the length, make sure it doesn't get too big
 	std::string	file_contents;	// First 8MB or so of the file go here
-	temp_fstream temp_file;// The rest of the file spills into a temporary file on disk
+	temp_fstream	temp_file;	// The rest of the file spills into a temporary file on disk
 	temp_file.exceptions(std::fstream::badbit);
 
 	char		buffer[1024];

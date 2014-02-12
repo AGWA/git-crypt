@@ -44,16 +44,16 @@ std::string	escape_shell_arg (const std::string&);
 
 
 #ifdef __WIN32__
-int 		win32_system (const char* command);
-void 		set_cin_cout_binary_mode(void);
+int			win32_system (const char* command);
+void		set_cin_cout_binary_mode (void);
 
-class temp_fstream : public std::fstream {
+class	temp_fstream : public std::fstream {
 public:
 				temp_fstream();
-	void 		open (const char *fname, std::ios_base::openmode mode);
-	virtual 	~temp_fstream();
+	void		open (const char *fname, std::ios_base::openmode mode);
+	virtual		~temp_fstream();
 private:
-	char *fileName;
+	char	*fileName;
 };
 #endif
 
