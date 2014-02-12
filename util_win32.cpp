@@ -163,6 +163,9 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	delete[] path;
 }
 
+temp_fstream::temp_fstream(): std::fstream(), fileName(NULL)
+{}
+
 void temp_fstream::open (const char *fname, std::ios_base::openmode mode)
 {
 	fileName = strdup(fname);
@@ -171,8 +174,10 @@ void temp_fstream::open (const char *fname, std::ios_base::openmode mode)
 
 temp_fstream::~temp_fstream()
 {
-	if (this->is_open()) this->close();
-	_unlink(fileName);
+	if ( this->is_open() ) 
+		this->close();
+	if ( fileName != NULL )
+		_unlink(fileName);
 }
 
 void set_cin_cout_binary_mode()

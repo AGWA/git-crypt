@@ -49,10 +49,11 @@ void 		set_cin_cout_binary_mode(void);
 
 class temp_fstream : public std::fstream {
 public:
+				temp_fstream();
 	void 		open (const char *fname, std::ios_base::openmode mode);
 	virtual 	~temp_fstream();
 private:
-	const char *fileName;
+	char *fileName;
 };
 #endif
 
