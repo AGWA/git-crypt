@@ -58,6 +58,10 @@ try {
 	std::cin.exceptions(std::ios_base::badbit);
 	std::cout.exceptions(std::ios_base::badbit);
 
+#ifdef __WIN32__
+	set_cin_cout_binary_mode();
+#endif
+
 	if (argc < 3) {
 		print_usage(argv[0]);
 		return 2;
