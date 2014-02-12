@@ -1,4 +1,4 @@
 *.o
-*.exe
 git-crypt
+git-crypt.exe
 test/

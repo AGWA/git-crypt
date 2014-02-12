@@ -34,17 +34,28 @@
 #include <string>
 #include <ios>
 #include <iosfwd>
+#include <fstream>
 
-int		exec_command (const char* command, std::ostream& output);
+
+int			exec_command (const char* command, std::ostream& output);
 std::string	resolve_path (const char* path);
 void		open_tempfile (std::fstream&, std::ios_base::openmode);
 std::string	escape_shell_arg (const std::string&);
 
 
 #ifdef __WIN32__
-int win32_system (const char* command);
-void set_cin_cout_binary_mode(void);
+int 		win32_system (const char* command);
+void 		set_cin_cout_binary_mode(void);
+
+class temp_fstream : public std::fstream {
+public:
+	void 		open (const char *fname, std::ios_base::openmode mode);
+	virtual 	~temp_fstream();
+private:
+	const char *fileName;
+};
 #endif
+
 
 #endif
 

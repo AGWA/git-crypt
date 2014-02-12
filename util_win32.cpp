@@ -36,6 +36,7 @@
 #include <io.h>
 
 #include <cstdlib>
+#include <ios>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -48,6 +49,7 @@ int LaunchChildProcess(HANDLE hChildStdOut,
 void ReadAndHandleOutput(HANDLE hPipeRead, std::ostream& output);
 int mkstemp(char *name);
 void DisplayError(LPCSTR wszPrefix);
+
 
 
 int exec_command (const char* command, std::ostream& output)
@@ -144,28 +146,33 @@ void open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 	char*		path = new char[tmpdir_len + 18];
 	strcpy(path, tmpdir);
 	strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
-
 	int		fd = mkstemp(path);
-
 	if (fd == -1) {
 		perror("mkstemp");
 		std::exit(9);
 	}
-
-	file.open(path, mode);
+	static_cast<temp_fstream&>(file).open(path, mode);
 	if (!file.is_open()) {
 		perror("open");
-		unlink(path);
+		_unlink(path);
 		std::exit(9);
 	}
-
-	//FIXME
-	// On windows we cannot remove open files, git-crypt.XXXXXX temporary files will
-	// remain on %TEMP% folder for manual remove. It´s not that hard cause 26 different name 
-	// limit on windows mkstemp. 
+	// On windows we cannot remove open files. 
 	// unlink(path);
-	// close(fd);
+	close(fd);
 	delete[] path;
+}
+
+void temp_fstream::open (const char *fname, std::ios_base::openmode mode)
+{
+	fileName = strdup(fname);
+	std::fstream::open(fname, mode);
+}
+
+temp_fstream::~temp_fstream()
+{
+	if (this->is_open()) this->close();
+	_unlink(fileName);
 }
 
 void set_cin_cout_binary_mode()
