@@ -1,0 +1,4 @@
+*.o
+git-crypt
+git-crypt.exe
+test/
