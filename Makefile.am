@@ -43,7 +43,7 @@ pkg-debian: dist-gzip
 	sed -i 's/Maintainer:.*/Maintainer: $(git_user) <$(git_email)>/g' debian/control && \
 	echo -e '\noverride_dh_auto_configure:\n\t./configure $(cfg_line)' >> debian/rules && \
 	echo -e '\noverride_dh_usrlocal:' >> debian/rules && \
-	dpkg-buildpackage -rfakeroot
+	dpkg-buildpackage -rfakeroot -us -uc
 
 ##
 ## Clean
