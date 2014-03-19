@@ -39,8 +39,8 @@ static void print_usage (const char* argv0)
 	std::clog << "Usage: " << argv0 << " COMMAND [ARGS ...]\n";
 	std::clog << "\n";
 	std::clog << "Valid commands:\n";
-	std::clog << " init KEYFILE   - prepare the current git repo to use git-crypt with this key\n";
-	std::clog << " keygen KEYFILE - generate a git-crypt key in the given file\n";
+	std::clog << " init [--name=<key-name>] KEYFILE - prepare the current git repo to use git-crypt with this key\n";
+	std::clog << " keygen KEYFILE  - generate a git-crypt key in the given file\n";
 	std::clog << "\n";
 	std::clog << "Plumbing commands (not to be used directly):\n";
 	std::clog << " clean KEYFILE\n";
@@ -66,7 +66,9 @@ try {
 	ERR_load_crypto_strings();
 
 	if (strcmp(argv[1], "init") == 0 && argc == 3) {
-		init(argv[0], argv[2]);
+		init(argv[0], argv[2], "git-crypt");
+	} else if (strcmp(argv[1], "init") == 0 && argc == 4 && strncmp(argv[2], "--name=", 7) == 0) {
+		init(argv[0], argv[3], argv[2] + 7);
 	} else if (strcmp(argv[1], "keygen") == 0 && argc == 3) {
 		keygen(argv[2]);
 	} else if (strcmp(argv[1], "clean") == 0 && argc == 3) {
