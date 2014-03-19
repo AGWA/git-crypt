@@ -59,8 +59,8 @@ Generate a secret key files:
 Configure a repository to use encryption:
 
         $ cd repo
-        $ git-crypt init --filter=keyname-1 /path/to/keyfile-1
-        $ git-crypt init --filter=keyname-2 /path/to/keyfile-2
+        $ git-crypt init --name=keyname-1 /path/to/keyfile-1
+        $ git-crypt init --name=keyname-2 /path/to/keyfile-2
 
 Specify files to encrypt by creating a .gitattributes file:
 
@@ -76,8 +76,8 @@ Cloning a repository with encrypted files:
 
         $ git clone /path/to/repo
         $ cd repo
-        $ git-crypt init --filter=keyname-1 /path/to/keyfile-1
-        $ git-crypt init --filter=keyname-2 /path/to/keyfile-2
+        $ git-crypt init --name=keyname-1 /path/to/keyfile-1
+        $ git-crypt init --name=keyname-2 /path/to/keyfile-2
 
 That's all you need to do - after running git-crypt init, you can use
 git normally - encryption and decryption happen transparently.
