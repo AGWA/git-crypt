@@ -34,11 +34,16 @@
 #include <string>
 #include <ios>
 #include <iosfwd>
+#include <stdint.h>
 
 int		exec_command (const char* command, std::ostream& output);
 std::string	resolve_path (const char* path);
 void		open_tempfile (std::fstream&, std::ios_base::openmode);
 std::string	escape_shell_arg (const std::string&);
+uint32_t	load_be32 (const unsigned char*);
+void		store_be32 (unsigned char*, uint32_t);
+bool		read_be32 (std::istream& in, uint32_t&);
+void		write_be32 (std::ostream& out, uint32_t);
 
 #endif
 

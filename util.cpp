@@ -126,3 +126,37 @@ std::string	escape_shell_arg (const std::string& str)
 	return new_str;
 }
 
+uint32_t	load_be32 (const unsigned char* p)
+{
+	return (static_cast<uint32_t>(p[3]) << 0) |
+	       (static_cast<uint32_t>(p[2]) << 8) |
+	       (static_cast<uint32_t>(p[1]) << 16) |
+	       (static_cast<uint32_t>(p[0]) << 24);
+}
+
+void		store_be32 (unsigned char* p, uint32_t i)
+{
+	p[3] = i; i >>= 8;
+	p[2] = i; i >>= 8;
+	p[1] = i; i >>= 8;
+	p[0] = i;
+}
+
+bool		read_be32 (std::istream& in, uint32_t& i)
+{
+	unsigned char buffer[4];
+	in.read(reinterpret_cast<char*>(buffer), 4);
+	if (in.gcount() != 4) {
+		return false;
+	}
+	i = load_be32(buffer);
+	return true;
+}
+
+void		write_be32 (std::ostream& out, uint32_t i)
+{
+	unsigned char buffer[4];
+	store_be32(buffer, i);
+	out.write(reinterpret_cast<const char*>(buffer), 4);
+}
+

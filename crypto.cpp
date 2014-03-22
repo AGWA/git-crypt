@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#define _BSD_SOURCE
 #include "crypto.hpp"
+#include "util.hpp"
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
@@ -38,7 +38,6 @@
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
-#include <arpa/inet.h>
 
 void load_keys (const char* filepath, keys_t* keys)
 {
@@ -82,9 +81,9 @@ void aes_ctr_state::process (const AES_KEY* key, const uint8_t* in, uint8_t* out
 			//  first 12 bytes - nonce
 			//  last   4 bytes - block number (sequentially increasing with each block)
 			uint8_t		ctr[16];
-			uint32_t	blockno = htonl(byte_counter / 16);
+			uint32_t	blockno = byte_counter / 16;
 			memcpy(ctr, nonce, 12);
-			memcpy(ctr + 12, &blockno, 4);
+			store_be32(ctr + 12, blockno);
 			AES_encrypt(ctr, otp, key);
 		}
 
