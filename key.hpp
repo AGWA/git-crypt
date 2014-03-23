@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, 2014 Andrew Ayer
+ * Copyright 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,33 +28,57 @@
  * as that of the covered work.
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef _KEY_H
+#define _KEY_H
 
-#include <string>
-#include <ios>
-#include <iosfwd>
+#include <map>
+#include <functional>
 #include <stdint.h>
+#include <iosfwd>
 
-struct System_error {
-	std::string	action;
-	std::string	target;
-	int		error;
-
-	System_error (const std::string& a, const std::string& t, int e) : action(a), target(t), error(e) { }
+enum {
+	HMAC_KEY_LEN = 64,
+	AES_KEY_LEN = 32
 };
 
-void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
-std::string	readlink (const char* pathname);
-std::string	our_exe_path ();
-int		exec_command (const char* command, std::ostream& output);
-bool		successful_exit (int status);
-void		open_tempfile (std::fstream&, std::ios_base::openmode);
-std::string	escape_shell_arg (const std::string&);
-uint32_t	load_be32 (const unsigned char*);
-void		store_be32 (unsigned char*, uint32_t);
-bool		read_be32 (std::istream& in, uint32_t&);
-void		write_be32 (std::ostream& out, uint32_t);
+struct Key_file {
+public:
+	struct Entry {
+		unsigned char		aes_key[AES_KEY_LEN];
+		unsigned char		hmac_key[HMAC_KEY_LEN];
+
+		void			load (std::istream&);
+		void			store (std::ostream&) const;
+		void			generate ();
+	};
+
+	struct Malformed { }; // exception class
+	struct Incompatible { }; // exception class
+
+	const Entry*			get_latest () const;
+
+	const Entry*			get (uint32_t version) const;
+	void				add (uint32_t version, const Entry&);
+
+	void				load_legacy (std::istream&);
+	void				load (std::istream&);
+	void				store (std::ostream&) const;
+
+	bool				load (const char* filename);
+	bool				store (const char* filename) const;
+
+	void				generate ();
+
+	bool				is_empty () const { return entries.empty(); }
+	bool				is_filled () const { return !is_empty(); }
+
+	uint32_t			latest () const;
+
+private:
+	typedef std::map<uint32_t, Entry, std::greater<uint32_t> > Map;
+	enum { FORMAT_VERSION = 1 };
+
+	Map				entries;
+};
 
 #endif
-

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -31,12 +31,28 @@
 #ifndef _COMMANDS_H
 #define _COMMANDS_H
 
+#include <string>
 
-void clean (const char* keyfile);
-void smudge (const char* keyfile);
-void diff (const char* keyfile, const char* filename);
-void init (const char* argv0, const char* keyfile);
-void keygen (const char* keyfile);
+struct Error {
+	std::string	message;
+
+	explicit Error (std::string m) : message(m) { }
+};
+
+// Plumbing commands:
+int clean (int argc, char** argv);
+int smudge (int argc, char** argv);
+int diff (int argc, char** argv);
+// Public commands:
+int init (int argc, char** argv);
+int unlock (int argc, char** argv);
+int add_collab (int argc, char** argv);
+int rm_collab (int argc, char** argv);
+int ls_collabs (int argc, char** argv);
+int export_key (int argc, char** argv);
+int keygen (int argc, char** argv);
+int migrate_key (int argc, char** argv);
+int refresh (int argc, char** argv);
 
 #endif
 

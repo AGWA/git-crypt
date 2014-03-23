@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -34,80 +34,64 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
-#include <fstream>
-#include <iostream>
+#include <openssl/rand.h>
+#include <openssl/err.h>
+#include <sstream>
 #include <cstring>
 #include <cstdlib>
 
-void load_keys (const char* filepath, keys_t* keys)
+Aes_ctr_encryptor::Aes_ctr_encryptor (const unsigned char* raw_key, const unsigned char* arg_nonce)
 {
-	std::ifstream	file(filepath);
-	if (!file) {
-		perror(filepath);
-		std::exit(1);
-	}
-	char	buffer[AES_KEY_BITS/8 + HMAC_KEY_LEN];
-	file.read(buffer, sizeof(buffer));
-	if (file.gcount() != sizeof(buffer)) {
-		std::clog << filepath << ": Premature end of key file\n";
-		std::exit(1);
+	if (AES_set_encrypt_key(raw_key, KEY_LEN * 8, &key) != 0) {
+		throw Crypto_error("Aes_ctr_encryptor::Aes_ctr_encryptor", "AES_set_encrypt_key failed");
 	}
 
-	// First comes the AES encryption key
-	if (AES_set_encrypt_key(reinterpret_cast<uint8_t*>(buffer), AES_KEY_BITS, &keys->enc) != 0) {
-		std::clog << filepath << ": Failed to initialize AES encryption key\n";
-		std::exit(1);
-	}
-
-	// Then it's the HMAC key
-	memcpy(keys->hmac, buffer + AES_KEY_BITS/8, HMAC_KEY_LEN);
-}
-
-
-aes_ctr_state::aes_ctr_state (const uint8_t* arg_nonce, size_t arg_nonce_len)
-{
-	memset(nonce, '\0', sizeof(nonce));
-	memcpy(nonce, arg_nonce, std::min(arg_nonce_len, sizeof(nonce)));
+	std::memcpy(nonce, arg_nonce, NONCE_LEN);
 	byte_counter = 0;
-	memset(otp, '\0', sizeof(otp));
+	std::memset(otp, '\0', sizeof(otp));
 }
 
-void aes_ctr_state::process (const AES_KEY* key, const uint8_t* in, uint8_t* out, size_t len)
+void Aes_ctr_encryptor::process (const unsigned char* in, unsigned char* out, size_t len)
 {
 	for (size_t i = 0; i < len; ++i) {
-		if (byte_counter % 16 == 0) {
+		if (byte_counter % BLOCK_LEN == 0) {
+			unsigned char	ctr[BLOCK_LEN];
+
+			// First 12 bytes of CTR: nonce
+			std::memcpy(ctr, nonce, NONCE_LEN);
+
+			// Last 4 bytes of CTR: block number (sequentially increasing with each block) (big endian)
+			store_be32(ctr + NONCE_LEN, byte_counter / BLOCK_LEN);
+
 			// Generate a new OTP
-			// CTR value:
-			//  first 12 bytes - nonce
-			//  last   4 bytes - block number (sequentially increasing with each block)
-			uint8_t		ctr[16];
-			uint32_t	blockno = byte_counter / 16;
-			memcpy(ctr, nonce, 12);
-			store_be32(ctr + 12, blockno);
-			AES_encrypt(ctr, otp, key);
+			AES_encrypt(ctr, otp, &key);
 		}
 
 		// encrypt one byte
-		out[i] = in[i] ^ otp[byte_counter++ % 16];
+		out[i] = in[i] ^ otp[byte_counter++ % BLOCK_LEN];
+
+		if (byte_counter == 0) {
+			throw Crypto_error("Aes_ctr_encryptor::process", "Too much data to encrypt securely");
+		}
 	}
 }
 
-hmac_sha1_state::hmac_sha1_state (const uint8_t* key, size_t key_len)
+Hmac_sha1_state::Hmac_sha1_state (const unsigned char* key, size_t key_len)
 {
 	HMAC_Init(&ctx, key, key_len, EVP_sha1());
 }
 
-hmac_sha1_state::~hmac_sha1_state ()
+Hmac_sha1_state::~Hmac_sha1_state ()
 {
 	HMAC_cleanup(&ctx);
 }
 
-void hmac_sha1_state::add (const uint8_t* buffer, size_t buffer_len)
+void Hmac_sha1_state::add (const unsigned char* buffer, size_t buffer_len)
 {
 	HMAC_Update(&ctx, buffer, buffer_len);
 }
 
-void hmac_sha1_state::get (uint8_t* digest)
+void Hmac_sha1_state::get (unsigned char* digest)
 {
 	unsigned int len;
 	HMAC_Final(&ctx, digest, &len);
@@ -115,14 +99,28 @@ void hmac_sha1_state::get (uint8_t* digest)
 
 
 // Encrypt/decrypt an entire input stream, writing to the given output stream
-void process_stream (std::istream& in, std::ostream& out, const AES_KEY* enc_key, const uint8_t* nonce)
+void Aes_ctr_encryptor::process_stream (std::istream& in, std::ostream& out, const unsigned char* key, const unsigned char* nonce)
 {
-	aes_ctr_state	state(nonce, 12);
+	Aes_ctr_encryptor	aes(key, nonce);
 
-	uint8_t		buffer[1024];
+	unsigned char		buffer[1024];
 	while (in) {
 		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
-		state.process(enc_key, buffer, buffer, in.gcount());
+		aes.process(buffer, buffer, in.gcount());
 		out.write(reinterpret_cast<char*>(buffer), in.gcount());
 	}
 }
+
+void random_bytes (unsigned char* buffer, size_t len)
+{
+	if (RAND_bytes(buffer, len) != 1) {
+		std::ostringstream	message;
+		while (unsigned long code = ERR_get_error()) {
+			char		error_string[120];
+			ERR_error_string_n(code, error_string, sizeof(error_string));
+			message << "OpenSSL Error: " << error_string << "; ";
+		}
+		throw Crypto_error("random_bytes", message.str());
+	}
+}
+

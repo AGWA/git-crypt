@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,8 +28,10 @@
  * as that of the covered work.
  */
 
+#include "git-crypt.hpp"
 #include "util.hpp"
 #include <string>
+#include <vector>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -40,17 +42,77 @@
 #include <errno.h>
 #include <fstream>
 
+void	mkdir_parent (const std::string& path)
+{
+	std::string::size_type		slash(path.find('/', 1));
+	while (slash != std::string::npos) {
+		std::string		prefix(path.substr(0, slash));
+		struct stat		status;
+		if (stat(prefix.c_str(), &status) == 0) {
+			// already exists - make sure it's a directory
+			if (!S_ISDIR(status.st_mode)) {
+				throw System_error("mkdir_parent", prefix, ENOTDIR);
+			}
+		} else {
+			if (errno != ENOENT) {
+				throw System_error("mkdir_parent", prefix, errno);
+			}
+			// doesn't exist - mkdir it
+			if (mkdir(prefix.c_str(), 0777) == -1) {
+				throw System_error("mkdir", prefix, errno);
+			}
+		}
+
+		slash = path.find('/', slash + 1);
+	}
+}
+
+std::string readlink (const char* pathname)
+{
+	std::vector<char>	buffer(64);
+	ssize_t			len;
+
+	while ((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size())) {
+		// buffer may have been truncated - grow and try again
+		buffer.resize(buffer.size() * 2);
+	}
+	if (len == -1) {
+		throw System_error("readlink", pathname, errno);
+	}
+
+	return std::string(buffer.begin(), buffer.begin() + len);
+}
+
+std::string our_exe_path ()
+{
+	try {
+		return readlink("/proc/self/exe");
+	} catch (const System_error&) {
+		if (argv0[0] == '/') {
+			// argv[0] starts with / => it's an absolute path
+			return argv0;
+		} else if (std::strchr(argv0, '/')) {
+			// argv[0] contains / => it a relative path that should be resolved
+			char*		resolved_path_p = realpath(argv0, NULL);
+			std::string	resolved_path(resolved_path_p);
+			free(resolved_path_p);
+			return resolved_path;
+		} else {
+			// argv[0] is just a bare filename => not much we can do
+			return argv0;
+		}
+	}
+}
+
 int exec_command (const char* command, std::ostream& output)
 {
 	int		pipefd[2];
 	if (pipe(pipefd) == -1) {
-		perror("pipe");
-		std::exit(9);
+		throw System_error("pipe", "", errno);
 	}
 	pid_t		child = fork();
 	if (child == -1) {
-		perror("fork");
-		std::exit(9);
+		throw System_error("fork", "", errno);
 	}
 	if (child == 0) {
 		close(pipefd[0]);
@@ -59,7 +121,8 @@ int exec_command (const char* command, std::ostream& output)
 			close(pipefd[1]);
 		}
 		execl("/bin/sh", "sh", "-c", command, NULL);
-		exit(-1);
+		perror("/bin/sh");
+		_exit(-1);
 	}
 	close(pipefd[1]);
 	char		buffer[1024];
@@ -67,49 +130,53 @@ int exec_command (const char* command, std::ostream& output)
 	while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
 		output.write(buffer, bytes_read);
 	}
+	if (bytes_read == -1) {
+		int	read_errno = errno;
+		close(pipefd[0]);
+		throw System_error("read", "", read_errno);
+	}
 	close(pipefd[0]);
 	int		status = 0;
-	waitpid(child, &status, 0);
+	if (waitpid(child, &status, 0) == -1) {
+		throw System_error("waitpid", "", errno);
+	}
 	return status;
 }
 
-std::string resolve_path (const char* path)
+bool successful_exit (int status)
 {
-	char*		resolved_path_p = realpath(path, NULL);
-	std::string	resolved_path(resolved_path_p);
-	free(resolved_path_p);
-	return resolved_path;
+	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
 {
-	const char*	tmpdir = getenv("TMPDIR");
-	size_t		tmpdir_len;
-	if (tmpdir) {
-		tmpdir_len = strlen(tmpdir);
-	} else {
+	const char*		tmpdir = getenv("TMPDIR");
+	size_t			tmpdir_len = tmpdir ? std::strlen(tmpdir) : 0;
+	if (tmpdir_len == 0 || tmpdir_len > 4096) {
+		// no $TMPDIR or it's excessively long => fall back to /tmp
 		tmpdir = "/tmp";
 		tmpdir_len = 4;
 	}
-	char*		path = new char[tmpdir_len + 18];
-	strcpy(path, tmpdir);
-	strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
-	mode_t		old_umask = umask(0077);
-	int		fd = mkstemp(path);
+	std::vector<char>	path_buffer(tmpdir_len + 18);
+	char*			path = &path_buffer[0];
+	std::strcpy(path, tmpdir);
+	std::strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
+	mode_t			old_umask = umask(0077);
+	int			fd = mkstemp(path);
 	if (fd == -1) {
-		perror("mkstemp");
-		std::exit(9);
+		int		mkstemp_errno = errno;
+		umask(old_umask);
+		throw System_error("mkstemp", "", mkstemp_errno);
 	}
 	umask(old_umask);
 	file.open(path, mode);
 	if (!file.is_open()) {
-		perror("open");
 		unlink(path);
-		std::exit(9);
+		close(fd);
+		throw System_error("std::fstream::open", path, 0);
 	}
 	unlink(path);
 	close(fd);
-	delete[] path;
 }
 
 std::string	escape_shell_arg (const std::string& str)

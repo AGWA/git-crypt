@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, 2014 Andrew Ayer
+ * Copyright 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,33 +28,9 @@
  * as that of the covered work.
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef _GIT_CRYPT_H
+#define _GIT_CRYPT_H
 
-#include <string>
-#include <ios>
-#include <iosfwd>
-#include <stdint.h>
-
-struct System_error {
-	std::string	action;
-	std::string	target;
-	int		error;
-
-	System_error (const std::string& a, const std::string& t, int e) : action(a), target(t), error(e) { }
-};
-
-void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
-std::string	readlink (const char* pathname);
-std::string	our_exe_path ();
-int		exec_command (const char* command, std::ostream& output);
-bool		successful_exit (int status);
-void		open_tempfile (std::fstream&, std::ios_base::openmode);
-std::string	escape_shell_arg (const std::string&);
-uint32_t	load_be32 (const unsigned char*);
-void		store_be32 (unsigned char*, uint32_t);
-bool		read_be32 (std::istream& in, uint32_t&);
-void		write_be32 (std::ostream& out, uint32_t);
+extern const char*	argv0;	// initialized in main() to argv[0]
 
 #endif
-
