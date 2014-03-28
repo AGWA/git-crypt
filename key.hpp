@@ -64,8 +64,8 @@ public:
 	void				load (std::istream&);
 	void				store (std::ostream&) const;
 
-	bool				load (const char* filename);
-	bool				store (const char* filename) const;
+	bool				load_from_file (const char* filename);
+	bool				store_to_file (const char* filename) const;
 
 	void				generate ();
 

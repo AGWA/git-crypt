@@ -332,7 +332,7 @@ int init (int argc, char** argv)
 	key_file.generate();
 
 	mkdir_parent(internal_key_path);
-	if (!key_file.store(internal_key_path.c_str())) {
+	if (!key_file.store_to_file(internal_key_path.c_str())) {
 		std::clog << "Error: " << internal_key_path << ": unable to write key file" << std::endl;
 		return 1;
 	}
@@ -393,7 +393,7 @@ int unlock (int argc, char** argv)
 			if (std::strcmp(symmetric_key_file, "-") == 0) {
 				key_file.load(std::cin);
 			} else {
-				if (!key_file.load(symmetric_key_file)) {
+				if (!key_file.load_from_file(symmetric_key_file)) {
 					std::clog << "Error: " << symmetric_key_file << ": unable to read key file" << std::endl;
 					return 1;
 				}
@@ -416,7 +416,7 @@ int unlock (int argc, char** argv)
 	std::string		internal_key_path(get_internal_key_path());
 	// TODO: croak if internal_key_path already exists???
 	mkdir_parent(internal_key_path);
-	if (!key_file.store(internal_key_path.c_str())) {
+	if (!key_file.store_to_file(internal_key_path.c_str())) {
 		std::clog << "Error: " << internal_key_path << ": unable to write key file" << std::endl;
 		return 1;
 	}
@@ -505,7 +505,7 @@ int export_key (int argc, char** argv)
 	if (std::strcmp(out_file_name, "-") == 0) {
 		key_file.store(std::cout);
 	} else {
-		if (!key_file.store(out_file_name)) {
+		if (!key_file.store_to_file(out_file_name)) {
 			std::clog << "Error: " << out_file_name << ": unable to write key file" << std::endl;
 			return 1;
 		}
@@ -535,7 +535,7 @@ int keygen (int argc, char** argv)
 	if (std::strcmp(key_file_name, "-") == 0) {
 		key_file.store(std::cout);
 	} else {
-		if (!key_file.store(key_file_name)) {
+		if (!key_file.store_to_file(key_file_name)) {
 			std::clog << "Error: " << key_file_name << ": unable to write key file" << std::endl;
 			return 1;
 		}
@@ -574,7 +574,7 @@ int migrate_key (int argc, char** argv)
 				return 1;
 			}
 
-			if (!key_file.store(new_key_file_name.c_str())) {
+			if (!key_file.store_to_file(new_key_file_name.c_str())) {
 				std::clog << "Error: " << new_key_file_name << ": unable to write key file" << std::endl;
 				return 1;
 			}

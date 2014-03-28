@@ -120,7 +120,7 @@ void		Key_file::store (std::ostream& out) const
 	}
 }
 
-bool		Key_file::load (const char* key_file_name)
+bool		Key_file::load_from_file (const char* key_file_name)
 {
 	std::ifstream	key_file_in(key_file_name, std::fstream::binary);
 	if (!key_file_in) {
@@ -130,7 +130,7 @@ bool		Key_file::load (const char* key_file_name)
 	return true;
 }
 
-bool		Key_file::store (const char* key_file_name) const
+bool		Key_file::store_to_file (const char* key_file_name) const
 {
 	mode_t		old_umask = umask(0077); // make sure key file is protected
 	std::ofstream	key_file_out(key_file_name, std::fstream::binary);
