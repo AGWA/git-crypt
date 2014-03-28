@@ -33,6 +33,7 @@
 #include "util.hpp"
 #include "crypto.hpp"
 #include "key.hpp"
+#include "gpg.hpp"
 #include <cstring>
 #include <unistd.h>
 #include <iostream>
@@ -180,6 +181,9 @@ try {
 
 } catch (const Error& e) {
 	std::cerr << "git-crypt: Error: " << e.message << std::endl;
+	return 1;
+} catch (const Gpg_error& e) {
+	std::cerr << "git-crypt: GPG error: " << e.message << std::endl;
 	return 1;
 } catch (const System_error& e) {
 	std::cerr << "git-crypt: " << e.action << ": ";

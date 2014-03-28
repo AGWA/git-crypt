@@ -32,6 +32,7 @@
 #include "crypto.hpp"
 #include "util.hpp"
 #include "key.hpp"
+#include "gpg.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -46,6 +47,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <vector>
 
 static void configure_git_filters ()
 {
@@ -90,6 +92,26 @@ static std::string get_internal_key_path ()
 	return path;
 }
 
+static std::string get_repo_keys_path ()
+{
+	std::stringstream	output;
+
+	if (!successful_exit(exec_command("git rev-parse --show-toplevel", output))) {
+		throw Error("'git rev-parse --show-toplevel' failed - is this a Git repository?");
+	}
+
+	std::string		path;
+	std::getline(output, path);
+
+	if (path.empty()) {
+		// could happen for a bare repo
+		throw Error("Could not determine Git working tree - is this a non-bare repo?");
+	}
+
+	path += "/.git-crypt/keys";
+	return path;
+}
+
 static void load_key (Key_file& key_file, const char* legacy_path =0)
 {
 	if (legacy_path) {
@@ -106,6 +128,53 @@ static void load_key (Key_file& key_file, const char* legacy_path =0)
 		key_file.load(key_file_in);
 	}
 }
+
+static bool decrypt_repo_key (Key_file& key_file, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
+{
+	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
+		std::ostringstream		path_builder;
+		path_builder << keys_path << '/' << key_version << '/' << *seckey;
+		std::string			path(path_builder.str());
+		if (access(path.c_str(), F_OK) == 0) {
+			std::stringstream	decrypted_contents;
+			gpg_decrypt_from_file(path, decrypted_contents);
+			Key_file		this_version_key_file;
+			this_version_key_file.load(decrypted_contents);
+			const Key_file::Entry*	this_version_entry = this_version_key_file.get(key_version);
+			if (!this_version_entry) {
+				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key version");
+			}
+			key_file.add(key_version, *this_version_entry);
+			return true;
+		}
+	}
+	return false;
+}
+
+static void encrypt_repo_key (uint32_t key_version, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
+{
+	std::string	key_file_data;
+	{
+		Key_file this_version_key_file;
+		this_version_key_file.add(key_version, key);
+		key_file_data = this_version_key_file.store_to_string();
+	}
+
+	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+		std::ostringstream	path_builder;
+		path_builder << keys_path << '/' << key_version << '/' << *collab;
+		std::string		path(path_builder.str());
+
+		if (access(path.c_str(), F_OK) == 0) {
+			continue;
+		}
+
+		mkdir_parent(path);
+		gpg_encrypt_to_file(path, *collab, key_file_data.data(), key_file_data.size());
+		new_files->push_back(path);
+	}
+}
+
 
 
 // Encrypt contents of stdin and write to stdout
@@ -409,9 +478,17 @@ int unlock (int argc, char** argv)
 			return 1;
 		}
 	} else {
-		// Decrypt GPG key from root of repo (TODO NOW)
-		std::clog << "Error: GPG support is not yet implemented" << std::endl;
-		return 1;
+		// Decrypt GPG key from root of repo
+		std::string			repo_keys_path(get_repo_keys_path());
+		std::vector<std::string>	gpg_secret_keys(gpg_list_secret_keys());
+		// TODO: command-line option to specify the precise secret key to use
+		// TODO: don't hard code key version 0 here - instead, determine the most recent version and try to decrypt that, or decrypt all versions if command-line option specified
+		if (!decrypt_repo_key(key_file, 0, gpg_secret_keys, repo_keys_path)) {
+			std::clog << "Error: no GPG secret key available to unlock this repository." << std::endl;
+			std::clog << "To unlock with a shared symmetric key instead, specify the path to the symmetric key as an argument to 'git-crypt unlock'." << std::endl;
+			std::clog << "To see a list of GPG keys authorized to unlock this repository, run 'git-crypt ls-collabs'." << std::endl;
+			return 1;
+		}
 	}
 	std::string		internal_key_path(get_internal_key_path());
 	// TODO: croak if internal_key_path already exists???
@@ -449,17 +526,78 @@ int unlock (int argc, char** argv)
 	return 0;
 }
 
-int add_collab (int argc, char** argv) // TODO NOW
+int add_collab (int argc, char** argv)
 {
-	// Sketch:
-	// 1. Resolve the key ID to a long hex ID
-	// 2. Create the in-repo key directory if it doesn't exist yet.
-	// 3. For most recent key version KEY_VERSION (or for each key version KEY_VERSION if retroactive option specified):
-	//     Encrypt KEY_VERSION with the GPG key and stash it in .git-crypt/keys/KEY_VERSION/LONG_HEX_ID
-	//      if file already exists, print a notice and move on
-	// 4. Commit the new file(s) (if any) with a meanignful commit message, unless -n was passed
-	std::clog << "Error: add-collab is not yet implemented." << std::endl;
-	return 1;
+	if (argc == 0) {
+		std::clog << "Usage: git-crypt add-collab GPG_USER_ID [...]" << std::endl;
+		return 2;
+	}
+
+	// build a list of key fingerprints for every collaborator specified on the command line
+	std::vector<std::string>	collab_keys;
+
+	for (int i = 0; i < argc; ++i) {
+		std::vector<std::string> keys(gpg_lookup_key(argv[i]));
+		if (keys.empty()) {
+			std::clog << "Error: public key for '" << argv[i] << "' not found in your GPG keyring" << std::endl;
+			return 1;
+		}
+		if (keys.size() > 1) {
+			std::clog << "Error: more than one public key matches '" << argv[i] << "' - please be more specific" << std::endl;
+			return 1;
+		}
+		collab_keys.push_back(keys[0]);
+	}
+
+	// TODO: have a retroactive option to grant access to all key versions, not just the most recent
+	Key_file			key_file;
+	load_key(key_file);
+	const Key_file::Entry*		key = key_file.get_latest();
+	if (!key) {
+		std::clog << "Error: key file is empty" << std::endl;
+		return 1;
+	}
+
+	std::string			keys_path(get_repo_keys_path());
+	std::vector<std::string>	new_files;
+
+	encrypt_repo_key(key_file.latest(), *key, collab_keys, keys_path, &new_files);
+
+	// add/commit the new files
+	if (!new_files.empty()) {
+		// git add ...
+		std::string		command("git add");
+		for (std::vector<std::string>::const_iterator file(new_files.begin()); file != new_files.end(); ++file) {
+			command += " ";
+			command += escape_shell_arg(*file);
+		}
+		if (!successful_exit(system(command.c_str()))) {
+			std::clog << "Error: 'git add' failed" << std::endl;
+			return 1;
+		}
+
+		// git commit ...
+		// TODO: add a command line option (-n perhaps) to inhibit committing
+		std::ostringstream	commit_message_builder;
+		commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
+		for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+			commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
+		}
+
+		command = "git commit -m ";
+		command += escape_shell_arg(commit_message_builder.str());
+		for (std::vector<std::string>::const_iterator file(new_files.begin()); file != new_files.end(); ++file) {
+			command += " ";
+			command += escape_shell_arg(*file);
+		}
+
+		if (!successful_exit(system(command.c_str()))) {
+			std::clog << "Error: 'git commit' failed" << std::endl;
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 int rm_collab (int argc, char** argv) // TODO

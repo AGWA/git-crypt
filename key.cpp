@@ -36,6 +36,7 @@
 #include <fstream>
 #include <istream>
 #include <ostream>
+#include <sstream>
 #include <cstring>
 #include <stdexcept>
 
@@ -144,6 +145,13 @@ bool		Key_file::store_to_file (const char* key_file_name) const
 		return false;
 	}
 	return true;
+}
+
+std::string	Key_file::store_to_string () const
+{
+	std::ostringstream	ss;
+	store(ss);
+	return ss.str();
 }
 
 void		Key_file::generate ()

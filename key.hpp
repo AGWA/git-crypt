@@ -35,6 +35,7 @@
 #include <functional>
 #include <stdint.h>
 #include <iosfwd>
+#include <string>
 
 enum {
 	HMAC_KEY_LEN = 64,
@@ -66,6 +67,8 @@ public:
 
 	bool				load_from_file (const char* filename);
 	bool				store_to_file (const char* filename) const;
+
+	std::string			store_to_string () const;
 
 	void				generate ();
 

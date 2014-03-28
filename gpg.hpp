@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, 2014 Andrew Ayer
+ * Copyright 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,34 +28,24 @@
  * as that of the covered work.
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef _GPG_H
+#define _GPG_H
 
 #include <string>
-#include <ios>
-#include <iosfwd>
-#include <stdint.h>
+#include <vector>
+#include <cstddef>
 
-struct System_error {
-	std::string	action;
-	std::string	target;
-	int		error;
+struct Gpg_error {
+	std::string	message;
 
-	System_error (const std::string& a, const std::string& t, int e) : action(a), target(t), error(e) { }
+	explicit Gpg_error (std::string m) : message(m) { }
 };
 
-void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
-std::string	readlink (const char* pathname);
-std::string	our_exe_path ();
-int		exec_command (const char* command, std::ostream& output);
-int		exec_command_with_input (const char* command, const char* p, size_t len);
-bool		successful_exit (int status);
-void		open_tempfile (std::fstream&, std::ios_base::openmode);
-std::string	escape_shell_arg (const std::string&);
-uint32_t	load_be32 (const unsigned char*);
-void		store_be32 (unsigned char*, uint32_t);
-bool		read_be32 (std::istream& in, uint32_t&);
-void		write_be32 (std::ostream& out, uint32_t);
+std::string			gpg_shorten_fingerprint (const std::string& fingerprint);
+std::string			gpg_get_uid (const std::string& fingerprint);
+std::vector<std::string>	gpg_lookup_key (const std::string& query);
+std::vector<std::string>	gpg_list_secret_keys ();
+void				gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, const char* p, size_t len);
+void				gpg_decrypt_from_file (const std::string& filename, std::ostream&);
 
 #endif
-

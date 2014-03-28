@@ -146,6 +146,48 @@ int exec_command (const char* command, std::ostream& output)
 	return status;
 }
 
+int exec_command_with_input (const char* command, const char* p, size_t len)
+{
+	int		pipefd[2];
+	if (pipe(pipefd) == -1) {
+		throw System_error("pipe", "", errno);
+	}
+	pid_t		child = fork();
+	if (child == -1) {
+		int	fork_errno = errno;
+		close(pipefd[0]);
+		close(pipefd[1]);
+		throw System_error("fork", "", fork_errno);
+	}
+	if (child == 0) {
+		close(pipefd[1]);
+		if (pipefd[0] != 0) {
+			dup2(pipefd[0], 0);
+			close(pipefd[0]);
+		}
+		execl("/bin/sh", "sh", "-c", command, NULL);
+		perror("/bin/sh");
+		_exit(-1);
+	}
+	close(pipefd[0]);
+	while (len > 0) {
+		ssize_t	bytes_written = write(pipefd[1], p, len);
+		if (bytes_written == -1) {
+			int	write_errno = errno;
+			close(pipefd[1]);
+			throw System_error("write", "", write_errno);
+		}
+		p += bytes_written;
+		len -= bytes_written;
+	}
+	close(pipefd[1]);
+	int		status = 0;
+	if (waitpid(child, &status, 0) == -1) {
+		throw System_error("waitpid", "", errno);
+	}
+	return status;
+}
+
 bool successful_exit (int status)
 {
 	return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
