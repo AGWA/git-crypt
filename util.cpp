@@ -112,7 +112,10 @@ int exec_command (const char* command, std::ostream& output)
 	}
 	pid_t		child = fork();
 	if (child == -1) {
-		throw System_error("fork", "", errno);
+		int	fork_errno = errno;
+		close(pipefd[0]);
+		close(pipefd[1]);
+		throw System_error("fork", "", fork_errno);
 	}
 	if (child == 0) {
 		close(pipefd[0]);
