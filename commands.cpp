@@ -55,7 +55,7 @@ static void configure_git_filters ()
 	std::string	command("git config filter.git-crypt.smudge ");
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge");
 
-	if (system(command.c_str()) != 0) {
+	if (!successful_exit(system(command.c_str()))) {
 		throw Error("'git config' failed");
 	}
 
@@ -63,7 +63,7 @@ static void configure_git_filters ()
 	command = "git config filter.git-crypt.clean ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " clean");
 
-	if (system(command.c_str()) != 0) {
+	if (!successful_exit(system(command.c_str()))) {
 		throw Error("'git config' failed");
 	}
 
@@ -71,7 +71,7 @@ static void configure_git_filters ()
 	command = "git config diff.git-crypt.textconv ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " diff");
 
-	if (system(command.c_str()) != 0) {
+	if (!successful_exit(system(command.c_str()))) {
 		throw Error("'git config' failed");
 	}
 }
@@ -355,7 +355,7 @@ int unlock (int argc, char** argv)
 	}
 
 	// 0. Check to see if HEAD exists.  See below why we do this.
-	bool			head_exists = system("git rev-parse HEAD >/dev/null 2>/dev/null") == 0;
+	bool			head_exists = successful_exit(system("git rev-parse HEAD >/dev/null 2>/dev/null"));
 
 	// 1. Make sure working directory is clean (ignoring untracked files)
 	// We do this because we run 'git checkout -f HEAD' later and we don't
@@ -439,7 +439,7 @@ int unlock (int argc, char** argv)
 			command += escape_shell_arg(path_to_top);
 		}
 
-		if (system(command.c_str()) != 0) {
+		if (!successful_exit(system(command.c_str()))) {
 			std::clog << "Error: 'git checkout' failed" << std::endl;
 			std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
 			return 1;

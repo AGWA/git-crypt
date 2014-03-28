@@ -145,7 +145,7 @@ int exec_command (const char* command, std::ostream& output)
 
 bool successful_exit (int status)
 {
-	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
 void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
