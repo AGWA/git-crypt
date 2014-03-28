@@ -81,7 +81,7 @@ static std::string get_internal_key_path ()
 	std::stringstream	output;
 
 	if (!successful_exit(exec_command("git rev-parse --git-dir", output))) {
-		throw Error("'git rev-parse --git-dir' - is this a Git repository?");
+		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
 	}
 
 	std::string		path;
