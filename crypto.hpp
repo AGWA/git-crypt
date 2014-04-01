@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _CRYPTO_H
-#define _CRYPTO_H
+#ifndef GIT_CRYPT_CRYPTO_HPP
+#define GIT_CRYPT_CRYPTO_HPP
 
 #include <openssl/aes.h>
 #include <openssl/hmac.h>

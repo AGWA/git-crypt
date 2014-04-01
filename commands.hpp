@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _COMMANDS_H
-#define _COMMANDS_H
+#ifndef GIT_CRYPT_COMMANDS_HPP
+#define GIT_CRYPT_COMMANDS_HPP
 
 
 void clean (const char* keyfile);
