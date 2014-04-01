@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _GIT_CRYPT_H
-#define _GIT_CRYPT_H
+#ifndef GIT_CRYPT_GIT_CRYPT_HPP
+#define GIT_CRYPT_GIT_CRYPT_HPP
 
 extern const char*	argv0;	// initialized in main() to argv[0]
 

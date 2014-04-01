@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef GIT_CRYPT_UTIL_HPP
+#define GIT_CRYPT_UTIL_HPP
 
 #include <string>
 #include <ios>

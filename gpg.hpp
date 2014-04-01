@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _GPG_H
-#define _GPG_H
+#ifndef GIT_CRYPT_GPG_HPP
+#define GIT_CRYPT_GPG_HPP
 
 #include <string>
 #include <vector>

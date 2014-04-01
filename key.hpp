@@ -28,8 +28,8 @@
  * as that of the covered work.
  */
 
-#ifndef _KEY_H
-#define _KEY_H
+#ifndef GIT_CRYPT_KEY_HPP
+#define GIT_CRYPT_KEY_HPP
 
 #include <map>
 #include <functional>
