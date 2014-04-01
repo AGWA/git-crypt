@@ -100,3 +100,12 @@ git-crypt does not itself provide any authentication.  It assumes that
 either the master copy of your repository is stored securely, or that
 you are using git's existing facilities to ensure integrity (signed tags,
 remembering commit hashes, etc.).
+
+
+MAILING LISTS
+
+To stay abreast of, and provide input to, git-crypt development, consider
+subscribing to one or both of our mailing lists:
+
+Announcements: http://lists.cloudmutt.com/mailman/listinfo/git-crypt-announce
+Discussion:    http://lists.cloudmutt.com/mailman/listinfo/git-crypt-discuss
