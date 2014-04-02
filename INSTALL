@@ -22,6 +22,15 @@ It doesn't matter where you install the git-crypt binary - choose wherever
 is most convenient for you.
 
 
+BUILDING A DEBIAN PACKAGE
+
+Debian packaging can be found in the 'debian' branch of the project
+Git repository.  The package is built using git-buildpackage as follows:
+
+	$ git checkout debian
+	$ git-buildpackage -uc -us
+
+
 INSTALLING ON MAC OS X
 
 Using the brew package manager, simply run:
