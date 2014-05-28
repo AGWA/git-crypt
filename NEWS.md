@@ -13,7 +13,7 @@ News
 
 ######v0.2 (2013-01-25)
 *   Numerous improvements to 'git-crypt init' usability.
-*   Fix gitattributes example in README: the old example showed a colon
+*   Fix gitattributes example in [README](README.md): the old example showed a colon
     after the filename where there shouldn't be one.
 *   Various build fixes and improvements.
 
