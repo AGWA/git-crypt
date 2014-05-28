@@ -20,21 +20,23 @@ The Makefile is tailored for g++, but should work with other compilers.
     make
     cp git-crypt /usr/local/bin/
 
-It doesn't matter where you install the git-crypt binary - choose wherever
-is most convenient for you.
+It doesn't matter where you install the git-crypt binary - choose
+wherever is most convenient for you.
 
 
-BUILDING A DEBIAN PACKAGE
+Building A Debian Package
+-------------------------
 
-Debian packaging can be found in the 'debian' branch of the project
-Git repository.  The package is built using git-buildpackage as follows:
+Debian packaging can be found in the 'debian' branch of the project Git
+repository.  The package is built using git-buildpackage as follows:
 
-	$ git checkout debian
-	$ git-buildpackage -uc -us
+    git checkout debian
+    git-buildpackage -uc -us
 
 
-INSTALLING ON MAC OS X
+Installing On Mac OS X
+----------------------
 
 Using the brew package manager, simply run:
 
-        $ brew install git-crypt
+    brew install git-crypt
