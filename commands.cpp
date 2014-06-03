@@ -251,7 +251,7 @@ void init (const char* argv0, const char* keyfile, const char* keyname)
 	}
 
 	// git config diff.<keyname>.textconv "git-crypt diff /path/to/key"
-	command = "git config filter." + std::string(keyname) + ".textconv ";
+	command = "git config diff." + std::string(keyname) + ".textconv ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " diff " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
