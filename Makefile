@@ -1,5 +1,5 @@
 CXX := c++
-CXXFLAGS := -Wall -pedantic -ansi -Wno-long-long -O2
+CXXFLAGS := -Wall -pedantic -Wno-long-long -O2
 LDFLAGS := -lcrypto
 PREFIX := /usr/local
 
