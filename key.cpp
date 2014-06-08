@@ -33,6 +33,7 @@
 #include "crypto.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdint.h>
 #include <fstream>
 #include <istream>
 #include <ostream>
@@ -133,7 +134,7 @@ bool		Key_file::load_from_file (const char* key_file_name)
 
 bool		Key_file::store_to_file (const char* key_file_name) const
 {
-	mode_t		old_umask = umask(0077); // make sure key file is protected
+	mode_t		old_umask = umask(0077); // make sure key file is protected (TODO: Windows compat)
 	std::ofstream	key_file_out(key_file_name, std::fstream::binary);
 	umask(old_umask);
 	if (!key_file_out) {

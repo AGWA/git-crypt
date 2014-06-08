@@ -10,6 +10,8 @@ all: git-crypt
 git-crypt: $(OBJFILES)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
+util.o: util.cpp util-unix.cpp util-win32.cpp
+
 clean:
 	rm -f *.o git-crypt
 

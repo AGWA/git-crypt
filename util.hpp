@@ -35,6 +35,7 @@
 #include <ios>
 #include <iosfwd>
 #include <stdint.h>
+#include <fstream>
 
 struct System_error {
 	std::string	action;
@@ -42,20 +43,30 @@ struct System_error {
 	int		error;
 
 	System_error (const std::string& a, const std::string& t, int e) : action(a), target(t), error(e) { }
+
+	std::string message () const;
+};
+
+class temp_fstream : public std::fstream {
+	std::string	filename;
+public:
+	~temp_fstream () { close(); }
+
+	void		open (std::ios_base::openmode);
+	void		close ();
 };
 
 void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
-std::string	readlink (const char* pathname);
 std::string	our_exe_path ();
 int		exec_command (const char* command, std::ostream& output);
 int		exec_command_with_input (const char* command, const char* p, size_t len);
 bool		successful_exit (int status);
-void		open_tempfile (std::fstream&, std::ios_base::openmode);
 std::string	escape_shell_arg (const std::string&);
 uint32_t	load_be32 (const unsigned char*);
 void		store_be32 (unsigned char*, uint32_t);
 bool		read_be32 (std::istream& in, uint32_t&);
 void		write_be32 (std::ostream& out, uint32_t);
+void		init_std_streams ();
 
 #endif
 

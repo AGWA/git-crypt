@@ -82,13 +82,7 @@ try {
 	 * General initialization
 	 */
 
-	// The following two lines are essential for achieving good performance:
-	std::ios_base::sync_with_stdio(false);
-	std::cin.tie(0);
-
-	std::cin.exceptions(std::ios_base::badbit);
-	std::cout.exceptions(std::ios_base::badbit);
-
+	init_std_streams();
 	ERR_load_crypto_strings();
 
 	/*
@@ -186,11 +180,7 @@ try {
 	std::cerr << "git-crypt: GPG error: " << e.message << std::endl;
 	return 1;
 } catch (const System_error& e) {
-	std::cerr << "git-crypt: " << e.action << ": ";
-	if (!e.target.empty()) {
-		std::cerr << e.target << ": ";
-	}
-	std::cerr << strerror(e.error) << std::endl;
+	std::cerr << "git-crypt: System error: " << e.message() << std::endl;
 	return 1;
 } catch (const Crypto_error& e) {
 	std::cerr << "git-crypt: Crypto error: " << e.where << ": " << e.message << std::endl;

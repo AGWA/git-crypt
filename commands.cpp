@@ -33,8 +33,6 @@
 #include "util.hpp"
 #include "key.hpp"
 #include "gpg.hpp"
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
@@ -202,7 +200,7 @@ int clean (int argc, char** argv)
 	Hmac_sha1_state	hmac(key->hmac_key, HMAC_KEY_LEN); // Calculate the file's SHA1 HMAC as we go
 	uint64_t		file_size = 0;	// Keep track of the length, make sure it doesn't get too big
 	std::string		file_contents;	// First 8MB or so of the file go here
-	std::fstream		temp_file;	// The rest of the file spills into a temporary file on disk
+	temp_fstream		temp_file;	// The rest of the file spills into a temporary file on disk
 	temp_file.exceptions(std::fstream::badbit);
 
 	char			buffer[1024];
@@ -219,7 +217,7 @@ int clean (int argc, char** argv)
 			file_contents.append(buffer, bytes_read);
 		} else {
 			if (!temp_file.is_open()) {
-				open_tempfile(temp_file, std::fstream::in | std::fstream::out | std::fstream::binary | std::fstream::app);
+				temp_file.open(std::fstream::in | std::fstream::out | std::fstream::binary | std::fstream::app);
 			}
 			temp_file.write(buffer, bytes_read);
 		}
