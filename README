@@ -49,6 +49,40 @@ That's all you need to do - after running git-crypt init, you can use
 git normally - encryption and decryption happen transparently.
 
 
+USING GIT-CRYPT WITH MULTIPLE KEYFILES
+
+Generate a secret key files:
+
+        $ git-crypt keygen /path/to/keyfile-1
+        $ git-crypt keygen /path/to/keyfile-2
+
+Configure a repository to use encryption:
+
+        $ cd repo
+        $ git-crypt init --name=keyname-1 /path/to/keyfile-1
+        $ git-crypt init --name=keyname-2 /path/to/keyfile-2
+
+Specify files to encrypt by creating a .gitattributes file:
+
+        secretfile filter=keyname-1 diff=keyname-1
+        *.key filter=keyname-2 diff=keyname-2
+
+Like a .gitignore file, it can match wildcards and should be checked
+into the repository.  Make sure you don't accidentally encrypt the
+.gitattributes file itself! Note that when file matches multiple
+entries the last one on file will be the active one.
+
+Cloning a repository with encrypted files:
+
+        $ git clone /path/to/repo
+        $ cd repo
+        $ git-crypt init --name=keyname-1 /path/to/keyfile-1
+        $ git-crypt init --name=keyname-2 /path/to/keyfile-2
+
+That's all you need to do - after running git-crypt init, you can use
+git normally - encryption and decryption happen transparently.
+
+
 CURRENT STATUS
 
 The latest version of git-crypt is 0.3, released on 2013-04-05.

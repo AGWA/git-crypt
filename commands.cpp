@@ -188,7 +188,7 @@ void diff (const char* keyfile, const char* filename)
 }
 
 
-void init (const char* argv0, const char* keyfile)
+void init (const char* argv0, const char* keyfile, const char* keyname)
 {
 	if (access(keyfile, R_OK) == -1) {
 		perror(keyfile);
@@ -230,9 +230,10 @@ void init (const char* argv0, const char* keyfile)
 
 	std::string	git_crypt_path(std::strchr(argv0, '/') ? resolve_path(argv0) : argv0);
 	std::string	keyfile_path(resolve_path(keyfile));
+	std::string	command;
 
-	// git config filter.git-crypt.smudge "git-crypt smudge /path/to/key"
-	std::string	command("git config filter.git-crypt.smudge ");
+	// git config filter.<keyname>.smudge "git-crypt smudge /path/to/key"
+	command = "git config filter." + std::string(keyname) + ".smudge ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
@@ -240,8 +241,8 @@ void init (const char* argv0, const char* keyfile)
 		std::exit(1);
 	}
 
-	// git config filter.git-crypt.clean "git-crypt clean /path/to/key"
-	command = "git config filter.git-crypt.clean ";
+	// git config filter.<keyname>.clean "git-crypt clean /path/to/key"
+	command = "git config filter." + std::string(keyname) + ".clean ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " clean " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {
@@ -249,8 +250,8 @@ void init (const char* argv0, const char* keyfile)
 		std::exit(1);
 	}
 
-	// git config diff.git-crypt.textconv "git-crypt diff /path/to/key"
-	command = "git config diff.git-crypt.textconv ";
+	// git config diff.<keyname>.textconv "git-crypt diff /path/to/key"
+	command = "git config diff." + std::string(keyname) + ".textconv ";
 	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " diff " + escape_shell_arg(keyfile_path));
 	
 	if (system(command.c_str()) != 0) {

@@ -1,0 +1,23 @@
+Source: git-crypt
+Section: devel
+Priority: extra
+Maintainer: 
+Build-Depends: debhelper (>= 8.0.0), autotools-dev
+Standards-Version: 3.9.3
+Homepage: 
+#Vcs-Git: https://github.com/AGWA/git-crypt.git
+#Vcs-Browser: https://github.com/AGWA/git-crypt
+
+Package: git-crypt
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, openssl
+Description: GIT Crypt
+ git-crypt enables transparent encryption and decryption of files in a
+ git repository.  Files which you choose to protect are encrypted when
+ committed, and decrypted when checked out.  git-crypt lets you freely
+ share a repository containing a mix of public and private content.
+ git-crypt gracefully degrades, so developers without the secret key can
+ still clone and commit to a repository with encrypted files.  This lets
+ you store your secret material (such as keys or passwords) in the same
+ repository as your code, without requiring you to lock down your entire
+ repository.

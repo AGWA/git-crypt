@@ -1,0 +1,28 @@
+git-crypt (0.3-1) unstable; urgency=low
+
+  * Fix 'git-crypt init' on newer versions of Git.  Previously,
+    encrypted files were not being automatically decrypted after
+    running 'git-crypt init' with recent versions of Git.
+  * Allow 'git-crypt init' to be run even if the working tree contains
+    untracked files.
+  * 'git-crypt init' now properly escapes arguments to the filter
+    commands it configures, allowing both the path to git-crypt and the
+    path to the key file to contain arbitrary characters such as spaces.
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Fri, 05 Apr 2013 00:00:00 +0000
+
+git-crypt (0.2-1) unstable; urgency=low
+
+  * Numerous improvements to 'git-crypt init' usability.
+  * Fix gitattributes example in README: the old example showed a colon
+    after the filename where there shouldn't be one.
+  * Various build fixes and improvements.
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Fri, 25 Jan 2013 00:00:00 +0000
+
+git-crypt (0.1-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Thu, 29 Nov 2012 00:00:00 +0000
+
