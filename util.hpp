@@ -36,6 +36,7 @@
 #include <iosfwd>
 #include <stdint.h>
 #include <fstream>
+#include <vector>
 
 struct System_error {
 	std::string	action;
@@ -58,8 +59,9 @@ public:
 
 void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
 std::string	our_exe_path ();
-int		exec_command (const char* command, std::ostream& output);
-int		exec_command_with_input (const char* command, const char* p, size_t len);
+int		exec_command (const std::vector<std::string>&);
+int		exec_command (const std::vector<std::string>&, std::ostream& output);
+int		exec_command_with_input (const std::vector<std::string>&, const char* p, size_t len);
 bool		successful_exit (int status);
 std::string	escape_shell_arg (const std::string&);
 uint32_t	load_be32 (const unsigned char*);

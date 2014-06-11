@@ -102,12 +102,17 @@ std::string our_exe_path () // TODO
 	return argv0;
 }
 
-int exec_command (const char* command, std::ostream& output) // TODO
+int exec_command (const std::vector<std::string>& command) // TODO
 {
 	return -1;
 }
 
-int exec_command_with_input (const char* command, const char* p, size_t len) // TODO
+int exec_command (const std::vector<std::string>& command, std::ostream& output) // TODO
+{
+	return -1;
+}
+
+int exec_command_with_input (const std::vector<std::string>& command, const char* p, size_t len) // TODO
 {
 	return -1;
 }

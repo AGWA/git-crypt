@@ -47,44 +47,43 @@
 #include <errno.h>
 #include <vector>
 
-static void configure_git_filters ()
+static void git_config (const std::string& name, const std::string& value)
 {
-	std::string	git_crypt_path(our_exe_path());
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back(name);
+	command.push_back(value);
 
-	// git config filter.git-crypt.smudge "/path/to/git-crypt smudge"
-	std::string	command("git config filter.git-crypt.smudge ");
-	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " smudge");
-
-	if (!successful_exit(system(command.c_str()))) {
-		throw Error("'git config' failed");
-	}
-
-	// git config filter.git-crypt.clean "/path/to/git-crypt clean"
-	command = "git config filter.git-crypt.clean ";
-	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " clean");
-
-	if (!successful_exit(system(command.c_str()))) {
-		throw Error("'git config' failed");
-	}
-
-	// git config diff.git-crypt.textconv "/path/to/git-crypt diff"
-	command = "git config diff.git-crypt.textconv ";
-	command += escape_shell_arg(escape_shell_arg(git_crypt_path) + " diff");
-
-	if (!successful_exit(system(command.c_str()))) {
+	if (!successful_exit(exec_command(command))) {
 		throw Error("'git config' failed");
 	}
 }
 
+static void configure_git_filters ()
+{
+	std::string	escaped_git_crypt_path(escape_shell_arg(our_exe_path()));
+
+	git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
+	git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
+	git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+}
+
 static std::string get_internal_key_path ()
 {
-	std::stringstream	output;
+	// git rev-parse --git-dir
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("rev-parse");
+	command.push_back("--git-dir");
 
-	if (!successful_exit(exec_command("git rev-parse --git-dir", output))) {
+	std::stringstream		output;
+
+	if (!successful_exit(exec_command(command, output))) {
 		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
 	}
 
-	std::string		path;
+	std::string			path;
 	std::getline(output, path);
 	path += "/git-crypt/key";
 	return path;
@@ -92,13 +91,19 @@ static std::string get_internal_key_path ()
 
 static std::string get_repo_keys_path ()
 {
-	std::stringstream	output;
+	// git rev-parse --show-toplevel
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("rev-parse");
+	command.push_back("--show-toplevel");
 
-	if (!successful_exit(exec_command("git rev-parse --show-toplevel", output))) {
+	std::stringstream		output;
+
+	if (!successful_exit(exec_command(command, output))) {
 		throw Error("'git rev-parse --show-toplevel' failed - is this a Git repository?");
 	}
 
-	std::string		path;
+	std::string			path;
 	std::getline(output, path);
 
 	if (path.empty()) {
@@ -108,6 +113,52 @@ static std::string get_repo_keys_path ()
 
 	path += "/.git-crypt/keys";
 	return path;
+}
+
+static std::string get_path_to_top ()
+{
+	// git rev-parse --show-cdup
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("rev-parse");
+	command.push_back("--show-cdup");
+
+	std::stringstream		output;
+
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git rev-parse --show-cdup' failed - is this a Git repository?");
+	}
+
+	std::string			path_to_top;
+	std::getline(output, path_to_top);
+
+	return path_to_top;
+}
+
+static void get_git_status (std::ostream& output)
+{
+	// git status -uno --porcelain
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("status");
+	command.push_back("-uno"); // don't show untracked files
+	command.push_back("--porcelain");
+
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git status' failed - is this a Git repository?");
+	}
+}
+
+static bool check_if_head_exists ()
+{
+	// git rev-parse HEAD
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("rev-parse");
+	command.push_back("HEAD");
+
+	std::stringstream		output;
+	return successful_exit(exec_command(command, output));
 }
 
 static void load_key (Key_file& key_file, const char* legacy_path =0)
@@ -421,20 +472,20 @@ int unlock (int argc, char** argv)
 		return 2;
 	}
 
-	// 0. Check to see if HEAD exists.  See below why we do this.
-	bool			head_exists = successful_exit(system("git rev-parse HEAD >/dev/null 2>/dev/null"));
-
-	// 1. Make sure working directory is clean (ignoring untracked files)
+	// 0. Make sure working directory is clean (ignoring untracked files)
 	// We do this because we run 'git checkout -f HEAD' later and we don't
 	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
 	// untracked files so it's safe to ignore those.
-	int			status;
+
+	// Running 'git status' also serves as a check that the Git repo is accessible.
+
 	std::stringstream	status_output;
-	status = exec_command("git status -uno --porcelain", status_output);
-	if (!successful_exit(status)) {
-		std::clog << "Error: 'git status' failed - is this a git repository?" << std::endl;
-		return 1;
-	} else if (status_output.peek() != -1 && head_exists) {
+	get_git_status(status_output);
+
+	// 1. Check to see if HEAD exists.  See below why we do this.
+	bool			head_exists = check_if_head_exists();
+
+	if (status_output.peek() != -1 && head_exists) {
 		// We only care that the working directory is dirty if HEAD exists.
 		// If HEAD doesn't exist, we won't be resetting to it (see below) so
 		// it doesn't matter that the working directory is dirty.
@@ -446,11 +497,7 @@ int unlock (int argc, char** argv)
 	// 2. Determine the path to the top of the repository.  We pass this as the argument
 	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
 	// mucked with the git config.)
-	std::stringstream	cdup_output;
-	if (!successful_exit(exec_command("git rev-parse --show-cdup", cdup_output))) {
-		std::clog << "Error: 'git rev-parse --show-cdup' failed" << std::endl;
-		return 1;
-	}
+	std::string		path_to_top(get_path_to_top());
 
 	// 3. Install the key
 	Key_file		key_file;
@@ -504,17 +551,20 @@ int unlock (int argc, char** argv)
 	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
 	// just skip the checkout.
 	if (head_exists) {
-		std::string	path_to_top;
-		std::getline(cdup_output, path_to_top);
-
-		std::string	command("git checkout -f HEAD -- ");
+		// git checkout -f HEAD -- path/to/top
+		std::vector<std::string>	command;
+		command.push_back("git");
+		command.push_back("checkout");
+		command.push_back("-f");
+		command.push_back("HEAD");
+		command.push_back("--");
 		if (path_to_top.empty()) {
-			command += ".";
+			command.push_back(".");
 		} else {
-			command += escape_shell_arg(path_to_top);
+			command.push_back(path_to_top);
 		}
 
-		if (!successful_exit(system(command.c_str()))) {
+		if (!successful_exit(exec_command(command))) {
 			std::clog << "Error: 'git checkout' failed" << std::endl;
 			std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
 			return 1;
@@ -563,13 +613,12 @@ int add_collab (int argc, char** argv)
 
 	// add/commit the new files
 	if (!new_files.empty()) {
-		// git add ...
-		std::string		command("git add");
-		for (std::vector<std::string>::const_iterator file(new_files.begin()); file != new_files.end(); ++file) {
-			command += " ";
-			command += escape_shell_arg(*file);
-		}
-		if (!successful_exit(system(command.c_str()))) {
+		// git add NEW_FILE ...
+		std::vector<std::string>	command;
+		command.push_back("git");
+		command.push_back("add");
+		command.insert(command.end(), new_files.begin(), new_files.end());
+		if (!successful_exit(exec_command(command))) {
 			std::clog << "Error: 'git add' failed" << std::endl;
 			return 1;
 		}
@@ -582,14 +631,15 @@ int add_collab (int argc, char** argv)
 			commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
 		}
 
-		command = "git commit -m ";
-		command += escape_shell_arg(commit_message_builder.str());
-		for (std::vector<std::string>::const_iterator file(new_files.begin()); file != new_files.end(); ++file) {
-			command += " ";
-			command += escape_shell_arg(*file);
-		}
+		// git commit -m MESSAGE NEW_FILE ...
+		command.clear();
+		command.push_back("git");
+		command.push_back("commit");
+		command.push_back("-m");
+		command.push_back(commit_message_builder.str());
+		command.insert(command.end(), new_files.begin(), new_files.end());
 
-		if (!successful_exit(system(command.c_str()))) {
+		if (!successful_exit(exec_command(command))) {
 			std::clog << "Error: 'git commit' failed" << std::endl;
 			return 1;
 		}

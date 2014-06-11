@@ -156,7 +156,36 @@ std::string our_exe_path ()
 	}
 }
 
-int exec_command (const char* command, std::ostream& output)
+static int execvp (const std::string& file, const std::vector<std::string>& args)
+{
+	std::vector<const char*>	args_c_str;
+	args_c_str.reserve(args.size());
+	for (std::vector<std::string>::const_iterator arg(args.begin()); arg != args.end(); ++arg) {
+		args_c_str.push_back(arg->c_str());
+	}
+	args_c_str.push_back(NULL);
+	return execvp(file.c_str(), const_cast<char**>(&args_c_str[0]));
+}
+
+int exec_command (const std::vector<std::string>& command)
+{
+	pid_t		child = fork();
+	if (child == -1) {
+		throw System_error("fork", "", errno);
+	}
+	if (child == 0) {
+		execvp(command[0], command);
+		perror(command[0].c_str());
+		_exit(-1);
+	}
+	int		status = 0;
+	if (waitpid(child, &status, 0) == -1) {
+		throw System_error("waitpid", "", errno);
+	}
+	return status;
+}
+
+int exec_command (const std::vector<std::string>& command, std::ostream& output)
 {
 	int		pipefd[2];
 	if (pipe(pipefd) == -1) {
@@ -175,8 +204,8 @@ int exec_command (const char* command, std::ostream& output)
 			dup2(pipefd[1], 1);
 			close(pipefd[1]);
 		}
-		execl("/bin/sh", "sh", "-c", command, NULL);
-		perror("/bin/sh");
+		execvp(command[0], command);
+		perror(command[0].c_str());
 		_exit(-1);
 	}
 	close(pipefd[1]);
@@ -198,7 +227,7 @@ int exec_command (const char* command, std::ostream& output)
 	return status;
 }
 
-int exec_command_with_input (const char* command, const char* p, size_t len)
+int exec_command_with_input (const std::vector<std::string>& command, const char* p, size_t len)
 {
 	int		pipefd[2];
 	if (pipe(pipefd) == -1) {
@@ -217,8 +246,8 @@ int exec_command_with_input (const char* command, const char* p, size_t len)
 			dup2(pipefd[0], 0);
 			close(pipefd[0]);
 		}
-		execl("/bin/sh", "sh", "-c", command, NULL);
-		perror("/bin/sh");
+		execvp(command[0], command);
+		perror(command[0].c_str());
 		_exit(-1);
 	}
 	close(pipefd[0]);

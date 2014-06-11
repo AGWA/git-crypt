@@ -61,10 +61,15 @@ std::string gpg_shorten_fingerprint (const std::string& fingerprint)
 std::string gpg_get_uid (const std::string& fingerprint)
 {
 	// gpg --batch --with-colons --fixed-list-mode --list-keys 0x7A399B2DB06D039020CD1CE1D0F3702D61489532
-	std::string			command("gpg --batch --with-colons --fixed-list-mode --list-keys ");
-	command += escape_shell_arg("0x" + fingerprint);
+	std::vector<std::string>	command;
+	command.push_back("gpg");
+	command.push_back("--batch");
+	command.push_back("--with-colons");
+	command.push_back("--fixed-list-mode");
+	command.push_back("--list-keys");
+	command.push_back("0x" + fingerprint);
 	std::stringstream		command_output;
-	if (!successful_exit(exec_command(command.c_str(), command_output))) {
+	if (!successful_exit(exec_command(command, command_output))) {
 		// This could happen if the keyring does not contain a public key with this fingerprint
 		return "";
 	}
@@ -88,10 +93,15 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 	std::vector<std::string>	fingerprints;
 
 	// gpg --batch --with-colons --fingerprint --list-keys jsmith@example.com
-	std::string			command("gpg --batch --with-colons --fingerprint --list-keys ");
-	command += escape_shell_arg(query);
+	std::vector<std::string>	command;
+	command.push_back("gpg");
+	command.push_back("--batch");
+	command.push_back("--with-colons");
+	command.push_back("--fingerprint");
+	command.push_back("--list-keys");
+	command.push_back(query);
 	std::stringstream		command_output;
-	if (successful_exit(exec_command(command.c_str(), command_output))) {
+	if (successful_exit(exec_command(command, command_output))) {
 		while (command_output.peek() != -1) {
 			std::string		line;
 			std::getline(command_output, line);
@@ -109,8 +119,14 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 std::vector<std::string> gpg_list_secret_keys ()
 {
 	// gpg --batch --with-colons --list-secret-keys --fingerprint
+	std::vector<std::string>	command;
+	command.push_back("gpg");
+	command.push_back("--batch");
+	command.push_back("--with-colons");
+	command.push_back("--list-secret-keys");
+	command.push_back("--fingerprint");
 	std::stringstream		command_output;
-	if (!successful_exit(exec_command("gpg --batch --with-colons --list-secret-keys --fingerprint", command_output))) {
+	if (!successful_exit(exec_command(command, command_output))) {
 		throw Gpg_error("gpg --list-secret-keys failed");
 	}
 
@@ -132,22 +148,28 @@ std::vector<std::string> gpg_list_secret_keys ()
 void gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, const char* p, size_t len)
 {
 	// gpg --batch -o FILENAME -r RECIPIENT -e
-	std::string	command("gpg --batch -o ");
-	command += escape_shell_arg(filename);
-	command += " -r ";
-	command += escape_shell_arg("0x" + recipient_fingerprint);
-	command += " -e";
-	if (!successful_exit(exec_command_with_input(command.c_str(), p, len))) {
+	std::vector<std::string>	command;
+	command.push_back("gpg");
+	command.push_back("--batch");
+	command.push_back("-o");
+	command.push_back(filename);
+	command.push_back("-r");
+	command.push_back("0x" + recipient_fingerprint);
+	command.push_back("-e");
+	if (!successful_exit(exec_command_with_input(command, p, len))) {
 		throw Gpg_error("Failed to encrypt");
 	}
 }
 
 void gpg_decrypt_from_file (const std::string& filename, std::ostream& output)
 {
-	// gpg -q -d
-	std::string	command("gpg -q -d ");
-	command += escape_shell_arg(filename);
-	if (!successful_exit(exec_command(command.c_str(), output))) {
+	// gpg -q -d FILENAME
+	std::vector<std::string>	command;
+	command.push_back("gpg");
+	command.push_back("-q");
+	command.push_back("-d");
+	command.push_back(filename);
+	if (!successful_exit(exec_command(command, output))) {
 		throw Gpg_error("Failed to decrypt");
 	}
 }
