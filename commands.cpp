@@ -259,7 +259,7 @@ int clean (int argc, char** argv)
 	while (std::cin && file_size < Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
 		std::cin.read(buffer, sizeof(buffer));
 
-		size_t	bytes_read = std::cin.gcount();
+		const size_t	bytes_read = std::cin.gcount();
 
 		hmac.add(reinterpret_cast<unsigned char*>(buffer), bytes_read);
 		file_size += bytes_read;
@@ -317,7 +317,7 @@ int clean (int argc, char** argv)
 	const unsigned char*	file_data = reinterpret_cast<const unsigned char*>(file_contents.data());
 	size_t			file_data_len = file_contents.size();
 	while (file_data_len > 0) {
-		size_t		buffer_len = std::min(sizeof(buffer), file_data_len);
+		const size_t	buffer_len = std::min(sizeof(buffer), file_data_len);
 		aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
 		std::cout.write(buffer, buffer_len);
 		file_data += buffer_len;
@@ -330,7 +330,7 @@ int clean (int argc, char** argv)
 		while (temp_file.peek() != -1) {
 			temp_file.read(buffer, sizeof(buffer));
 
-			size_t	buffer_len = temp_file.gcount();
+			const size_t	buffer_len = temp_file.gcount();
 
 			aes.process(reinterpret_cast<unsigned char*>(buffer),
 			            reinterpret_cast<unsigned char*>(buffer),
@@ -359,7 +359,7 @@ int smudge (int argc, char** argv)
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (!std::cin || std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
+	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		std::clog << "git-crypt: error: file not encrypted" << std::endl;
 		return 1;
 	}
@@ -403,7 +403,7 @@ int diff (int argc, char** argv)
 	// Read the header to get the nonce and determine if it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	in.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (!in || in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
+	if (in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::cout.write(reinterpret_cast<char*>(header), in.gcount()); // don't forget to include the header which we read!
 		std::cout << in.rdbuf();
