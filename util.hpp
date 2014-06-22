@@ -64,6 +64,7 @@ int		exec_command (const std::vector<std::string>&);
 int		exec_command (const std::vector<std::string>&, std::ostream& output);
 int		exec_command_with_input (const std::vector<std::string>&, const char* p, size_t len);
 bool		successful_exit (int status);
+void		touch_file (const std::string&);
 std::string	escape_shell_arg (const std::string&);
 uint32_t	load_be32 (const unsigned char*);
 void		store_be32 (unsigned char*, uint32_t);

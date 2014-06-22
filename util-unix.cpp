@@ -31,7 +31,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <errno.h>
+#include <utime.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
@@ -272,6 +274,13 @@ int exec_command_with_input (const std::vector<std::string>& command, const char
 bool successful_exit (int status)
 {
 	return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+void	touch_file (const std::string& filename)
+{
+	if (utimes(filename.c_str(), NULL) == -1) {
+		throw System_error("utimes", "", errno);
+	}
 }
 
 static void	init_std_streams_platform ()

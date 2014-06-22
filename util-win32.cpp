@@ -320,6 +320,25 @@ bool successful_exit (int status)
 	return status == 0;
 }
 
+void	touch_file (const std::string& filename)
+{
+	HANDLE	fh = CreateFileA(filename.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	if (fh == INVALID_HANDLE_VALUE) {
+		throw System_error("CreateFileA", filename, GetLastError());
+	}
+	SYSTEMTIME	system_time;
+	GetSystemTime(&system_time);
+	FILETIME	file_time;
+	SystemTimeToFileTime(&system_time, &file_time);
+
+	if (!SetFileTime(fh, NULL, NULL, &file_time)) {
+		DWORD	error = GetLastError();
+		CloseHandle(fh);
+		throw System_error("SetFileTime", filename, error);
+	}
+	CloseHandle(fh);
+}
+
 static void	init_std_streams_platform ()
 {
 	_setmode(_fileno(stdin), _O_BINARY);
