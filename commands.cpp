@@ -503,6 +503,7 @@ int unlock (int argc, char** argv)
 	Key_file		key_file;
 	if (symmetric_key_file) {
 		// Read from the symmetric key file
+		// TODO: command line flag to accept legacy key format?
 		try {
 			if (std::strcmp(symmetric_key_file, "-") == 0) {
 				key_file.load(std::cin);
