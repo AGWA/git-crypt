@@ -618,6 +618,7 @@ int add_collab (int argc, char** argv)
 		std::vector<std::string>	command;
 		command.push_back("git");
 		command.push_back("add");
+		command.push_back("--");
 		command.insert(command.end(), new_files.begin(), new_files.end());
 		if (!successful_exit(exec_command(command))) {
 			std::clog << "Error: 'git add' failed" << std::endl;
@@ -638,6 +639,7 @@ int add_collab (int argc, char** argv)
 		command.push_back("commit");
 		command.push_back("-m");
 		command.push_back(commit_message_builder.str());
+		command.push_back("--");
 		command.insert(command.end(), new_files.begin(), new_files.end());
 
 		if (!successful_exit(exec_command(command))) {
