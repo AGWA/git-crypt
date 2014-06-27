@@ -325,3 +325,16 @@ static void	init_std_streams_platform ()
 	_setmode(_fileno(stdin), _O_BINARY);
 	_setmode(_fileno(stdout), _O_BINARY);
 }
+
+mode_t util_umask (mode_t mode)
+{
+	// Not available in Windows and function not always defined in Win32 environments
+	return 0;
+}
+
+int util_rename (const char* from, const char* to)
+{
+	// On Windows OS, it is necessary to ensure target file doesn't exist
+	unlink(to);
+	return rename(from, to);
+}

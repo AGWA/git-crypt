@@ -765,7 +765,7 @@ int migrate_key (int argc, char** argv)
 				return 1;
 			}
 
-			if (rename(new_key_file_name.c_str(), key_file_name) == -1) {
+			if (util_rename(new_key_file_name.c_str(), key_file_name) == -1) {
 				std::clog << "Error: " << key_file_name << ": " << strerror(errno) << std::endl;
 				unlink(new_key_file_name.c_str());
 				return 1;

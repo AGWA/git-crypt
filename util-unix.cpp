@@ -69,14 +69,14 @@ void	temp_fstream::open (std::ios_base::openmode mode)
 	char*			path = &path_buffer[0];
 	std::strcpy(path, tmpdir);
 	std::strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
-	mode_t			old_umask = umask(0077);
+	mode_t			old_umask = util_umask(0077);
 	int			fd = mkstemp(path);
 	if (fd == -1) {
 		int		mkstemp_errno = errno;
-		umask(old_umask);
+		util_umask(old_umask);
 		throw System_error("mkstemp", "", mkstemp_errno);
 	}
-	umask(old_umask);
+	util_umask(old_umask);
 	std::fstream::open(path, mode);
 	if (!std::fstream::is_open()) {
 		unlink(path);
@@ -276,4 +276,14 @@ bool successful_exit (int status)
 
 static void	init_std_streams_platform ()
 {
+}
+
+mode_t util_umask (mode_t mode)
+{
+	return umask(mode);
+}
+
+int util_rename (const char* from, const char* to)
+{
+	return rename(from, to);
 }

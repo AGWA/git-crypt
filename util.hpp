@@ -35,6 +35,7 @@
 #include <ios>
 #include <iosfwd>
 #include <stdint.h>
+#include <sys/types.h>
 #include <fstream>
 #include <vector>
 
@@ -69,6 +70,8 @@ void		store_be32 (unsigned char*, uint32_t);
 bool		read_be32 (std::istream& in, uint32_t&);
 void		write_be32 (std::ostream& out, uint32_t);
 void		init_std_streams ();
+mode_t		util_umask (mode_t);
+int		util_rename (const char*, const char*);
 
 #endif
 
