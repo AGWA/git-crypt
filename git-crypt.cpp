@@ -159,6 +159,9 @@ try {
 	if (std::strcmp(command, "refresh") == 0) {
 		return refresh(argc, argv);
 	}
+	if (std::strcmp(command, "status") == 0) {
+		return status(argc, argv);
+	}
 	// Plumbing commands (executed by git, not by user):
 	if (std::strcmp(command, "clean") == 0) {
 		return clean(argc, argv);
