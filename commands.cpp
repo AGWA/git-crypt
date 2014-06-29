@@ -319,7 +319,7 @@ static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t
 {
 	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
 		std::ostringstream		path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *seckey;
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *seckey << ".gpg";
 		std::string			path(path_builder.str());
 		if (access(path.c_str(), F_OK) == 0) {
 			std::stringstream	decrypted_contents;
@@ -348,7 +348,7 @@ static void encrypt_repo_key (const char* key_name, uint32_t key_version, const 
 
 	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *collab;
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *collab << ".gpg";
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
