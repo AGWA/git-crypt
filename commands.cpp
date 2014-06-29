@@ -33,6 +33,7 @@
 #include "util.hpp"
 #include "key.hpp"
 #include "gpg.hpp"
+#include "parse_options.hpp"
 #include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
@@ -890,58 +891,28 @@ int refresh (int argc, char** argv) // TODO: do a force checkout, much like in u
 
 int status (int argc, char** argv)
 {
-	int		argi = 0;
-
 	// Usage:
 	//  git-crypt status -r [-z]			Show repo status
 	//  git-crypt status [-e | -u] [-z] [FILE ...]	Show encrypted status of files
 	//  git-crypt status -f				Fix unencrypted blobs
 
-	// Flags:
-	//  -e show encrypted files only
-	//  -u show unencrypted files only
-	//  -f fix problems
-	//  -z machine-parseable output
-	//  -r show repo status only
-
 	// TODO: help option / usage output
 
-	bool		repo_status_only = false;
-	bool		show_encrypted_only = false;
-	bool		show_unencrypted_only = false;
-	bool		fix_problems = false;
-	bool		machine_output = false;
+	bool		repo_status_only = false;	// -r show repo status only
+	bool		show_encrypted_only = false;	// -e show encrypted files only
+	bool		show_unencrypted_only = false;	// -u show unencrypted files only
+	bool		fix_problems = false;		// -f fix problems
+	bool		machine_output = false;		// -z machine-parseable output
 
-	while (argi < argc && argv[argi][0] == '-') {
-		if (std::strcmp(argv[argi], "--") == 0) {
-			++argi;
-			break;
-		}
-		const char*	flags = argv[argi] + 1;
-		while (char flag = *flags++) {
-			switch (flag) {
-			case 'r':
-				repo_status_only = true;
-				break;
-			case 'e':
-				show_encrypted_only = true;
-				break;
-			case 'u':
-				show_unencrypted_only = true;
-				break;
-			case 'f':
-				fix_problems = true;
-				break;
-			case 'z':
-				machine_output = true;
-				break;
-			default:
-				std::clog << "Error: unknown option `" << flag << "'" << std::endl;
-				return 2;
-			}
-		}
-		++argi;
-	}
+	Options_list	options;
+	options.push_back(Option_def("-r", &repo_status_only));
+	options.push_back(Option_def("-e", &show_encrypted_only));
+	options.push_back(Option_def("-u", &show_unencrypted_only));
+	options.push_back(Option_def("-f", &fix_problems));
+	options.push_back(Option_def("--fix", &fix_problems));
+	options.push_back(Option_def("-z", &machine_output));
+
+	int		argi = parse_options(options, argc, argv);
 
 	if (repo_status_only) {
 		if (show_encrypted_only || show_unencrypted_only) {

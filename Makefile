@@ -3,7 +3,7 @@ CXXFLAGS := -Wall -pedantic -Wno-long-long -O2
 LDFLAGS := -lcrypto
 PREFIX := /usr/local
 
-OBJFILES = git-crypt.o commands.o crypto.o gpg.o key.o util.o
+OBJFILES = git-crypt.o commands.o crypto.o gpg.o key.o util.o parse_options.o
 
 all: git-crypt
 

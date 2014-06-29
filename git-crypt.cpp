@@ -34,6 +34,7 @@
 #include "crypto.hpp"
 #include "key.hpp"
 #include "gpg.hpp"
+#include "parse_options.hpp"
 #include <cstring>
 #include <unistd.h>
 #include <iostream>
@@ -187,6 +188,9 @@ try {
 	return 1;
 } catch (const Crypto_error& e) {
 	std::cerr << "git-crypt: Crypto error: " << e.where << ": " << e.message << std::endl;
+	return 1;
+} catch (const Option_error& e) {
+	std::cerr << "git-crypt: Error: " << e.option_name << ": " << e.message << std::endl;
 	return 1;
 } catch (Key_file::Incompatible) {
 	std::cerr << "git-crypt: This repository contains a incompatible key file.  Please upgrade git-crypt." << std::endl;
