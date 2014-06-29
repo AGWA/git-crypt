@@ -43,6 +43,7 @@
 #include <iostream>
 #include <cstddef>
 #include <cstring>
+#include <cctype>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -61,16 +62,43 @@ static void git_config (const std::string& name, const std::string& value)
 	}
 }
 
-static void configure_git_filters ()
+static void configure_git_filters (const char* key_name)
 {
 	std::string	escaped_git_crypt_path(escape_shell_arg(our_exe_path()));
 
-	git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
-	git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
-	git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+	if (key_name) {
+		// Note: key_name contains only shell-safe characters so it need not be escaped.
+		git_config(std::string("filter.git-crypt-") + key_name + ".smudge",
+		           escaped_git_crypt_path + " smudge --key-name=" + key_name);
+		git_config(std::string("filter.git-crypt-") + key_name + ".clean",
+		           escaped_git_crypt_path + " clean --key-name=" + key_name);
+		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
+		           escaped_git_crypt_path + " diff --key-name=" + key_name);
+	} else {
+		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
+		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
+		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+	}
 }
 
-static std::string get_internal_key_path ()
+static void validate_key_name (const char* key_name)
+{
+	if (!*key_name) {
+		throw Error("Key name may not be empty");
+	}
+
+	if (std::strcmp(key_name, "default") == 0) {
+		throw Error("`default' is not a legal key name");
+	}
+	// Need to be restrictive with key names because they're used as part of a Git filter name
+	while (char c = *key_name++) {
+		if (!std::isalnum(c) && c != '-' && c != '_') {
+			throw Error("Key names may contain only A-Z, a-z, 0-9, '-', and '_'");
+		}
+	}
+}
+
+static std::string get_internal_key_path (const char* key_name)
 {
 	// git rev-parse --git-dir
 	std::vector<std::string>	command;
@@ -86,7 +114,8 @@ static std::string get_internal_key_path ()
 
 	std::string			path;
 	std::getline(output, path);
-	path += "/git-crypt/key";
+	path += "/git-crypt/keys/";
+	path += key_name ? key_name : "default";
 	return path;
 }
 
@@ -262,7 +291,7 @@ static bool check_if_file_is_encrypted (const std::string& filename)
 	return check_if_blob_is_encrypted(object_id);
 }
 
-static void load_key (Key_file& key_file, const char* legacy_path =0)
+static void load_key (Key_file& key_file, const char* key_name, const char* key_path =0, const char* legacy_path =0)
 {
 	if (legacy_path) {
 		std::ifstream		key_file_in(legacy_path, std::fstream::binary);
@@ -270,20 +299,27 @@ static void load_key (Key_file& key_file, const char* legacy_path =0)
 			throw Error(std::string("Unable to open key file: ") + legacy_path);
 		}
 		key_file.load_legacy(key_file_in);
-	} else {
-		std::ifstream		key_file_in(get_internal_key_path().c_str(), std::fstream::binary);
+	} else if (key_path) {
+		std::ifstream		key_file_in(key_path, std::fstream::binary);
 		if (!key_file_in) {
+			throw Error(std::string("Unable to open key file: ") + key_path);
+		}
+		key_file.load(key_file_in);
+	} else {
+		std::ifstream		key_file_in(get_internal_key_path(key_name).c_str(), std::fstream::binary);
+		if (!key_file_in) {
+			// TODO: include key name in error message
 			throw Error("Unable to open key file - have you unlocked/initialized this repository yet?");
 		}
 		key_file.load(key_file_in);
 	}
 }
 
-static bool decrypt_repo_key (Key_file& key_file, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
+static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
 {
 	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
 		std::ostringstream		path_builder;
-		path_builder << keys_path << '/' << key_version << '/' << *seckey;
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *seckey;
 		std::string			path(path_builder.str());
 		if (access(path.c_str(), F_OK) == 0) {
 			std::stringstream	decrypted_contents;
@@ -301,7 +337,7 @@ static bool decrypt_repo_key (Key_file& key_file, uint32_t key_version, const st
 	return false;
 }
 
-static void encrypt_repo_key (uint32_t key_version, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
+static void encrypt_repo_key (const char* key_name, uint32_t key_version, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
 {
 	std::string	key_file_data;
 	{
@@ -312,7 +348,7 @@ static void encrypt_repo_key (uint32_t key_version, const Key_file::Entry& key, 
 
 	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << key_version << '/' << *collab;
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *collab;
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
@@ -325,21 +361,35 @@ static void encrypt_repo_key (uint32_t key_version, const Key_file::Entry& key, 
 	}
 }
 
+static int parse_plumbing_options (const char** key_name, const char** key_file, int argc, char** argv)
+{
+	Options_list	options;
+	options.push_back(Option_def("-k", key_name));
+	options.push_back(Option_def("--key-name", key_name));
+	options.push_back(Option_def("--key-file", key_file));
+
+	return parse_options(options, argc, argv);
+}
+
 
 
 // Encrypt contents of stdin and write to stdout
 int clean (int argc, char** argv)
 {
-	const char*	legacy_key_path = 0;
-	if (argc == 0) {
-	} else if (argc == 1) {
-		legacy_key_path = argv[0];
+	const char*		key_name = 0;
+	const char*		key_path = 0;
+	const char*		legacy_key_path = 0;
+
+	int			argi = parse_plumbing_options(&key_name, &key_path, argc, argv);
+	if (argc - argi == 0) {
+	} else if (!key_name && !key_path && argc - argi == 1) { // Deprecated - for compatibility with pre-0.4
+		legacy_key_path = argv[argi];
 	} else {
-		std::clog << "Usage: git-crypt smudge" << std::endl;
+		std::clog << "Usage: git-crypt clean [--key-name=NAME] [--key-file=PATH]" << std::endl;
 		return 2;
 	}
 	Key_file		key_file;
-	load_key(key_file, legacy_key_path);
+	load_key(key_file, key_name, key_path, legacy_key_path);
 
 	const Key_file::Entry*	key = key_file.get_latest();
 	if (!key) {
@@ -446,16 +496,20 @@ int clean (int argc, char** argv)
 // Decrypt contents of stdin and write to stdout
 int smudge (int argc, char** argv)
 {
-	const char*	legacy_key_path = 0;
-	if (argc == 0) {
-	} else if (argc == 1) {
-		legacy_key_path = argv[0];
+	const char*		key_name = 0;
+	const char*		key_path = 0;
+	const char*		legacy_key_path = 0;
+
+	int			argi = parse_plumbing_options(&key_name, &key_path, argc, argv);
+	if (argc - argi == 0) {
+	} else if (!key_name && !key_path && argc - argi == 1) { // Deprecated - for compatibility with pre-0.4
+		legacy_key_path = argv[argi];
 	} else {
-		std::clog << "Usage: git-crypt smudge" << std::endl;
+		std::clog << "Usage: git-crypt smudge [--key-name=NAME] [--key-file=PATH]" << std::endl;
 		return 2;
 	}
 	Key_file		key_file;
-	load_key(key_file, legacy_key_path);
+	load_key(key_file, key_name, key_path, legacy_key_path);
 
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
@@ -479,19 +533,23 @@ int smudge (int argc, char** argv)
 
 int diff (int argc, char** argv)
 {
-	const char*	filename = 0;
-	const char*	legacy_key_path = 0;
-	if (argc == 1) {
-		filename = argv[0];
-	} else if (argc == 2) {
-		legacy_key_path = argv[0];
-		filename = argv[1];
+	const char*		key_name = 0;
+	const char*		key_path = 0;
+	const char*		filename = 0;
+	const char*		legacy_key_path = 0;
+
+	int			argi = parse_plumbing_options(&key_name, &key_path, argc, argv);
+	if (argc - argi == 1) {
+		filename = argv[argi];
+	} else if (!key_name && !key_path && argc - argi == 2) { // Deprecated - for compatibility with pre-0.4
+		legacy_key_path = argv[argi];
+		filename = argv[argi + 1];
 	} else {
-		std::clog << "Usage: git-crypt diff FILENAME" << std::endl;
+		std::clog << "Usage: git-crypt diff [--key-name=NAME] [--key-file=PATH] FILENAME" << std::endl;
 		return 2;
 	}
 	Key_file		key_file;
-	load_key(key_file, legacy_key_path);
+	load_key(key_file, key_name, key_path, legacy_key_path);
 
 	// Open the file
 	std::ifstream		in(filename, std::fstream::binary);
@@ -527,20 +585,32 @@ int diff (int argc, char** argv)
 
 int init (int argc, char** argv)
 {
-	if (argc == 1) {
+	const char*	key_name = 0;
+	Options_list	options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
+
+	int		argi = parse_options(options, argc, argv);
+
+	if (!key_name && argc - argi == 1) {
 		std::clog << "Warning: 'git-crypt init' with a key file is deprecated as of git-crypt 0.4" << std::endl;
 		std::clog << "and will be removed in a future release. Please get in the habit of using" << std::endl;
 		std::clog << "'git-crypt unlock KEYFILE' instead." << std::endl;
 		return unlock(argc, argv);
 	}
-	if (argc != 0) {
-		std::clog << "Error: 'git-crypt init' takes no arguments." << std::endl;
+	if (argc - argi != 0) {
+		std::clog << "Usage: git-crypt init [-k KEYNAME]" << std::endl;
 		return 2;
 	}
 
-	std::string		internal_key_path(get_internal_key_path());
+	if (key_name) {
+		validate_key_name(key_name);
+	}
+
+	std::string		internal_key_path(get_internal_key_path(key_name));
 	if (access(internal_key_path.c_str(), F_OK) == 0) {
 		// TODO: add a -f option to reinitialize the repo anyways (this should probably imply a refresh)
+		// TODO: include key_name in error message
 		std::clog << "Error: this repository has already been initialized with git-crypt." << std::endl;
 		return 1;
 	}
@@ -557,7 +627,7 @@ int init (int argc, char** argv)
 	}
 
 	// 2. Configure git for git-crypt
-	configure_git_filters();
+	configure_git_filters(key_name);
 
 	return 0;
 }
@@ -565,11 +635,17 @@ int init (int argc, char** argv)
 int unlock (int argc, char** argv)
 {
 	const char*		symmetric_key_file = 0;
-	if (argc == 0) {
-	} else if (argc == 1) {
-		symmetric_key_file = argv[0];
+	const char*		key_name = 0;
+	Options_list		options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
+
+	int			argi = parse_options(options, argc, argv);
+	if (argc - argi == 0) {
+	} else if (argc - argi == 1) {
+		symmetric_key_file = argv[argi];
 	} else {
-		std::clog << "Usage: git-crypt unlock [KEYFILE]" << std::endl;
+		std::clog << "Usage: git-crypt unlock [-k KEYNAME] [KEYFILE]" << std::endl;
 		return 2;
 	}
 
@@ -630,14 +706,14 @@ int unlock (int argc, char** argv)
 		std::vector<std::string>	gpg_secret_keys(gpg_list_secret_keys());
 		// TODO: command-line option to specify the precise secret key to use
 		// TODO: don't hard code key version 0 here - instead, determine the most recent version and try to decrypt that, or decrypt all versions if command-line option specified
-		if (!decrypt_repo_key(key_file, 0, gpg_secret_keys, repo_keys_path)) {
+		if (!decrypt_repo_key(key_file, key_name, 0, gpg_secret_keys, repo_keys_path)) {
 			std::clog << "Error: no GPG secret key available to unlock this repository." << std::endl;
 			std::clog << "To unlock with a shared symmetric key instead, specify the path to the symmetric key as an argument to 'git-crypt unlock'." << std::endl;
 			std::clog << "To see a list of GPG keys authorized to unlock this repository, run 'git-crypt ls-collabs'." << std::endl;
 			return 1;
 		}
 	}
-	std::string		internal_key_path(get_internal_key_path());
+	std::string		internal_key_path(get_internal_key_path(key_name));
 	// TODO: croak if internal_key_path already exists???
 	mkdir_parent(internal_key_path);
 	if (!key_file.store_to_file(internal_key_path.c_str())) {
@@ -646,7 +722,7 @@ int unlock (int argc, char** argv)
 	}
 
 	// 4. Configure git for git-crypt
-	configure_git_filters();
+	configure_git_filters(key_name);
 
 	// 5. Do a force checkout so any files that were previously checked out encrypted
 	//    will now be checked out decrypted.
@@ -678,15 +754,21 @@ int unlock (int argc, char** argv)
 
 int add_collab (int argc, char** argv)
 {
-	if (argc == 0) {
-		std::clog << "Usage: git-crypt add-collab GPG_USER_ID [...]" << std::endl;
+	const char*		key_name = 0;
+	Options_list		options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
+
+	int			argi = parse_options(options, argc, argv);
+	if (argc - argi == 0) {
+		std::clog << "Usage: git-crypt add-collab [-k KEYNAME] GPG_USER_ID [...]" << std::endl;
 		return 2;
 	}
 
 	// build a list of key fingerprints for every collaborator specified on the command line
 	std::vector<std::string>	collab_keys;
 
-	for (int i = 0; i < argc; ++i) {
+	for (int i = argi; i < argc; ++i) {
 		std::vector<std::string> keys(gpg_lookup_key(argv[i]));
 		if (keys.empty()) {
 			std::clog << "Error: public key for '" << argv[i] << "' not found in your GPG keyring" << std::endl;
@@ -701,7 +783,7 @@ int add_collab (int argc, char** argv)
 
 	// TODO: have a retroactive option to grant access to all key versions, not just the most recent
 	Key_file			key_file;
-	load_key(key_file);
+	load_key(key_file, key_name);
 	const Key_file::Entry*		key = key_file.get_latest();
 	if (!key) {
 		std::clog << "Error: key file is empty" << std::endl;
@@ -711,7 +793,7 @@ int add_collab (int argc, char** argv)
 	std::string			keys_path(get_repo_keys_path());
 	std::vector<std::string>	new_files;
 
-	encrypt_repo_key(key_file.latest(), *key, collab_keys, keys_path, &new_files);
+	encrypt_repo_key(key_name, key_file.latest(), *key, collab_keys, keys_path, &new_files);
 
 	// add/commit the new files
 	if (!new_files.empty()) {
@@ -728,6 +810,7 @@ int add_collab (int argc, char** argv)
 
 		// git commit ...
 		// TODO: add a command line option (-n perhaps) to inhibit committing
+		// TODO: include key_name in commit message
 		std::ostringstream	commit_message_builder;
 		commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
 		for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
@@ -781,16 +864,22 @@ int ls_collabs (int argc, char** argv) // TODO
 int export_key (int argc, char** argv)
 {
 	// TODO: provide options to export only certain key versions
+	const char*		key_name = 0;
+	Options_list		options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
 
-	if (argc != 1) {
-		std::clog << "Usage: git-crypt export-key FILENAME" << std::endl;
+	int			argi = parse_options(options, argc, argv);
+
+	if (argc - argi != 1) {
+		std::clog << "Usage: git-crypt export-key [-k KEYNAME] FILENAME" << std::endl;
 		return 2;
 	}
 
 	Key_file		key_file;
-	load_key(key_file);
+	load_key(key_file, key_name);
 
-	const char*		out_file_name = argv[0];
+	const char*		out_file_name = argv[argi];
 
 	if (std::strcmp(out_file_name, "-") == 0) {
 		key_file.store(std::cout);
@@ -1005,7 +1094,7 @@ int status (int argc, char** argv)
 		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
 		const std::pair<std::string, std::string> file_attrs(get_file_attributes(filename));
 
-		if (file_attrs.first == "git-crypt") {
+		if (file_attrs.first == "git-crypt") { // TODO: key_name support
 			// File is encrypted
 			const bool	blob_is_unencrypted = !object_id.empty() && !check_if_blob_is_encrypted(object_id);
 
