@@ -81,20 +81,11 @@ static void configure_git_filters (const char* key_name)
 	}
 }
 
-static void validate_key_name (const char* key_name)
+static void validate_key_name_or_throw (const char* key_name)
 {
-	if (!*key_name) {
-		throw Error("Key name may not be empty");
-	}
-
-	if (std::strcmp(key_name, "default") == 0) {
-		throw Error("`default' is not a legal key name");
-	}
-	// Need to be restrictive with key names because they're used as part of a Git filter name
-	while (char c = *key_name++) {
-		if (!std::isalnum(c) && c != '-' && c != '_') {
-			throw Error("Key names may contain only A-Z, a-z, 0-9, '-', and '_'");
-		}
+	std::string			reason;
+	if (!validate_key_name(key_name, &reason)) {
+		throw Error(reason);
 	}
 }
 
@@ -330,25 +321,26 @@ static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t
 			if (!this_version_entry) {
 				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key version");
 			}
-			key_file.add(key_version, *this_version_entry);
+			key_file.add(*this_version_entry);
 			return true;
 		}
 	}
 	return false;
 }
 
-static void encrypt_repo_key (const char* key_name, uint32_t key_version, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
+static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
 {
 	std::string	key_file_data;
 	{
 		Key_file this_version_key_file;
-		this_version_key_file.add(key_version, key);
+		this_version_key_file.set_key_name(key_name);
+		this_version_key_file.add(key);
 		key_file_data = this_version_key_file.store_to_string();
 	}
 
 	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *collab << ".gpg";
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << *collab << ".gpg";
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
@@ -604,7 +596,7 @@ int init (int argc, char** argv)
 	}
 
 	if (key_name) {
-		validate_key_name(key_name);
+		validate_key_name_or_throw(key_name);
 	}
 
 	std::string		internal_key_path(get_internal_key_path(key_name));
@@ -618,6 +610,7 @@ int init (int argc, char** argv)
 	// 1. Generate a key and install it
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
+	key_file.set_key_name(key_name);
 	key_file.generate();
 
 	mkdir_parent(internal_key_path);
@@ -681,6 +674,12 @@ int unlock (int argc, char** argv)
 	if (symmetric_key_file) {
 		// Read from the symmetric key file
 		// TODO: command line flag to accept legacy key format?
+
+		if (key_name) {
+			std::clog << "Error: key name should not be specified when unlocking with symmetric key." << std::endl;
+			return 1;
+		}
+
 		try {
 			if (std::strcmp(symmetric_key_file, "-") == 0) {
 				key_file.load(std::cin);
@@ -713,7 +712,7 @@ int unlock (int argc, char** argv)
 			return 1;
 		}
 	}
-	std::string		internal_key_path(get_internal_key_path(key_name));
+	std::string		internal_key_path(get_internal_key_path(key_file.get_key_name()));
 	// TODO: croak if internal_key_path already exists???
 	mkdir_parent(internal_key_path);
 	if (!key_file.store_to_file(internal_key_path.c_str())) {
@@ -722,7 +721,7 @@ int unlock (int argc, char** argv)
 	}
 
 	// 4. Configure git for git-crypt
-	configure_git_filters(key_name);
+	configure_git_filters(key_file.get_key_name());
 
 	// 5. Do a force checkout so any files that were previously checked out encrypted
 	//    will now be checked out decrypted.
@@ -793,7 +792,7 @@ int add_collab (int argc, char** argv)
 	std::string			keys_path(get_repo_keys_path());
 	std::vector<std::string>	new_files;
 
-	encrypt_repo_key(key_name, key_file.latest(), *key, collab_keys, keys_path, &new_files);
+	encrypt_repo_key(key_name, *key, collab_keys, keys_path, &new_files);
 
 	// add/commit the new files
 	if (!new_files.empty()) {

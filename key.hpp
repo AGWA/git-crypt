@@ -45,12 +45,16 @@ enum {
 struct Key_file {
 public:
 	struct Entry {
+		uint32_t		version;
 		unsigned char		aes_key[AES_KEY_LEN];
 		unsigned char		hmac_key[HMAC_KEY_LEN];
 
+		Entry ();
+
 		void			load (std::istream&);
+		void			load_legacy (uint32_t version, std::istream&);
 		void			store (std::ostream&) const;
-		void			generate ();
+		void			generate (uint32_t version);
 	};
 
 	struct Malformed { }; // exception class
@@ -59,7 +63,7 @@ public:
 	const Entry*			get_latest () const;
 
 	const Entry*			get (uint32_t version) const;
-	void				add (uint32_t version, const Entry&);
+	void				add (const Entry&);
 
 	void				load_legacy (std::istream&);
 	void				load (std::istream&);
@@ -77,11 +81,33 @@ public:
 
 	uint32_t			latest () const;
 
+	void				set_key_name (const char* k) { key_name = k ? k : ""; }
+	const char*			get_key_name () const { return key_name.empty() ? 0 : key_name.c_str(); }
 private:
 	typedef std::map<uint32_t, Entry, std::greater<uint32_t> > Map;
-	enum { FORMAT_VERSION = 1 };
+	enum { FORMAT_VERSION = 2 };
 
 	Map				entries;
+	std::string			key_name;
+
+	void				load_header (std::istream&);
+
+	enum {
+		HEADER_FIELD_END	= 0,
+		HEADER_FIELD_KEY_NAME	= 1
+	};
+	enum {
+		KEY_FIELD_END		= 0,
+		KEY_FIELD_VERSION	= 1,
+		KEY_FIELD_AES_KEY	= 3,
+		KEY_FIELD_HMAC_KEY	= 5
+	};
 };
+
+enum {
+	KEY_NAME_MAX_LEN = 128
+};
+
+bool validate_key_name (const char* key_name, std::string* reason =0);
 
 #endif
