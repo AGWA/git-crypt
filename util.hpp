@@ -73,6 +73,7 @@ void		write_be32 (std::ostream& out, uint32_t);
 void		init_std_streams ();
 mode_t		util_umask (mode_t);
 int		util_rename (const char*, const char*);
+std::vector<std::string> get_directory_contents (const char* path);
 
 #endif
 

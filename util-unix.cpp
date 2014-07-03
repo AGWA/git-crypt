@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -295,4 +296,27 @@ mode_t util_umask (mode_t mode)
 int util_rename (const char* from, const char* to)
 {
 	return rename(from, to);
+}
+
+static int dirfilter (const struct dirent* ent)
+{
+	// filter out . and ..
+	return std::strcmp(ent->d_name, ".") != 0 && std::strcmp(ent->d_name, "..") != 0;
+}
+
+std::vector<std::string> get_directory_contents (const char* path)
+{
+	struct dirent**		namelist;
+	int			n = scandir(path, &namelist, dirfilter, alphasort);
+	if (n == -1) {
+		throw System_error("scandir", path, errno);
+	}
+	std::vector<std::string>	contents(n);
+	for (int i = 0; i < n; ++i) {
+		contents[i] = namelist[i]->d_name;
+		free(namelist[i]);
+	}
+	free(namelist);
+
+	return contents;
 }

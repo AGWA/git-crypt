@@ -33,6 +33,7 @@
 #include <fcntl.h>
 #include <windows.h>
 #include <vector>
+#include <cstring>
 
 std::string System_error::message () const
 {
@@ -356,4 +357,32 @@ int util_rename (const char* from, const char* to)
 	// On Windows OS, it is necessary to ensure target file doesn't exist
 	unlink(to);
 	return rename(from, to);
+}
+
+std::vector<std::string> get_directory_contents (const char* path)
+{
+	std::vector<std::string>	filenames;
+	std::string			patt(path);
+	if (!patt.empty() && patt[patt.size() - 1] != '/' && patt[patt.size() - 1] != '\\') {
+		patt.push_back('\\');
+	}
+	patt.push_back('*');
+
+	WIN32_FIND_DATAA		ffd;
+	HANDLE				h = FindFirstFileA(patt.c_str(), &ffd);
+	if (h == INVALID_HANDLE_VALUE) {
+		throw System_error("FindFirstFileA", patt, GetLastError());
+	}
+	do {
+		if (std::strcmp(ffd.cFileName, ".") != 0 && std::strcmp(ffd.cFileName, "..") != 0) {
+			filenames.push_back(ffd.cFileName);
+		}
+	} while (FindNextFileA(h, &ffd) != 0);
+
+	DWORD				err = GetLastError();
+	if (err != ERROR_NO_MORE_FILES) {
+		throw System_error("FileNextFileA", patt, err);
+	}
+	FindClose(h);
+	return filenames;
 }
