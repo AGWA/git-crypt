@@ -81,6 +81,11 @@ static void configure_git_filters (const char* key_name)
 	}
 }
 
+static bool same_key_name (const char* a, const char* b)
+{
+	return (!a && !b) || (a && b && std::strcmp(a, b) == 0);
+}
+
 static void validate_key_name_or_throw (const char* key_name)
 {
 	std::string			reason;
@@ -321,11 +326,42 @@ static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t
 			if (!this_version_entry) {
 				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key version");
 			}
+			if (!same_key_name(key_name, this_version_key_file.get_key_name())) {
+				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key name");
+			}
+			key_file.set_key_name(key_name);
 			key_file.add(*this_version_entry);
 			return true;
 		}
 	}
 	return false;
+}
+
+static bool decrypt_repo_keys (std::vector<Key_file>& key_files, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
+{
+	bool				successful = false;
+	std::vector<std::string>	dirents;
+
+	if (access(keys_path.c_str(), F_OK) == 0) {
+		dirents = get_directory_contents(keys_path.c_str());
+	}
+
+	for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
+		const char*		key_name = 0;
+		if (*dirent != "default") {
+			if (!validate_key_name(dirent->c_str())) {
+				continue;
+			}
+			key_name = dirent->c_str();
+		}
+
+		Key_file	key_file;
+		if (decrypt_repo_key(key_file, key_name, key_version, secret_keys, keys_path)) {
+			key_files.push_back(key_file);
+			successful = true;
+		}
+	}
+	return successful;
 }
 
 static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
@@ -627,21 +663,6 @@ int init (int argc, char** argv)
 
 int unlock (int argc, char** argv)
 {
-	const char*		symmetric_key_file = 0;
-	const char*		key_name = 0;
-	Options_list		options;
-	options.push_back(Option_def("-k", &key_name));
-	options.push_back(Option_def("--key-name", &key_name));
-
-	int			argi = parse_options(options, argc, argv);
-	if (argc - argi == 0) {
-	} else if (argc - argi == 1) {
-		symmetric_key_file = argv[argi];
-	} else {
-		std::clog << "Usage: git-crypt unlock [-k KEYNAME] [KEYFILE]" << std::endl;
-		return 2;
-	}
-
 	// 0. Make sure working directory is clean (ignoring untracked files)
 	// We do this because we run 'git checkout -f HEAD' later and we don't
 	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
@@ -669,35 +690,37 @@ int unlock (int argc, char** argv)
 	// mucked with the git config.)
 	std::string		path_to_top(get_path_to_top());
 
-	// 3. Install the key
-	Key_file		key_file;
-	if (symmetric_key_file) {
-		// Read from the symmetric key file
+	// 3. Load the key(s)
+	std::vector<Key_file>	key_files;
+	if (argc > 0) {
+		// Read from the symmetric key file(s)
 		// TODO: command line flag to accept legacy key format?
 
-		if (key_name) {
-			std::clog << "Error: key name should not be specified when unlocking with symmetric key." << std::endl;
-			return 1;
-		}
+		for (int argi = 0; argi < argc; ++argi) {
+			const char*	symmetric_key_file = argv[argi];
+			Key_file	key_file;
 
-		try {
-			if (std::strcmp(symmetric_key_file, "-") == 0) {
-				key_file.load(std::cin);
-			} else {
-				if (!key_file.load_from_file(symmetric_key_file)) {
-					std::clog << "Error: " << symmetric_key_file << ": unable to read key file" << std::endl;
-					return 1;
+			try {
+				if (std::strcmp(symmetric_key_file, "-") == 0) {
+					key_file.load(std::cin);
+				} else {
+					if (!key_file.load_from_file(symmetric_key_file)) {
+						std::clog << "Error: " << symmetric_key_file << ": unable to read key file" << std::endl;
+						return 1;
+					}
 				}
+			} catch (Key_file::Incompatible) {
+				std::clog << "Error: " << symmetric_key_file << " is in an incompatible format" << std::endl;
+				std::clog << "Please upgrade to a newer version of git-crypt." << std::endl;
+				return 1;
+			} catch (Key_file::Malformed) {
+				std::clog << "Error: " << symmetric_key_file << ": not a valid git-crypt key file" << std::endl;
+				std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
+				std::clog << "by running 'git-crypt migrate-key /path/to/key/file'." << std::endl;
+				return 1;
 			}
-		} catch (Key_file::Incompatible) {
-			std::clog << "Error: " << symmetric_key_file << " is in an incompatible format" << std::endl;
-			std::clog << "Please upgrade to a newer version of git-crypt." << std::endl;
-			return 1;
-		} catch (Key_file::Malformed) {
-			std::clog << "Error: " << symmetric_key_file << ": not a valid git-crypt key file" << std::endl;
-			std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
-			std::clog << "by running 'git-crypt migrate-key /path/to/key/file'." << std::endl;
-			return 1;
+
+			key_files.push_back(key_file);
 		}
 	} else {
 		// Decrypt GPG key from root of repo
@@ -705,23 +728,29 @@ int unlock (int argc, char** argv)
 		std::vector<std::string>	gpg_secret_keys(gpg_list_secret_keys());
 		// TODO: command-line option to specify the precise secret key to use
 		// TODO: don't hard code key version 0 here - instead, determine the most recent version and try to decrypt that, or decrypt all versions if command-line option specified
-		if (!decrypt_repo_key(key_file, key_name, 0, gpg_secret_keys, repo_keys_path)) {
+		// TODO: command line option to only unlock specific key instead of all of them
+		// TODO: avoid decrypting repo keys which are already unlocked in the .git directory
+		if (!decrypt_repo_keys(key_files, 0, gpg_secret_keys, repo_keys_path)) {
 			std::clog << "Error: no GPG secret key available to unlock this repository." << std::endl;
 			std::clog << "To unlock with a shared symmetric key instead, specify the path to the symmetric key as an argument to 'git-crypt unlock'." << std::endl;
 			std::clog << "To see a list of GPG keys authorized to unlock this repository, run 'git-crypt ls-collabs'." << std::endl;
 			return 1;
 		}
 	}
-	std::string		internal_key_path(get_internal_key_path(key_file.get_key_name()));
-	// TODO: croak if internal_key_path already exists???
-	mkdir_parent(internal_key_path);
-	if (!key_file.store_to_file(internal_key_path.c_str())) {
-		std::clog << "Error: " << internal_key_path << ": unable to write key file" << std::endl;
-		return 1;
-	}
 
-	// 4. Configure git for git-crypt
-	configure_git_filters(key_file.get_key_name());
+
+	// 4. Install the key(s) and configure the git filters
+	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
+		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
+		// TODO: croak if internal_key_path already exists???
+		mkdir_parent(internal_key_path);
+		if (!key_file->store_to_file(internal_key_path.c_str())) {
+			std::clog << "Error: " << internal_key_path << ": unable to write key file" << std::endl;
+			return 1;
+		}
+
+		configure_git_filters(key_file->get_key_name());
+	}
 
 	// 5. Do a force checkout so any files that were previously checked out encrypted
 	//    will now be checked out decrypted.
