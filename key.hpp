@@ -102,6 +102,9 @@ private:
 		KEY_FIELD_AES_KEY	= 3,
 		KEY_FIELD_HMAC_KEY	= 5
 	};
+	enum {
+		MAX_FIELD_LEN		= 1<<20
+	};
 };
 
 enum {

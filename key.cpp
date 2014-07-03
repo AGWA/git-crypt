@@ -91,8 +91,11 @@ void		Key_file::Entry::load (std::istream& in)
 			throw Incompatible();
 		} else {
 			// unknown non-critical field - safe to ignore
+			if (field_len > MAX_FIELD_LEN) {
+				throw Malformed();
+			}
 			in.ignore(field_len);
-			if (in.gcount() != field_len) {
+			if (in.gcount() != static_cast<std::streamsize>(field_len)) {
 				throw Malformed();
 			}
 		}
@@ -208,7 +211,7 @@ void		Key_file::load_header (std::istream& in)
 			}
 			std::vector<char>	bytes(field_len);
 			in.read(&bytes[0], field_len);
-			if (in.gcount() != field_len) {
+			if (in.gcount() != static_cast<std::streamsize>(field_len)) {
 				throw Malformed();
 			}
 			key_name.assign(&bytes[0], field_len);
@@ -220,8 +223,11 @@ void		Key_file::load_header (std::istream& in)
 			throw Incompatible();
 		} else {
 			// unknown non-critical field - safe to ignore
+			if (field_len > MAX_FIELD_LEN) {
+				throw Malformed();
+			}
 			in.ignore(field_len);
-			if (in.gcount() != field_len) {
+			if (in.gcount() != static_cast<std::streamsize>(field_len)) {
 				throw Malformed();
 			}
 		}
