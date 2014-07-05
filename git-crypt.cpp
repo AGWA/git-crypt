@@ -139,14 +139,14 @@ try {
 	if (std::strcmp(command, "unlock") == 0) {
 		return unlock(argc, argv);
 	}
-	if (std::strcmp(command, "add-collab") == 0) {
-		return add_collab(argc, argv);
+	if (std::strcmp(command, "add-gpg-key") == 0) {
+		return add_gpg_key(argc, argv);
 	}
-	if (std::strcmp(command, "rm-collab") == 0) {
-		return rm_collab(argc, argv);
+	if (std::strcmp(command, "rm-gpg-key") == 0) {
+		return rm_gpg_key(argc, argv);
 	}
-	if (std::strcmp(command, "ls-collabs") == 0) {
-		return ls_collabs(argc, argv);
+	if (std::strcmp(command, "ls-gpg-keys") == 0) {
+		return ls_gpg_keys(argc, argv);
 	}
 	if (std::strcmp(command, "export-key") == 0) {
 		return export_key(argc, argv);

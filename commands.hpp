@@ -46,9 +46,9 @@ int diff (int argc, char** argv);
 // Public commands:
 int init (int argc, char** argv);
 int unlock (int argc, char** argv);
-int add_collab (int argc, char** argv);
-int rm_collab (int argc, char** argv);
-int ls_collabs (int argc, char** argv);
+int add_gpg_key (int argc, char** argv);
+int rm_gpg_key (int argc, char** argv);
+int ls_gpg_keys (int argc, char** argv);
 int export_key (int argc, char** argv);
 int keygen (int argc, char** argv);
 int migrate_key (int argc, char** argv);

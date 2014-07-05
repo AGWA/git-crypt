@@ -780,7 +780,7 @@ int unlock (int argc, char** argv)
 	return 0;
 }
 
-int add_collab (int argc, char** argv)
+int add_gpg_key (int argc, char** argv)
 {
 	const char*		key_name = 0;
 	Options_list		options;
@@ -863,13 +863,13 @@ int add_collab (int argc, char** argv)
 	return 0;
 }
 
-int rm_collab (int argc, char** argv) // TODO
+int rm_gpg_key (int argc, char** argv) // TODO
 {
-	std::clog << "Error: rm-collab is not yet implemented." << std::endl;
+	std::clog << "Error: rm-gpg-key is not yet implemented." << std::endl;
 	return 1;
 }
 
-int ls_collabs (int argc, char** argv) // TODO
+int ls_gpg_keys (int argc, char** argv) // TODO
 {
 	// Sketch:
 	// Scan the sub-directories in .git-crypt/keys, outputting something like this:
@@ -885,7 +885,7 @@ int ls_collabs (int argc, char** argv) // TODO
 	// To resolve a long hex ID, use a command like this:
 	//  gpg --options /dev/null --fixed-list-mode --batch --with-colons --list-keys 0x143DE9B3F7316900
 
-	std::clog << "Error: ls-collabs is not yet implemented." << std::endl;
+	std::clog << "Error: ls-gpg-keys is not yet implemented." << std::endl;
 	return 1;
 }
 
