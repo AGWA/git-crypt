@@ -389,7 +389,7 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 	}
 }
 
-static int parse_plumbing_options (const char** key_name, const char** key_file, int argc, char** argv)
+static int parse_plumbing_options (const char** key_name, const char** key_file, int argc, const char** argv)
 {
 	Options_list	options;
 	options.push_back(Option_def("-k", key_name));
@@ -402,7 +402,7 @@ static int parse_plumbing_options (const char** key_name, const char** key_file,
 
 
 // Encrypt contents of stdin and write to stdout
-int clean (int argc, char** argv)
+int clean (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -522,7 +522,7 @@ int clean (int argc, char** argv)
 }
 
 // Decrypt contents of stdin and write to stdout
-int smudge (int argc, char** argv)
+int smudge (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -559,7 +559,7 @@ int smudge (int argc, char** argv)
 	return 0;
 }
 
-int diff (int argc, char** argv)
+int diff (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -611,7 +611,7 @@ int diff (int argc, char** argv)
 	return 0;
 }
 
-int init (int argc, char** argv)
+int init (int argc, const char** argv)
 {
 	const char*	key_name = 0;
 	Options_list	options;
@@ -661,7 +661,7 @@ int init (int argc, char** argv)
 	return 0;
 }
 
-int unlock (int argc, char** argv)
+int unlock (int argc, const char** argv)
 {
 	// 0. Make sure working directory is clean (ignoring untracked files)
 	// We do this because we run 'git checkout -f HEAD' later and we don't
@@ -780,7 +780,7 @@ int unlock (int argc, char** argv)
 	return 0;
 }
 
-int add_gpg_key (int argc, char** argv)
+int add_gpg_key (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	Options_list		options;
@@ -863,13 +863,13 @@ int add_gpg_key (int argc, char** argv)
 	return 0;
 }
 
-int rm_gpg_key (int argc, char** argv) // TODO
+int rm_gpg_key (int argc, const char** argv) // TODO
 {
 	std::clog << "Error: rm-gpg-key is not yet implemented." << std::endl;
 	return 1;
 }
 
-int ls_gpg_keys (int argc, char** argv) // TODO
+int ls_gpg_keys (int argc, const char** argv) // TODO
 {
 	// Sketch:
 	// Scan the sub-directories in .git-crypt/keys, outputting something like this:
@@ -889,7 +889,7 @@ int ls_gpg_keys (int argc, char** argv) // TODO
 	return 1;
 }
 
-int export_key (int argc, char** argv)
+int export_key (int argc, const char** argv)
 {
 	// TODO: provide options to export only certain key versions
 	const char*		key_name = 0;
@@ -921,7 +921,7 @@ int export_key (int argc, char** argv)
 	return 0;
 }
 
-int keygen (int argc, char** argv)
+int keygen (int argc, const char** argv)
 {
 	if (argc != 1) {
 		std::clog << "Usage: git-crypt keygen KEYFILE" << std::endl;
@@ -950,7 +950,7 @@ int keygen (int argc, char** argv)
 	return 0;
 }
 
-int migrate_key (int argc, char** argv)
+int migrate_key (int argc, const char** argv)
 {
 	if (argc != 1) {
 		std::clog << "Usage: git-crypt migrate-key KEYFILE" << std::endl;
@@ -1000,13 +1000,13 @@ int migrate_key (int argc, char** argv)
 	return 0;
 }
 
-int refresh (int argc, char** argv) // TODO: do a force checkout, much like in unlock
+int refresh (int argc, const char** argv) // TODO: do a force checkout, much like in unlock
 {
 	std::clog << "Error: refresh is not yet implemented." << std::endl;
 	return 1;
 }
 
-int status (int argc, char** argv)
+int status (int argc, const char** argv)
 {
 	// Usage:
 	//  git-crypt status -r [-z]			Show repo status

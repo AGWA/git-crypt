@@ -40,20 +40,20 @@ struct Error {
 };
 
 // Plumbing commands:
-int clean (int argc, char** argv);
-int smudge (int argc, char** argv);
-int diff (int argc, char** argv);
+int clean (int argc, const char** argv);
+int smudge (int argc, const char** argv);
+int diff (int argc, const char** argv);
 // Public commands:
-int init (int argc, char** argv);
-int unlock (int argc, char** argv);
-int add_gpg_key (int argc, char** argv);
-int rm_gpg_key (int argc, char** argv);
-int ls_gpg_keys (int argc, char** argv);
-int export_key (int argc, char** argv);
-int keygen (int argc, char** argv);
-int migrate_key (int argc, char** argv);
-int refresh (int argc, char** argv);
-int status (int argc, char** argv);
+int init (int argc, const char** argv);
+int unlock (int argc, const char** argv);
+int add_gpg_key (int argc, const char** argv);
+int rm_gpg_key (int argc, const char** argv);
+int ls_gpg_keys (int argc, const char** argv);
+int export_key (int argc, const char** argv);
+int keygen (int argc, const char** argv);
+int migrate_key (int argc, const char** argv);
+int refresh (int argc, const char** argv);
+int status (int argc, const char** argv);
 
 #endif
 

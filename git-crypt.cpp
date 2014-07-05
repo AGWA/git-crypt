@@ -81,7 +81,7 @@ static void print_usage (std::ostream& out)
 }
 
 
-int main (int argc, char** argv)
+int main (int argc, const char** argv)
 try {
 	argv0 = argv[0];
 

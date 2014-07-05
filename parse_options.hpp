@@ -48,7 +48,7 @@ struct Option_def {
 
 typedef std::vector<Option_def> Options_list;
 
-int parse_options (const Options_list& options, int argc, char** argv);
+int parse_options (const Options_list& options, int argc, const char** argv);
 
 struct Option_error {
 	std::string	option_name;

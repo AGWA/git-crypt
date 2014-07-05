@@ -42,7 +42,7 @@ static const Option_def* find_option (const Options_list& options, const std::st
 	return 0;
 }
 
-int parse_options (const Options_list& options, int argc, char** argv)
+int parse_options (const Options_list& options, int argc, const char** argv)
 {
 	int	argi = 0;
 
@@ -53,7 +53,7 @@ int parse_options (const Options_list& options, int argc, char** argv)
 		} else if (std::strncmp(argv[argi], "--", 2) == 0) {
 			std::string			option_name;
 			const char*			option_value = 0;
-			if (char* eq = std::strchr(argv[argi], '=')) {
+			if (const char* eq = std::strchr(argv[argi], '=')) {
 				option_name.assign(argv[argi], eq);
 				option_value = eq + 1;
 			} else {
