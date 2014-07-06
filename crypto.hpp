@@ -32,18 +32,40 @@
 #define GIT_CRYPT_CRYPTO_HPP
 
 #include "key.hpp"
-#include <openssl/aes.h>
-#include <openssl/hmac.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <iosfwd>
 #include <string>
+
+void init_crypto ();
 
 struct Crypto_error {
 	std::string	where;
 	std::string	message;
 
 	Crypto_error (const std::string& w, const std::string& m) : where(w), message(m) { }
+};
+
+struct Aes_impl;
+
+class Aes_ecb_encryptor {
+public:
+	enum {
+		KEY_LEN		= AES_KEY_LEN,
+		BLOCK_LEN	= 16
+	};
+
+private:
+	Aes_impl*	impl;
+
+	// disallow copy/assignment:
+	Aes_ecb_encryptor (const Aes_ecb_encryptor&);
+	Aes_ecb_encryptor& operator= (const Aes_ecb_encryptor&);
+
+public:
+	Aes_ecb_encryptor (const unsigned char* key);
+	~Aes_ecb_encryptor ();
+	void encrypt (const unsigned char* plain, unsigned char* cipher);
 };
 
 class Aes_ctr_encryptor {
@@ -56,10 +78,10 @@ public:
 	};
 
 private:
-	AES_KEY		key;
-	char		nonce[NONCE_LEN];// First 96 bits of counter
-	uint32_t	byte_counter;	// How many bytes processed so far?
-	unsigned char	otp[BLOCK_LEN];	// The current OTP that's in use
+	Aes_ecb_encryptor	ecb;
+	char			nonce[NONCE_LEN];// First 96 bits of counter
+	uint32_t		byte_counter;	// How many bytes processed so far?
+	unsigned char		otp[BLOCK_LEN];	// The current OTP that's in use
 
 public:
 	Aes_ctr_encryptor (const unsigned char* key, const unsigned char* nonce);
@@ -72,6 +94,8 @@ public:
 
 typedef Aes_ctr_encryptor Aes_ctr_decryptor;
 
+struct Hmac_impl;
+
 class Hmac_sha1_state {
 public:
 	enum {
@@ -80,7 +104,7 @@ public:
 	};
 
 private:
-	HMAC_CTX	ctx;
+	Hmac_impl*	impl;
 
 	// disallow copy/assignment:
 	Hmac_sha1_state (const Hmac_sha1_state&) { }

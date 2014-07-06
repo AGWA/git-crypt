@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <iostream>
 #include <string.h>
-#include <openssl/err.h>
 
 const char*	argv0;
 
@@ -90,7 +89,7 @@ try {
 	 */
 
 	init_std_streams();
-	ERR_load_crypto_strings();
+	init_crypto();
 
 	/*
 	 * Parse command line arguments
