@@ -48,8 +48,8 @@ struct Aes_impl {
 };
 
 Aes_ecb_encryptor::Aes_ecb_encryptor (const unsigned char* raw_key)
+: impl(new Aes_impl)
 {
-	impl = new Aes_impl;
 	if (AES_set_encrypt_key(raw_key, KEY_LEN * 8, &(impl->key)) != 0) {
 		throw Crypto_error("Aes_ctr_encryptor::Aes_ctr_encryptor", "AES_set_encrypt_key failed");
 	}
@@ -57,7 +57,8 @@ Aes_ecb_encryptor::Aes_ecb_encryptor (const unsigned char* raw_key)
 
 Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 {
-	delete impl;
+	// Note: Explicit destructor necessary because class contains an auto_ptr
+	// which contains an incomplete type when the auto_ptr is declared.
 }
 
 void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* cipher)
@@ -70,15 +71,17 @@ struct Hmac_impl {
 };
 
 Hmac_sha1_state::Hmac_sha1_state (const unsigned char* key, size_t key_len)
+: impl(new Hmac_impl)
 {
-	impl = new Hmac_impl;
 	HMAC_Init(&(impl->ctx), key, key_len, EVP_sha1());
 }
 
 Hmac_sha1_state::~Hmac_sha1_state ()
 {
+	// Note: Explicit destructor necessary because class contains an auto_ptr
+	// which contains an incomplete type when the auto_ptr is declared.
+
 	HMAC_cleanup(&(impl->ctx));
-	delete impl;
 }
 
 void Hmac_sha1_state::add (const unsigned char* buffer, size_t buffer_len)

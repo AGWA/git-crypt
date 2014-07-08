@@ -36,6 +36,7 @@
 #include <stddef.h>
 #include <iosfwd>
 #include <string>
+#include <memory>
 
 void init_crypto ();
 
@@ -56,11 +57,7 @@ public:
 	};
 
 private:
-	Aes_impl*	impl;
-
-	// disallow copy/assignment:
-	Aes_ecb_encryptor (const Aes_ecb_encryptor&);
-	Aes_ecb_encryptor& operator= (const Aes_ecb_encryptor&);
+	std::auto_ptr<Aes_impl>	impl;
 
 public:
 	Aes_ecb_encryptor (const unsigned char* key);
@@ -104,11 +101,7 @@ public:
 	};
 
 private:
-	Hmac_impl*	impl;
-
-	// disallow copy/assignment:
-	Hmac_sha1_state (const Hmac_sha1_state&) { }
-	Hmac_sha1_state& operator= (const Hmac_sha1_state&) { return *this; }
+	std::auto_ptr<Hmac_impl>	impl;
 
 public:
 	Hmac_sha1_state (const unsigned char* key, size_t key_len);
