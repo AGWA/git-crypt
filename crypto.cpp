@@ -32,32 +32,33 @@
 #include "util.hpp"
 #include <cstring>
 
-Aes_ctr_encryptor::Aes_ctr_encryptor (const unsigned char* raw_key, const unsigned char* arg_nonce)
+Aes_ctr_encryptor::Aes_ctr_encryptor (const unsigned char* raw_key, const unsigned char* nonce)
 : ecb(raw_key)
 {
-	std::memcpy(nonce, arg_nonce, NONCE_LEN);
+	// Set first 12 bytes of the CTR value to the nonce.
+	// This stays the same for the entirety of this object's lifetime.
+	std::memcpy(ctr_value, nonce, NONCE_LEN);
 	byte_counter = 0;
-	std::memset(otp, '\0', sizeof(otp));
+}
+
+Aes_ctr_encryptor::~Aes_ctr_encryptor ()
+{
+	std::memset(pad, '\0', BLOCK_LEN);
 }
 
 void Aes_ctr_encryptor::process (const unsigned char* in, unsigned char* out, size_t len)
 {
 	for (size_t i = 0; i < len; ++i) {
 		if (byte_counter % BLOCK_LEN == 0) {
-			unsigned char	ctr[BLOCK_LEN];
+			// Set last 4 bytes of CTR to the (big-endian) block number (sequentially increasing with each block)
+			store_be32(ctr_value + NONCE_LEN, byte_counter / BLOCK_LEN);
 
-			// First 12 bytes of CTR: nonce
-			std::memcpy(ctr, nonce, NONCE_LEN);
-
-			// Last 4 bytes of CTR: block number (sequentially increasing with each block) (big endian)
-			store_be32(ctr + NONCE_LEN, byte_counter / BLOCK_LEN);
-
-			// Generate a new OTP
-			ecb.encrypt(ctr, otp);
+			// Generate a new pad
+			ecb.encrypt(ctr_value, pad);
 		}
 
 		// encrypt one byte
-		out[i] = in[i] ^ otp[byte_counter++ % BLOCK_LEN];
+		out[i] = in[i] ^ pad[byte_counter++ % BLOCK_LEN];
 
 		if (byte_counter == 0) {
 			throw Crypto_error("Aes_ctr_encryptor::process", "Too much data to encrypt securely");

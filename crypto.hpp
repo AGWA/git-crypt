@@ -76,12 +76,13 @@ public:
 
 private:
 	Aes_ecb_encryptor	ecb;
-	char			nonce[NONCE_LEN];// First 96 bits of counter
-	uint32_t		byte_counter;	// How many bytes processed so far?
-	unsigned char		otp[BLOCK_LEN];	// The current OTP that's in use
+	unsigned char		ctr_value[BLOCK_LEN];	// Current CTR value (used as input to AES to derive pad)
+	unsigned char		pad[BLOCK_LEN];		// Current encryption pad (output of AES)
+	uint32_t		byte_counter;		// How many bytes processed so far?
 
 public:
 	Aes_ctr_encryptor (const unsigned char* key, const unsigned char* nonce);
+	~Aes_ctr_encryptor ();
 
 	void process (const unsigned char* in, unsigned char* out, size_t len);
 
