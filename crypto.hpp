@@ -47,8 +47,6 @@ struct Crypto_error {
 	Crypto_error (const std::string& w, const std::string& m) : where(w), message(m) { }
 };
 
-struct Aes_impl;
-
 class Aes_ecb_encryptor {
 public:
 	enum {
@@ -57,6 +55,8 @@ public:
 	};
 
 private:
+	struct Aes_impl;
+
 	std::auto_ptr<Aes_impl>	impl;
 
 public:
@@ -91,8 +91,6 @@ public:
 
 typedef Aes_ctr_encryptor Aes_ctr_decryptor;
 
-struct Hmac_impl;
-
 class Hmac_sha1_state {
 public:
 	enum {
@@ -101,6 +99,8 @@ public:
 	};
 
 private:
+	struct Hmac_impl;
+
 	std::auto_ptr<Hmac_impl>	impl;
 
 public:

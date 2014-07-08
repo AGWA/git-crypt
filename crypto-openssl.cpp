@@ -43,7 +43,7 @@ void init_crypto ()
 	ERR_load_crypto_strings();
 }
 
-struct Aes_impl {
+struct Aes_ecb_encryptor::Aes_impl {
 	AES_KEY key;
 };
 
@@ -66,7 +66,7 @@ void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* ciphe
 	AES_encrypt(plain, cipher, &(impl->key));
 }
 
-struct Hmac_impl {
+struct Hmac_sha1_state::Hmac_impl {
 	HMAC_CTX ctx;
 };
 
