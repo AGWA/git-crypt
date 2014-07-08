@@ -37,6 +37,7 @@
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #include <sstream>
+#include <cstring>
 
 void init_crypto ()
 {
@@ -59,6 +60,8 @@ Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 {
 	// Note: Explicit destructor necessary because class contains an auto_ptr
 	// which contains an incomplete type when the auto_ptr is declared.
+
+	std::memset(&impl->key, '\0', sizeof(impl->key));
 }
 
 void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* cipher)
