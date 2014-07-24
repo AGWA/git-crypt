@@ -521,6 +521,21 @@ int clean (int argc, const char** argv)
 	return 0;
 }
 
+static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char* header, std::istream& in)
+{
+	const unsigned char*	nonce = header + 10;
+	uint32_t		key_version = 0; // TODO: get the version from the file header
+
+	const Key_file::Entry*	key = key_file.get(key_version);
+	if (!key) {
+		std::clog << "git-crypt: error: key version " << key_version << " not available - please unlock with the latest version of the key." << std::endl;
+		return 1;
+	}
+
+	Aes_ctr_decryptor::process_stream(in, std::cout, key->aes_key, nonce);
+	return 0;
+}
+
 // Decrypt contents of stdin and write to stdout
 int smudge (int argc, const char** argv)
 {
@@ -546,17 +561,8 @@ int smudge (int argc, const char** argv)
 		std::clog << "git-crypt: error: file not encrypted" << std::endl;
 		return 1;
 	}
-	const unsigned char*	nonce = header + 10;
-	uint32_t		key_version = 0; // TODO: get the version from the file header
 
-	const Key_file::Entry*	key = key_file.get(key_version);
-	if (!key) {
-		std::clog << "git-crypt: error: key version " << key_version << " not available - please unlock with the latest version of the key." << std::endl;
-		return 1;
-	}
-
-	Aes_ctr_decryptor::process_stream(std::cin, std::cout, key->aes_key, nonce);
-	return 0;
+	return decrypt_file_to_stdout(key_file, header, std::cin);
 }
 
 int diff (int argc, const char** argv)
@@ -598,17 +604,7 @@ int diff (int argc, const char** argv)
 	}
 
 	// Go ahead and decrypt it
-	const unsigned char*	nonce = header + 10;
-	uint32_t		key_version = 0; // TODO: get the version from the file header
-
-	const Key_file::Entry*	key = key_file.get(key_version);
-	if (!key) {
-		std::clog << "git-crypt: error: key version " << key_version << " not available - please unlock with the latest version of the key." << std::endl;
-		return 1;
-	}
-
-	Aes_ctr_decryptor::process_stream(in, std::cout, key->aes_key, nonce);
-	return 0;
+	return decrypt_file_to_stdout(key_file, header, in);
 }
 
 int init (int argc, const char** argv)
