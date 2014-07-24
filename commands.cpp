@@ -532,7 +532,26 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 		return 1;
 	}
 
-	Aes_ctr_decryptor::process_stream(in, std::cout, key->aes_key, nonce);
+	Aes_ctr_decryptor	aes(key->aes_key, nonce);
+	Hmac_sha1_state		hmac(key->hmac_key, HMAC_KEY_LEN);
+	while (in) {
+		unsigned char	buffer[1024];
+		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
+		aes.process(buffer, buffer, in.gcount());
+		hmac.add(buffer, in.gcount());
+		std::cout.write(reinterpret_cast<char*>(buffer), in.gcount());
+	}
+
+	unsigned char		digest[Hmac_sha1_state::LEN];
+	hmac.get(digest);
+	if (!leakless_equals(digest, nonce, Aes_ctr_decryptor::NONCE_LEN)) {
+		std::clog << "git-crypt: error: encrypted file has been tampered with!" << std::endl;
+		// Although we've already written the tampered file to stdout, exiting
+		// with a non-zero status will tell git the file has not been filtered,
+		// so git will not replace it.
+		return 1;
+	}
+
 	return 0;
 }
 

@@ -92,6 +92,23 @@ void*		explicit_memset (void* s, int c, std::size_t n)
 	return s;
 }
 
+static bool	leakless_equals_char (const unsigned char* a, const unsigned char* b, std::size_t len)
+{
+	volatile int	diff = 0;
+
+	while (len > 0) {
+		diff |= *a++ ^ *b++;
+		--len;
+	}
+
+	return diff == 0;
+}
+
+bool 		leakless_equals (const void* a, const void* b, std::size_t len)
+{
+	return leakless_equals_char(reinterpret_cast<const unsigned char*>(a), reinterpret_cast<const unsigned char*>(b), len);
+}
+
 static void	init_std_streams_platform (); // platform-specific initialization
 
 void		init_std_streams ()
