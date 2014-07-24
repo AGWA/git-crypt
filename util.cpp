@@ -81,6 +81,17 @@ void		write_be32 (std::ostream& out, uint32_t i)
 	out.write(reinterpret_cast<const char*>(buffer), 4);
 }
 
+void*		explicit_memset (void* s, int c, std::size_t n)
+{
+	volatile unsigned char* p = reinterpret_cast<unsigned char*>(s);
+
+	while (n--) {
+		*p++ = c;
+	}
+
+	return s;
+}
+
 static void	init_std_streams_platform (); // platform-specific initialization
 
 void		init_std_streams ()

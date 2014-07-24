@@ -43,7 +43,7 @@ Aes_ctr_encryptor::Aes_ctr_encryptor (const unsigned char* raw_key, const unsign
 
 Aes_ctr_encryptor::~Aes_ctr_encryptor ()
 {
-	std::memset(pad, '\0', BLOCK_LEN);
+	explicit_memset(pad, '\0', BLOCK_LEN);
 }
 
 void Aes_ctr_encryptor::process (const unsigned char* in, unsigned char* out, size_t len)

@@ -70,6 +70,7 @@ uint32_t	load_be32 (const unsigned char*);
 void		store_be32 (unsigned char*, uint32_t);
 bool		read_be32 (std::istream& in, uint32_t&);
 void		write_be32 (std::ostream& out, uint32_t);
+void*		explicit_memset (void* s, int c, size_t n);	// memset that won't be optimized away
 void		init_std_streams ();
 mode_t		util_umask (mode_t);
 int		util_rename (const char*, const char*);

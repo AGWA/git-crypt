@@ -30,6 +30,7 @@
 
 #include "crypto.hpp"
 #include "key.hpp"
+#include "util.hpp"
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
@@ -61,7 +62,7 @@ Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 	// Note: Explicit destructor necessary because class contains an auto_ptr
 	// which contains an incomplete type when the auto_ptr is declared.
 
-	std::memset(&impl->key, '\0', sizeof(impl->key));
+	explicit_memset(&impl->key, '\0', sizeof(impl->key));
 }
 
 void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* cipher)

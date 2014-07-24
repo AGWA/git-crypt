@@ -45,8 +45,8 @@
 Key_file::Entry::Entry ()
 {
 	version = 0;
-	std::memset(aes_key, 0, AES_KEY_LEN);
-	std::memset(hmac_key, 0, HMAC_KEY_LEN);
+	explicit_memset(aes_key, 0, AES_KEY_LEN);
+	explicit_memset(hmac_key, 0, HMAC_KEY_LEN);
 }
 
 void		Key_file::Entry::load (std::istream& in)
