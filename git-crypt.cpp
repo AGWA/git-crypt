@@ -94,18 +94,11 @@ try {
 	/*
 	 * Parse command line arguments
 	 */
-	const char*		profile = 0;
 	int			arg_index = 1;
 	while (arg_index < argc && argv[arg_index][0] == '-') {
 		if (std::strcmp(argv[arg_index], "--help") == 0) {
 			print_usage(std::clog);
 			return 0;
-		} else if (std::strncmp(argv[arg_index], "--profile=", 10) == 0) {
-			profile = argv[arg_index] + 10;
-			++arg_index;
-		} else if (std::strcmp(argv[arg_index], "-p") == 0 && arg_index + 1 < argc) {
-			profile = argv[arg_index + 1];
-			arg_index += 2;
 		} else if (std::strcmp(argv[arg_index], "--") == 0) {
 			++arg_index;
 			break;
@@ -115,8 +108,6 @@ try {
 			return 2;
 		}
 	}
-
-	(void)(profile); // TODO: profile support
 
 	argc -= arg_index;
 	argv += arg_index;
