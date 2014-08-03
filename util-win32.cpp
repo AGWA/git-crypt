@@ -346,10 +346,8 @@ static void	init_std_streams_platform ()
 	_setmode(_fileno(stdout), _O_BINARY);
 }
 
-mode_t util_umask (mode_t mode)
+void create_protected_file (const char* path) // TODO
 {
-	// Not available in Windows and function not always defined in Win32 environments
-	return 0;
 }
 
 int util_rename (const char* from, const char* to)

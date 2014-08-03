@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <vector>
@@ -72,14 +73,14 @@ void	temp_fstream::open (std::ios_base::openmode mode)
 	char*			path = &path_buffer[0];
 	std::strcpy(path, tmpdir);
 	std::strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
-	mode_t			old_umask = util_umask(0077);
+	mode_t			old_umask = umask(0077);
 	int			fd = mkstemp(path);
 	if (fd == -1) {
 		int		mkstemp_errno = errno;
-		util_umask(old_umask);
+		umask(old_umask);
 		throw System_error("mkstemp", "", mkstemp_errno);
 	}
-	util_umask(old_umask);
+	umask(old_umask);
 	std::fstream::open(path, mode);
 	if (!std::fstream::is_open()) {
 		unlink(path);
@@ -288,9 +289,13 @@ static void	init_std_streams_platform ()
 {
 }
 
-mode_t util_umask (mode_t mode)
+void	create_protected_file (const char* path)
 {
-	return umask(mode);
+	int	fd = open(path, O_WRONLY | O_CREAT, 0600);
+	if (fd == -1) {
+		throw System_error("open", path, errno);
+	}
+	close(fd);
 }
 
 int util_rename (const char* from, const char* to)

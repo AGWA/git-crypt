@@ -73,7 +73,7 @@ void		write_be32 (std::ostream& out, uint32_t);
 void*		explicit_memset (void* s, int c, size_t n);	// memset that won't be optimized away
 bool		leakless_equals (const void* a, const void* b, size_t len); // compare bytes w/o leaking timing
 void		init_std_streams ();
-mode_t		util_umask (mode_t);
+void		create_protected_file (const char* path); // create empty file accessible only by current user
 int		util_rename (const char*, const char*);
 std::vector<std::string> get_directory_contents (const char* path);
 

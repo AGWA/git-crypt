@@ -261,9 +261,8 @@ bool		Key_file::load_from_file (const char* key_file_name)
 
 bool		Key_file::store_to_file (const char* key_file_name) const
 {
-	mode_t		old_umask = util_umask(0077); // make sure key file is protected
+	create_protected_file(key_file_name);
 	std::ofstream	key_file_out(key_file_name, std::fstream::binary);
-	util_umask(old_umask);
 	if (!key_file_out) {
 		return false;
 	}
