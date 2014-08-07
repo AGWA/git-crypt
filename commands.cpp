@@ -579,8 +579,11 @@ int smudge (int argc, const char** argv)
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
 	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
-		std::clog << "git-crypt: error: file not encrypted" << std::endl;
-		return 1;
+		// File not encrypted - just copy it out to stdout
+		std::clog << "git-crypt: warning: file not encrypted" << std::endl; // TODO: display additional information explaining why file might be unencrypted
+		std::cout.write(reinterpret_cast<char*>(header), std::cin.gcount()); // include the bytes which we already read
+		std::cout << std::cin.rdbuf();
+		return 0;
 	}
 
 	return decrypt_file_to_stdout(key_file, header, std::cin);
@@ -619,7 +622,7 @@ int diff (int argc, const char** argv)
 	in.read(reinterpret_cast<char*>(header), sizeof(header));
 	if (in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		// File not encrypted - just copy it out to stdout
-		std::cout.write(reinterpret_cast<char*>(header), in.gcount()); // don't forget to include the header which we read!
+		std::cout.write(reinterpret_cast<char*>(header), in.gcount()); // include the bytes which we already read
 		std::cout << in.rdbuf();
 		return 0;
 	}
