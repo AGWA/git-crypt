@@ -209,12 +209,18 @@ void		Key_file::load_header (std::istream& in)
 			if (field_len > KEY_NAME_MAX_LEN) {
 				throw Malformed();
 			}
-			std::vector<char>	bytes(field_len);
-			in.read(&bytes[0], field_len);
-			if (in.gcount() != static_cast<std::streamsize>(field_len)) {
-				throw Malformed();
+			if (field_len == 0) {
+				// special case field_len==0 to avoid possible undefined behavior
+				// edge cases with an empty std::vector (particularly, &bytes[0]).
+				key_name.clear();
+			} else {
+				std::vector<char>	bytes(field_len);
+				in.read(&bytes[0], field_len);
+				if (in.gcount() != static_cast<std::streamsize>(field_len)) {
+					throw Malformed();
+				}
+				key_name.assign(&bytes[0], field_len);
 			}
-			key_name.assign(&bytes[0], field_len);
 			if (!validate_key_name(key_name.c_str())) {
 				key_name.clear();
 				throw Malformed();
