@@ -57,6 +57,7 @@ static void print_usage (std::ostream& out)
 	//out << "   rm-gpg-key KEYID    revoke collaborator status from the given GPG key ID" << std::endl;
 	//out << "   ls-gpg-keys         list the GPG key IDs of collaborators" << std::endl;
 	out << "   unlock              decrypt this repo using the in-repo GPG-encrypted key" << std::endl;
+	out << "   lock                check out encrypted versions of files in this repo" << std::endl;
 	out << std::endl;
 	out << "Symmetric key commands:" << std::endl;
 	out << "   export-key FILE     export this repo's symmetric key to the given file" << std::endl;
@@ -134,6 +135,9 @@ try {
 	}
 	if (std::strcmp(command, "unlock") == 0) {
 		return unlock(argc, argv);
+	}
+	if (std::strcmp(command, "lock") == 0) {
+		return lock(argc, argv);
 	}
 	if (std::strcmp(command, "add-gpg-key") == 0) {
 		return add_gpg_key(argc, argv);

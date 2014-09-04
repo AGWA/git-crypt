@@ -62,6 +62,19 @@ static void git_config (const std::string& name, const std::string& value)
 	}
 }
 
+static void git_unconfig (const std::string& name)
+{
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--remove-section");
+	command.push_back(name);
+
+	if (!successful_exit(exec_command(command))) {
+		throw Error("'git config' failed");
+	}
+}
+
 static void configure_git_filters (const char* key_name)
 {
 	std::string	escaped_git_crypt_path(escape_shell_arg(our_exe_path()));
@@ -83,6 +96,43 @@ static void configure_git_filters (const char* key_name)
 	}
 }
 
+static void unconfigure_git_filters (const char* key_name)
+{
+	// unconfigure the git-crypt filters
+	if (key_name && (strncmp(key_name, "default", 7) != 0)) {
+		// named key
+		git_unconfig(std::string("filter.git-crypt-") + key_name);
+		git_unconfig(std::string("diff.git-crypt-") + key_name);
+	} else {
+		// default key
+		git_unconfig("filter.git-crypt");
+		git_unconfig("diff.git-crypt");
+	}
+}
+
+static bool git_checkout_head (const std::string& top_dir)
+{
+	std::vector<std::string>	command;
+
+	command.push_back("git");
+	command.push_back("checkout");
+	command.push_back("-f");
+	command.push_back("HEAD");
+	command.push_back("--");
+
+	if (top_dir.empty()) {
+		command.push_back(".");
+	} else {
+		command.push_back(top_dir);
+	}
+
+	if (!successful_exit(exec_command(command))) {
+		return false;
+	}
+
+	return true;
+}
+
 static bool same_key_name (const char* a, const char* b)
 {
 	return (!a && !b) || (a && b && std::strcmp(a, b) == 0);
@@ -96,7 +146,7 @@ static void validate_key_name_or_throw (const char* key_name)
 	}
 }
 
-static std::string get_internal_key_path (const char* key_name)
+static std::string get_internal_keys_path ()
 {
 	// git rev-parse --git-dir
 	std::vector<std::string>	command;
@@ -112,8 +162,17 @@ static std::string get_internal_key_path (const char* key_name)
 
 	std::string			path;
 	std::getline(output, path);
-	path += "/git-crypt/keys/";
+	path += "/git-crypt/keys";
+
+	return path;
+}
+
+static std::string get_internal_key_path (const char* key_name)
+{
+	std::string		path(get_internal_keys_path());
+	path += "/";
 	path += key_name ? key_name : "default";
+
 	return path;
 }
 
@@ -313,6 +372,15 @@ static void load_key (Key_file& key_file, const char* key_name, const char* key_
 	}
 }
 
+static void unlink_repo_key (const char* key_name)
+{
+	std::string	key_path(get_internal_key_path(key_name ? key_name : "default"));
+
+	if ((unlink(key_path.c_str())) == -1 && errno != ENOENT) {
+		throw System_error("Unable to remove repo key", key_path, errno);
+	}
+}
+
 static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
 {
 	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
@@ -400,8 +468,6 @@ static int parse_plumbing_options (const char** key_name, const char** key_file,
 
 	return parse_options(options, argc, argv);
 }
-
-
 
 // Encrypt contents of stdin and write to stdout
 int clean (int argc, const char** argv)
@@ -781,22 +847,83 @@ int unlock (int argc, const char** argv)
 	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
 	// just skip the checkout.
 	if (head_exists) {
-		// git checkout -f HEAD -- path/to/top
-		std::vector<std::string>	command;
-		command.push_back("git");
-		command.push_back("checkout");
-		command.push_back("-f");
-		command.push_back("HEAD");
-		command.push_back("--");
-		if (path_to_top.empty()) {
-			command.push_back(".");
-		} else {
-			command.push_back(path_to_top);
-		}
-
-		if (!successful_exit(exec_command(command))) {
+		if (!git_checkout_head(path_to_top)) {
 			std::clog << "Error: 'git checkout' failed" << std::endl;
 			std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int lock (int argc, const char** argv)
+{
+	const char*	key_name = 0;
+	bool all_keys = false;
+	Options_list	options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
+	options.push_back(Option_def("-a", &all_keys));
+	options.push_back(Option_def("--all", &all_keys));
+
+	int			argi = parse_options(options, argc, argv);
+
+	if (argc - argi != 0) {
+		std::clog << "Usage: git-crypt lock [-k KEYNAME] [--all]" << std::endl;
+		return 2;
+	}
+
+	// 0. Make sure working directory is clean (ignoring untracked files)
+	// We do this because we run 'git checkout -f HEAD' later and we don't
+	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
+	// untracked files so it's safe to ignore those.
+
+	// Running 'git status' also serves as a check that the Git repo is accessible.
+
+	std::stringstream	status_output;
+	get_git_status(status_output);
+
+	// 1. Check to see if HEAD exists.  See below why we do this.
+	bool			head_exists = check_if_head_exists();
+
+	if (status_output.peek() != -1 && head_exists) {
+		// We only care that the working directory is dirty if HEAD exists.
+		// If HEAD doesn't exist, we won't be resetting to it (see below) so
+		// it doesn't matter that the working directory is dirty.
+		std::clog << "Error: Working directory not clean." << std::endl;
+		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt' lock." << std::endl;
+		return 1;
+	}
+
+	// 2. Determine the path to the top of the repository.  We pass this as the argument
+	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
+	// mucked with the git config.)
+	std::string		path_to_top(get_path_to_top());
+
+	// 3. unconfigure the git filters and remove decrypted keys
+	if (all_keys) {
+		// unconfigure for all keys
+		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
+
+		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
+			unlink_repo_key(dirent->c_str());
+			unconfigure_git_filters(dirent->c_str());
+		}
+	} else {
+		// just handle the given key
+		unlink_repo_key(key_name);
+		unconfigure_git_filters(key_name);
+	}
+
+	// 4. Do a force checkout so any files that were previously checked out decrypted
+	//    will now be checked out encrypted.
+	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
+	// just skip the checkout.
+	if (head_exists) {
+		if (!git_checkout_head(path_to_top)) {
+			std::clog << "Error: 'git checkout' failed" << std::endl;
+			std::clog << "git-crypt has been locked but up but existing decrypted files have not been encrypted" << std::endl;
 			return 1;
 		}
 	}
