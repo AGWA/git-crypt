@@ -46,6 +46,7 @@ int diff (int argc, char** argv);
 // Public commands:
 int init (int argc, char** argv);
 int unlock (int argc, char** argv);
+int lock (int argc, char** argv);
 int add_gpg_key (int argc, char** argv);
 int rm_gpg_key (int argc, char** argv);
 int ls_gpg_keys (int argc, char** argv);
