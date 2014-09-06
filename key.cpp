@@ -117,6 +117,13 @@ void		Key_file::Entry::load_legacy (uint32_t arg_version, std::istream& in)
 	if (in.gcount() != HMAC_KEY_LEN) {
 		throw Malformed();
 	}
+
+	if (in.peek() != -1) {
+		// Trailing data is a good indication that we are not actually reading a
+		// legacy key file.  (This is important to check since legacy key files
+		// did not have any sort of file header.)
+		throw Malformed();
+	}
 }
 
 void		Key_file::Entry::store (std::ostream& out) const
