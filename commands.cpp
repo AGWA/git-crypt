@@ -1147,7 +1147,7 @@ int status (int argc, const char** argv)
 		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
 		const std::pair<std::string, std::string> file_attrs(get_file_attributes(filename));
 
-		if (file_attrs.first == "git-crypt") { // TODO: key_name support
+		if (file_attrs.first == "git-crypt" || std::strncmp(file_attrs.first.c_str(), "git-crypt-", 10) == 0) {
 			// File is encrypted
 			const bool	blob_is_unencrypted = !object_id.empty() && !check_if_blob_is_encrypted(object_id);
 
@@ -1174,6 +1174,7 @@ int status (int argc, const char** argv)
 					}
 				}
 			} else if (!fix_problems && !show_unencrypted_only) {
+				// TODO: output the key name used to encrypt this file
 				std::cout << "    encrypted: " << filename;
 				if (file_attrs.second != file_attrs.first) {
 					// but diff filter is not properly set
