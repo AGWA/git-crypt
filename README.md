@@ -36,9 +36,10 @@ Specify files to encrypt by creating a .gitattributes file:
     secretfile filter=git-crypt diff=git-crypt
     *.key filter=git-crypt diff=git-crypt
 
-Like a .gitignore file, it can match wildcards and should be checked
-into the repository.  Make sure you don't accidentally encrypt the
-.gitattributes file itself!
+Like a .gitignore file, it can match wildcards and should be checked into
+the repository.  See below for more information about .gitattributes
+files.  Make sure you don't accidentally encrypt the .gitattributes
+file itself!
 
 Cloning a repository with encrypted files:
 
@@ -107,6 +108,25 @@ protected against tampering (an attacker who can mutate your repository
 can alter your .gitattributes file to disable encryption).  If necessary,
 use git features such as signed tags instead of relying solely on
 git-crypt for integrity.
+
+Gitattributes File
+------------------
+
+The .gitattributes file is documented in the gitattributes(5) man page.
+The file pattern format is the same as the one used by .gitignore,
+as documented in the gitignore(5) man page, with the exception that
+specifying a directory name in .gitattributes is not sufficient to
+encrypt all files beneath it.
+
+Also note that the pattern `dir/*` does not match files under
+sub-directories of dir/.  To encrypt an entire sub-tree dir/, place the
+following in dir/.gitattributes:
+
+    * filter=git-crypt diff=git-crypt
+    .gitattributes !filter !diff
+
+The second pattern is essential for ensuring that .gitattributes itself
+is not encrypted.
 
 Mailing Lists
 -------------
