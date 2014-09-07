@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,89 +28,10 @@
  * as that of the covered work.
  */
 
+#include "git-crypt.hpp"
 #include "util.hpp"
 #include <string>
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <errno.h>
-#include <fstream>
-
-int exec_command (const char* command, std::ostream& output)
-{
-	int		pipefd[2];
-	if (pipe(pipefd) == -1) {
-		perror("pipe");
-		std::exit(9);
-	}
-	pid_t		child = fork();
-	if (child == -1) {
-		perror("fork");
-		std::exit(9);
-	}
-	if (child == 0) {
-		close(pipefd[0]);
-		if (pipefd[1] != 1) {
-			dup2(pipefd[1], 1);
-			close(pipefd[1]);
-		}
-		execl("/bin/sh", "sh", "-c", command, NULL);
-		exit(-1);
-	}
-	close(pipefd[1]);
-	char		buffer[1024];
-	ssize_t		bytes_read;
-	while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-		output.write(buffer, bytes_read);
-	}
-	close(pipefd[0]);
-	int		status = 0;
-	waitpid(child, &status, 0);
-	return status;
-}
-
-std::string resolve_path (const char* path)
-{
-	char*		resolved_path_p = realpath(path, NULL);
-	std::string	resolved_path(resolved_path_p);
-	free(resolved_path_p);
-	return resolved_path;
-}
-
-void	open_tempfile (std::fstream& file, std::ios_base::openmode mode)
-{
-	const char*	tmpdir = getenv("TMPDIR");
-	size_t		tmpdir_len;
-	if (tmpdir) {
-		tmpdir_len = strlen(tmpdir);
-	} else {
-		tmpdir = "/tmp";
-		tmpdir_len = 4;
-	}
-	char*		path = new char[tmpdir_len + 18];
-	strcpy(path, tmpdir);
-	strcpy(path + tmpdir_len, "/git-crypt.XXXXXX");
-	mode_t		old_umask = umask(0077);
-	int		fd = mkstemp(path);
-	if (fd == -1) {
-		perror("mkstemp");
-		std::exit(9);
-	}
-	umask(old_umask);
-	file.open(path, mode);
-	if (!file.is_open()) {
-		perror("open");
-		unlink(path);
-		std::exit(9);
-	}
-	unlink(path);
-	close(fd);
-	delete[] path;
-}
+#include <iostream>
 
 std::string	escape_shell_arg (const std::string& str)
 {
@@ -126,3 +47,84 @@ std::string	escape_shell_arg (const std::string& str)
 	return new_str;
 }
 
+uint32_t	load_be32 (const unsigned char* p)
+{
+	return (static_cast<uint32_t>(p[3]) << 0) |
+	       (static_cast<uint32_t>(p[2]) << 8) |
+	       (static_cast<uint32_t>(p[1]) << 16) |
+	       (static_cast<uint32_t>(p[0]) << 24);
+}
+
+void		store_be32 (unsigned char* p, uint32_t i)
+{
+	p[3] = i; i >>= 8;
+	p[2] = i; i >>= 8;
+	p[1] = i; i >>= 8;
+	p[0] = i;
+}
+
+bool		read_be32 (std::istream& in, uint32_t& i)
+{
+	unsigned char buffer[4];
+	in.read(reinterpret_cast<char*>(buffer), 4);
+	if (in.gcount() != 4) {
+		return false;
+	}
+	i = load_be32(buffer);
+	return true;
+}
+
+void		write_be32 (std::ostream& out, uint32_t i)
+{
+	unsigned char buffer[4];
+	store_be32(buffer, i);
+	out.write(reinterpret_cast<const char*>(buffer), 4);
+}
+
+void*		explicit_memset (void* s, int c, std::size_t n)
+{
+	volatile unsigned char* p = reinterpret_cast<unsigned char*>(s);
+
+	while (n--) {
+		*p++ = c;
+	}
+
+	return s;
+}
+
+static bool	leakless_equals_char (const unsigned char* a, const unsigned char* b, std::size_t len)
+{
+	volatile int	diff = 0;
+
+	while (len > 0) {
+		diff |= *a++ ^ *b++;
+		--len;
+	}
+
+	return diff == 0;
+}
+
+bool 		leakless_equals (const void* a, const void* b, std::size_t len)
+{
+	return leakless_equals_char(reinterpret_cast<const unsigned char*>(a), reinterpret_cast<const unsigned char*>(b), len);
+}
+
+static void	init_std_streams_platform (); // platform-specific initialization
+
+void		init_std_streams ()
+{
+	// The following two lines are essential for achieving good performance:
+	std::ios_base::sync_with_stdio(false);
+	std::cin.tie(0);
+
+	std::cin.exceptions(std::ios_base::badbit);
+	std::cout.exceptions(std::ios_base::badbit);
+
+	init_std_streams_platform();
+}
+
+#ifdef _WIN32
+#include "util-win32.cpp"
+#else
+#include "util-unix.cpp"
+#endif

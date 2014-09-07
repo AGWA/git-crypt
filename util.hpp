@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -34,11 +34,48 @@
 #include <string>
 #include <ios>
 #include <iosfwd>
+#include <stdint.h>
+#include <sys/types.h>
+#include <fstream>
+#include <vector>
 
-int		exec_command (const char* command, std::ostream& output);
-std::string	resolve_path (const char* path);
-void		open_tempfile (std::fstream&, std::ios_base::openmode);
+struct System_error {
+	std::string	action;
+	std::string	target;
+	int		error;
+
+	System_error (const std::string& a, const std::string& t, int e) : action(a), target(t), error(e) { }
+
+	std::string message () const;
+};
+
+class temp_fstream : public std::fstream {
+	std::string	filename;
+public:
+	~temp_fstream () { close(); }
+
+	void		open (std::ios_base::openmode);
+	void		close ();
+};
+
+void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
+std::string	our_exe_path ();
+int		exec_command (const std::vector<std::string>&);
+int		exec_command (const std::vector<std::string>&, std::ostream& output);
+int		exec_command_with_input (const std::vector<std::string>&, const char* p, size_t len);
+bool		successful_exit (int status);
+void		touch_file (const std::string&);
 std::string	escape_shell_arg (const std::string&);
+uint32_t	load_be32 (const unsigned char*);
+void		store_be32 (unsigned char*, uint32_t);
+bool		read_be32 (std::istream& in, uint32_t&);
+void		write_be32 (std::ostream& out, uint32_t);
+void*		explicit_memset (void* s, int c, size_t n);	// memset that won't be optimized away
+bool		leakless_equals (const void* a, const void* b, size_t len); // compare bytes w/o leaking timing
+void		init_std_streams ();
+void		create_protected_file (const char* path); // create empty file accessible only by current user
+int		util_rename (const char*, const char*);
+std::vector<std::string> get_directory_contents (const char* path);
 
 #endif
 

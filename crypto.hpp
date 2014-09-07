@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -31,53 +31,87 @@
 #ifndef GIT_CRYPT_CRYPTO_HPP
 #define GIT_CRYPT_CRYPTO_HPP
 
-#include <openssl/aes.h>
-#include <openssl/hmac.h>
+#include "key.hpp"
 #include <stdint.h>
 #include <stddef.h>
 #include <iosfwd>
+#include <string>
+#include <memory>
 
-enum {
-	SHA1_LEN = 20,
-	NONCE_LEN = 12,
-	HMAC_KEY_LEN = 64,
-	AES_KEY_BITS = 256,
-	MAX_CRYPT_BYTES = (1ULL<<32)*16	// Don't encrypt more than this or the CTR value will repeat itself
+void init_crypto ();
+
+struct Crypto_error {
+	std::string	where;
+	std::string	message;
+
+	Crypto_error (const std::string& w, const std::string& m) : where(w), message(m) { }
 };
 
-struct keys_t {
-	AES_KEY		enc;
-	uint8_t		hmac[HMAC_KEY_LEN];
-};
-void load_keys (const char* filepath, keys_t* keys);
+class Aes_ecb_encryptor {
+public:
+	enum {
+		KEY_LEN		= AES_KEY_LEN,
+		BLOCK_LEN	= 16
+	};
 
-class aes_ctr_state {
-	char		nonce[NONCE_LEN];// First 96 bits of counter
-	uint32_t	byte_counter;	// How many bytes processed so far?
-	uint8_t		otp[16];	// The current OTP that's in use
+private:
+	struct Aes_impl;
+
+	std::auto_ptr<Aes_impl>	impl;
 
 public:
-	aes_ctr_state (const uint8_t* arg_nonce, size_t arg_nonce_len);
-
-	void process (const AES_KEY* key, const uint8_t* in, uint8_t* out, size_t len);
+	Aes_ecb_encryptor (const unsigned char* key);
+	~Aes_ecb_encryptor ();
+	void encrypt (const unsigned char* plain, unsigned char* cipher);
 };
 
-class hmac_sha1_state {
-	HMAC_CTX	ctx;
-
-	// disallow copy/assignment:
-	hmac_sha1_state (const hmac_sha1_state&) { }
-	hmac_sha1_state& operator= (const hmac_sha1_state&) { return *this; }
+class Aes_ctr_encryptor {
 public:
-	hmac_sha1_state (const uint8_t* key, size_t key_len);
-	~hmac_sha1_state ();
+	enum {
+		NONCE_LEN	= 12,
+		KEY_LEN		= AES_KEY_LEN,
+		BLOCK_LEN	= 16,
+		MAX_CRYPT_BYTES	= (1ULL<<32)*16 // Don't encrypt more than this or the CTR value will repeat itself
+	};
 
-	void add (const uint8_t* buffer, size_t buffer_len);
-	void get (uint8_t*);
+private:
+	Aes_ecb_encryptor	ecb;
+	unsigned char		ctr_value[BLOCK_LEN];	// Current CTR value (used as input to AES to derive pad)
+	unsigned char		pad[BLOCK_LEN];		// Current encryption pad (output of AES)
+	uint32_t		byte_counter;		// How many bytes processed so far?
+
+public:
+	Aes_ctr_encryptor (const unsigned char* key, const unsigned char* nonce);
+	~Aes_ctr_encryptor ();
+
+	void process (const unsigned char* in, unsigned char* out, size_t len);
+
+	// Encrypt/decrypt an entire input stream, writing to the given output stream
+	static void process_stream (std::istream& in, std::ostream& out, const unsigned char* key, const unsigned char* nonce);
 };
 
-// Encrypt/decrypt an entire input stream, writing to the given output stream
-void process_stream (std::istream& in, std::ostream& out, const AES_KEY* enc_key, const uint8_t* nonce);
+typedef Aes_ctr_encryptor Aes_ctr_decryptor;
 
+class Hmac_sha1_state {
+public:
+	enum {
+		LEN	= 20,
+		KEY_LEN	= HMAC_KEY_LEN
+	};
+
+private:
+	struct Hmac_impl;
+
+	std::auto_ptr<Hmac_impl>	impl;
+
+public:
+	Hmac_sha1_state (const unsigned char* key, size_t key_len);
+	~Hmac_sha1_state ();
+
+	void add (const unsigned char* buffer, size_t buffer_len);
+	void get (unsigned char*);
+};
+
+void random_bytes (unsigned char*, size_t);
 
 #endif
