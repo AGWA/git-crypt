@@ -719,7 +719,6 @@ int unlock (int argc, const char** argv)
 	std::vector<Key_file>	key_files;
 	if (argc > 0) {
 		// Read from the symmetric key file(s)
-		// TODO: command line flag to accept legacy key format?
 
 		for (int argi = 0; argi < argc; ++argi) {
 			const char*	symmetric_key_file = argv[argi];
