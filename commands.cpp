@@ -808,9 +808,12 @@ int unlock (int argc, const char** argv)
 int add_gpg_key (int argc, const char** argv)
 {
 	const char*		key_name = 0;
+	bool			no_commit = false;
 	Options_list		options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
+	options.push_back(Option_def("-n", &no_commit));
+	options.push_back(Option_def("--no-commit", &no_commit));
 
 	int			argi = parse_options(options, argc, argv);
 	if (argc - argi == 0) {
@@ -862,26 +865,27 @@ int add_gpg_key (int argc, const char** argv)
 		}
 
 		// git commit ...
-		// TODO: add a command line option (-n perhaps) to inhibit committing
-		// TODO: include key_name in commit message
-		std::ostringstream	commit_message_builder;
-		commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
-		for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
-			commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
-		}
+		if (!no_commit) {
+			// TODO: include key_name in commit message
+			std::ostringstream	commit_message_builder;
+			commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
+			for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+				commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
+			}
 
-		// git commit -m MESSAGE NEW_FILE ...
-		command.clear();
-		command.push_back("git");
-		command.push_back("commit");
-		command.push_back("-m");
-		command.push_back(commit_message_builder.str());
-		command.push_back("--");
-		command.insert(command.end(), new_files.begin(), new_files.end());
+			// git commit -m MESSAGE NEW_FILE ...
+			command.clear();
+			command.push_back("git");
+			command.push_back("commit");
+			command.push_back("-m");
+			command.push_back(commit_message_builder.str());
+			command.push_back("--");
+			command.insert(command.end(), new_files.begin(), new_files.end());
 
-		if (!successful_exit(exec_command(command))) {
-			std::clog << "Error: 'git commit' failed" << std::endl;
-			return 1;
+			if (!successful_exit(exec_command(command))) {
+				std::clog << "Error: 'git commit' failed" << std::endl;
+				return 1;
+			}
 		}
 	}
 
