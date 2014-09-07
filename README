@@ -76,30 +76,35 @@ beyond whether two files are identical or not.  Other proposals for
 transparent git encryption use ECB or CBC with a fixed IV.  These systems
 are not semantically secure and leak information.
 
-The AES key is stored unencrypted on disk.  The user is responsible for
-protecting it and ensuring it's safely distributed only to authorized
-people.  A future version of git-crypt may support encrypting the key
-with a passphrase.
-
 
 LIMITATIONS
 
-git-crypt is not designed to encrypt an entire repository.  Not only does
-that defeat the aim of git-crypt, which is the ability to selectively
-encrypt files and share the repository with less-trusted developers, there
-are probably better, more efficient ways to encrypt an entire repository,
-such as by storing it on an encrypted filesystem.  Also note that
-git-crypt is somewhat of an abuse of git's smudge, clean, and textconv
-features.  Junio Hamano, git's maintainer, has said not to do this
-<http://thread.gmane.org/gmane.comp.version-control.git/113124/focus=113221>,
-though his main objection ("making a pair of similar 'smudged' contents
-totally dissimilar in their 'clean' counterparts.") does not apply here
-since git-crypt uses deterministic encryption.
+git-crypt relies on git filters, which were not designed with encryption
+in mind.  As such, git-crypt is not the best tool for encrypting most or
+all of the files in a repository. Where git-crypt really shines is where
+most of your repository is public, but you have a few files (perhaps
+private keys named *.key, or a file with API credentials) which you
+need to encrypt.  For encrypting an entire repository, consider using a
+system like git-remote-gcrypt <https://github.com/joeyh/git-remote-gcrypt>
+instead.  (Note: no endorsement is made of git-remote-gcrypt's security.)
 
-git-crypt does not itself provide any authentication.  It assumes that
-either the master copy of your repository is stored securely, or that
-you are using git's existing facilities to ensure integrity (signed tags,
-remembering commit hashes, etc.).
+git-crypt does not encrypt file names, commit messages, or other metadata.
+
+Files encrypted with git-crypt are not compressible.  Even the smallest
+change to an encrypted file requires git to store the entire changed file,
+instead of just a delta.
+
+Files encrypted with git-crypt cannot be patched with git-apply, unless
+the patch itself is encrypted.  To generate an encrypted patch, use `git
+diff --no-textconv --binary`.  Alternatively, you can apply a plaintext
+patch outside of git using the patch command.
+
+Although git-crypt protects individual file contents with a SHA-1
+HMAC, git-crypt cannot be used securely unless the entire repository is
+protected against tampering (an attacker who can mutate your repository
+can alter your .gitattributes file to disable encryption).  If necessary,
+use git features such as signed tags instead of relying solely on
+git-crypt for integrity.
 
 
 MAILING LISTS
