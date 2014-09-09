@@ -109,6 +109,10 @@ can alter your .gitattributes file to disable encryption).  If necessary,
 use git features such as signed tags instead of relying solely on
 git-crypt for integrity.
 
+git-crypt does [not work reliably with Atlassian
+SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511).  Files might
+be left in an unencrypted state.
+
 Gitattributes File
 ------------------
 
