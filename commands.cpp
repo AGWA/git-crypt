@@ -99,7 +99,7 @@ static void configure_git_filters (const char* key_name)
 static void unconfigure_git_filters (const char* key_name)
 {
 	// unconfigure the git-crypt filters
-	if (key_name && (strncmp(key_name, "default", 7) != 0)) {
+	if (key_name) {
 		// named key
 		git_unconfig(std::string("filter.git-crypt-") + key_name);
 		git_unconfig(std::string("diff.git-crypt-") + key_name);
@@ -908,8 +908,9 @@ int lock (int argc, const char** argv)
 		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
-			unlink_internal_key(dirent->c_str());
-			unconfigure_git_filters(dirent->c_str());
+			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
+			unlink_internal_key(this_key_name);
+			unconfigure_git_filters(this_key_name);
 		}
 	} else {
 		// just handle the given key
