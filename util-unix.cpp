@@ -281,7 +281,7 @@ bool successful_exit (int status)
 void	touch_file (const std::string& filename)
 {
 	if (utimes(filename.c_str(), NULL) == -1) {
-		throw System_error("utimes", "", errno);
+		throw System_error("utimes", filename, errno);
 	}
 }
 
