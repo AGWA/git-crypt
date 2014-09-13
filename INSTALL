@@ -36,3 +36,14 @@ INSTALLING ON MAC OS X
 Using the brew package manager, simply run:
 
         $ brew install git-crypt
+
+
+EXPERIMENTAL WINDOWS SUPPORT
+
+git-crypt should build on Windows with MinGW, although the build system
+is not yet finalized so you will need to pass your own CXX, CXXFLAGS, and
+LDFLAGS variables to make.  Additionally, Windows support is less tested
+and does not currently create key files with restrictive permissions,
+making it unsuitable for use on a multi-user system.  Windows support
+will mature in a future version of git-crypt.  Bug reports and patches
+are most welcome!
