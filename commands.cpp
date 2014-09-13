@@ -372,13 +372,9 @@ static void load_key (Key_file& key_file, const char* key_name, const char* key_
 	}
 }
 
-static void unlink_repo_key (const char* key_name)
+static void unlink_internal_key (const char* key_name)
 {
-	std::string	key_path(get_internal_key_path(key_name ? key_name : "default"));
-
-	if ((unlink(key_path.c_str())) == -1 && errno != ENOENT) {
-		throw System_error("Unable to remove repo key", key_path, errno);
-	}
+	remove_file(get_internal_key_path(key_name ? key_name : "default"));
 }
 
 static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
@@ -907,12 +903,12 @@ int lock (int argc, const char** argv)
 		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
-			unlink_repo_key(dirent->c_str());
+			unlink_internal_key(dirent->c_str());
 			unconfigure_git_filters(dirent->c_str());
 		}
 	} else {
 		// just handle the given key
-		unlink_repo_key(key_name);
+		unlink_internal_key(key_name);
 		unconfigure_git_filters(key_name);
 	}
 

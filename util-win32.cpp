@@ -340,6 +340,13 @@ void	touch_file (const std::string& filename)
 	CloseHandle(fh);
 }
 
+void	remove_file (const std::string& filename)
+{
+	if (!DeleteFileA(filename.c_str())) {
+		throw System_error("DeleteFileA", filename, GetLastError());
+	}
+}
+
 static void	init_std_streams_platform ()
 {
 	_setmode(_fileno(stdin), _O_BINARY);
