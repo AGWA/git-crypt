@@ -914,6 +914,15 @@ int lock (int argc, const char** argv)
 		}
 	} else {
 		// just handle the given key
+		if (access(get_internal_key_path(key_name).c_str(), F_OK) == -1 && errno == ENOENT) {
+			std::clog << "Error: this repository is not currently locked";
+			if (key_name) {
+				std::clog << " with key '" << key_name << "'";
+			}
+			std::clog << "." << std::endl;
+			return 1;
+		}
+
 		unlink_internal_key(key_name);
 		unconfigure_git_filters(key_name);
 	}
