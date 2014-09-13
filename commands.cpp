@@ -870,6 +870,11 @@ int lock (int argc, const char** argv)
 		return 2;
 	}
 
+	if (all_keys && key_name) {
+		std::clog << "Error: -k and --all options are mutually exclusive" << std::endl;
+		return 2;
+	}
+
 	// 0. Make sure working directory is clean (ignoring untracked files)
 	// We do this because we run 'git checkout -f HEAD' later and we don't
 	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
