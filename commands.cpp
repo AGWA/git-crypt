@@ -372,11 +372,6 @@ static void load_key (Key_file& key_file, const char* key_name, const char* key_
 	}
 }
 
-static void unlink_internal_key (const char* key_name)
-{
-	remove_file(get_internal_key_path(key_name ? key_name : "default"));
-}
-
 static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
 {
 	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
@@ -909,12 +904,13 @@ int lock (int argc, const char** argv)
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
 			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
-			unlink_internal_key(this_key_name);
+			remove_file(get_internal_key_path(this_key_name));
 			unconfigure_git_filters(this_key_name);
 		}
 	} else {
 		// just handle the given key
-		if (access(get_internal_key_path(key_name).c_str(), F_OK) == -1 && errno == ENOENT) {
+		std::string	internal_key_path(get_internal_key_path(key_name));
+		if (access(internal_key_path.c_str(), F_OK) == -1 && errno == ENOENT) {
 			std::clog << "Error: this repository is not currently locked";
 			if (key_name) {
 				std::clog << " with key '" << key_name << "'";
@@ -923,7 +919,7 @@ int lock (int argc, const char** argv)
 			return 1;
 		}
 
-		unlink_internal_key(key_name);
+		remove_file(internal_key_path);
 		unconfigure_git_filters(key_name);
 	}
 
