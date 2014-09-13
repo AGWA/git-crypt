@@ -54,8 +54,8 @@ static void print_usage (std::ostream& out)
 	out << "  lock               de-configure git-crypt and re-encrypt files in working tree" << std::endl;
 	out << std::endl;
 	out << "GPG commands:" << std::endl;
-	out << "  add-gpg-key KEYID  add the user with the given GPG key ID as a collaborator" << std::endl;
-	//out << "  rm-gpg-key KEYID   revoke collaborator status from the given GPG key ID" << std::endl;
+	out << "  add-gpg-key USRID  add the user with the given GPG user ID as a collaborator" << std::endl;
+	//out << "  rm-gpg-key USRID   revoke collaborator status from the given GPG user ID" << std::endl;
 	//out << "  ls-gpg-keys        list the GPG key IDs of collaborators" << std::endl;
 	out << "  unlock             decrypt this repo using the in-repo GPG-encrypted key" << std::endl;
 	out << std::endl;
