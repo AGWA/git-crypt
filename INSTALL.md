@@ -12,7 +12,7 @@ To build git-crypt, you need a C++ compiler and OpenSSL development
 headers.
 
 
-Building GIT-CRYPT
+Building git-crypt
 ------------------
 
 The Makefile is tailored for g++, but should work with other compilers.
