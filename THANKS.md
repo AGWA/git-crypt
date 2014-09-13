@@ -10,6 +10,7 @@ For their contributions to git-crypt, I thank:
    * Darayus Nanavati
    * Jon Sailor
    * Linus G Thiel
+   * Michael Schout
    * Simon Kotlinski
 
  * And everyone who has tested git-crypt, provided feedback, reported
