@@ -32,6 +32,7 @@
 #define GIT_CRYPT_COMMANDS_HPP
 
 #include <string>
+#include <iosfwd>
 
 struct Error {
 	std::string	message;
@@ -56,5 +57,17 @@ int migrate_key (int argc, const char** argv);
 int refresh (int argc, const char** argv);
 int status (int argc, const char** argv);
 
-#endif
+// Help messages:
+void help_init (std::ostream&);
+void help_unlock (std::ostream&);
+void help_lock (std::ostream&);
+void help_add_gpg_key (std::ostream&);
+void help_rm_gpg_key (std::ostream&);
+void help_ls_gpg_keys (std::ostream&);
+void help_export_key (std::ostream&);
+void help_keygen (std::ostream&);
+void help_migrate_key (std::ostream&);
+void help_refresh (std::ostream&);
+void help_status (std::ostream&);
 
+#endif

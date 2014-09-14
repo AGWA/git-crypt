@@ -74,10 +74,51 @@ static void print_usage (std::ostream& out)
 	out << "   smudge [LEGACY-KEYFILE]" << std::endl;
 	out << "   diff [LEGACY-KEYFILE] FILE" << std::endl;
 	*/
-	/*
 	out << std::endl;
 	out << "See 'git-crypt help COMMAND' for more information on a specific command." << std::endl;
-	*/
+}
+
+static bool help_for_command (const char* command, std::ostream& out)
+{
+	if (std::strcmp(command, "init") == 0) {
+		help_init(out);
+	} else if (std::strcmp(command, "unlock") == 0) {
+		help_unlock(out);
+	} else if (std::strcmp(command, "lock") == 0) {
+		help_lock(out);
+	} else if (std::strcmp(command, "add-gpg-key") == 0) {
+		help_add_gpg_key(out);
+	} else if (std::strcmp(command, "rm-gpg-key") == 0) {
+		help_rm_gpg_key(out);
+	} else if (std::strcmp(command, "ls-gpg-keys") == 0) {
+		help_ls_gpg_keys(out);
+	} else if (std::strcmp(command, "export-key") == 0) {
+		help_export_key(out);
+	} else if (std::strcmp(command, "keygen") == 0) {
+		help_keygen(out);
+	} else if (std::strcmp(command, "migrate-key") == 0) {
+		help_migrate_key(out);
+	} else if (std::strcmp(command, "refresh") == 0) {
+		help_refresh(out);
+	} else if (std::strcmp(command, "status") == 0) {
+		help_status(out);
+	} else {
+		return false;
+	}
+	return true;
+}
+
+static int help (int argc, const char** argv)
+{
+	if (argc == 0) {
+		print_usage(std::cout);
+	} else {
+		if (!help_for_command(argv[0], std::cout)) {
+			std::clog << "Error: '" << argv[0] << "' is not a git-crypt command. See 'git-crypt help'." << std::endl;
+			return 1;
+		}
+	}
+	return 0;
 }
 
 
@@ -125,56 +166,61 @@ try {
 	--argc;
 	++argv;
 
-	// Public commands:
-	if (std::strcmp(command, "help") == 0) {
-		print_usage(std::clog);
-		return 0;
-	}
-	if (std::strcmp(command, "init") == 0) {
-		return init(argc, argv);
-	}
-	if (std::strcmp(command, "unlock") == 0) {
-		return unlock(argc, argv);
-	}
-	if (std::strcmp(command, "lock") == 0) {
-		return lock(argc, argv);
-	}
-	if (std::strcmp(command, "add-gpg-key") == 0) {
-		return add_gpg_key(argc, argv);
-	}
-	if (std::strcmp(command, "rm-gpg-key") == 0) {
-		return rm_gpg_key(argc, argv);
-	}
-	if (std::strcmp(command, "ls-gpg-keys") == 0) {
-		return ls_gpg_keys(argc, argv);
-	}
-	if (std::strcmp(command, "export-key") == 0) {
-		return export_key(argc, argv);
-	}
-	if (std::strcmp(command, "keygen") == 0) {
-		return keygen(argc, argv);
-	}
-	if (std::strcmp(command, "migrate-key") == 0) {
-		return migrate_key(argc, argv);
-	}
-	if (std::strcmp(command, "refresh") == 0) {
-		return refresh(argc, argv);
-	}
-	if (std::strcmp(command, "status") == 0) {
-		return status(argc, argv);
-	}
-	// Plumbing commands (executed by git, not by user):
-	if (std::strcmp(command, "clean") == 0) {
-		return clean(argc, argv);
-	}
-	if (std::strcmp(command, "smudge") == 0) {
-		return smudge(argc, argv);
-	}
-	if (std::strcmp(command, "diff") == 0) {
-		return diff(argc, argv);
+	try {
+		// Public commands:
+		if (std::strcmp(command, "help") == 0) {
+			return help(argc, argv);
+		}
+		if (std::strcmp(command, "init") == 0) {
+			return init(argc, argv);
+		}
+		if (std::strcmp(command, "unlock") == 0) {
+			return unlock(argc, argv);
+		}
+		if (std::strcmp(command, "lock") == 0) {
+			return lock(argc, argv);
+		}
+		if (std::strcmp(command, "add-gpg-key") == 0) {
+			return add_gpg_key(argc, argv);
+		}
+		if (std::strcmp(command, "rm-gpg-key") == 0) {
+			return rm_gpg_key(argc, argv);
+		}
+		if (std::strcmp(command, "ls-gpg-keys") == 0) {
+			return ls_gpg_keys(argc, argv);
+		}
+		if (std::strcmp(command, "export-key") == 0) {
+			return export_key(argc, argv);
+		}
+		if (std::strcmp(command, "keygen") == 0) {
+			return keygen(argc, argv);
+		}
+		if (std::strcmp(command, "migrate-key") == 0) {
+			return migrate_key(argc, argv);
+		}
+		if (std::strcmp(command, "refresh") == 0) {
+			return refresh(argc, argv);
+		}
+		if (std::strcmp(command, "status") == 0) {
+			return status(argc, argv);
+		}
+		// Plumbing commands (executed by git, not by user):
+		if (std::strcmp(command, "clean") == 0) {
+			return clean(argc, argv);
+		}
+		if (std::strcmp(command, "smudge") == 0) {
+			return smudge(argc, argv);
+		}
+		if (std::strcmp(command, "diff") == 0) {
+			return diff(argc, argv);
+		}
+	} catch (const Option_error& e) {
+		std::clog << "git-crypt: Error: " << e.option_name << ": " << e.message << std::endl;
+		help_for_command(command, std::clog);
+		return 2;
 	}
 
-	print_usage(std::clog);
+	std::clog << "Error: '" << command << "' is not a git-crypt command. See 'git-crypt help'." << std::endl;
 	return 2;
 
 } catch (const Error& e) {
@@ -188,9 +234,6 @@ try {
 	return 1;
 } catch (const Crypto_error& e) {
 	std::cerr << "git-crypt: Crypto error: " << e.where << ": " << e.message << std::endl;
-	return 1;
-} catch (const Option_error& e) {
-	std::cerr << "git-crypt: Error: " << e.option_name << ": " << e.message << std::endl;
 	return 1;
 } catch (Key_file::Incompatible) {
 	std::cerr << "git-crypt: This repository contains a incompatible key file.  Please upgrade git-crypt." << std::endl;
