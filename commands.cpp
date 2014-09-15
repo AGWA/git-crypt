@@ -964,16 +964,16 @@ int lock (int argc, const char** argv)
 	return 0;
 }
 
-void help_add_gpg_key (std::ostream& out)
+void help_add_gpg_user (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt add-gpg-key [OPTIONS] GPG_USER_ID ..." << std::endl;
+	out << "Usage: git-crypt add-gpg-user [OPTIONS] GPG_USER_ID ..." << std::endl;
 	out << std::endl;
 	out << "    -k, --key-name KEYNAME      Add GPG user to given key, instead of default" << std::endl;
 	out << "    -n, --no-commit             Don't automatically commit" << std::endl;
 	out << std::endl;
 }
-int add_gpg_key (int argc, const char** argv)
+int add_gpg_user (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	bool			no_commit = false;
@@ -986,7 +986,7 @@ int add_gpg_key (int argc, const char** argv)
 	int			argi = parse_options(options, argc, argv);
 	if (argc - argi == 0) {
 		std::clog << "Error: no GPG user ID specified" << std::endl;
-		help_add_gpg_key(std::clog);
+		help_add_gpg_user(std::clog);
 		return 2;
 	}
 
@@ -1061,27 +1061,27 @@ int add_gpg_key (int argc, const char** argv)
 	return 0;
 }
 
-void help_rm_gpg_key (std::ostream& out)
+void help_rm_gpg_user (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt rm-gpg-key [OPTIONS] GPG_USER_ID ..." << std::endl;
+	out << "Usage: git-crypt rm-gpg-user [OPTIONS] GPG_USER_ID ..." << std::endl;
 	out << std::endl;
 	out << "    -k, --key-name KEYNAME      Remove user from given key, instead of default" << std::endl;
 	out << "    -n, --no-commit             Don't automatically commit" << std::endl;
 	out << std::endl;
 }
-int rm_gpg_key (int argc, const char** argv) // TODO
+int rm_gpg_user (int argc, const char** argv) // TODO
 {
-	std::clog << "Error: rm-gpg-key is not yet implemented." << std::endl;
+	std::clog << "Error: rm-gpg-user is not yet implemented." << std::endl;
 	return 1;
 }
 
-void help_ls_gpg_keys (std::ostream& out)
+void help_ls_gpg_users (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt ls-gpg-keys" << std::endl;
+	out << "Usage: git-crypt ls-gpg-users" << std::endl;
 }
-int ls_gpg_keys (int argc, const char** argv) // TODO
+int ls_gpg_users (int argc, const char** argv) // TODO
 {
 	// Sketch:
 	// Scan the sub-directories in .git-crypt/keys, outputting something like this:
@@ -1097,7 +1097,7 @@ int ls_gpg_keys (int argc, const char** argv) // TODO
 	// To resolve a long hex ID, use a command like this:
 	//  gpg --options /dev/null --fixed-list-mode --batch --with-colons --list-keys 0x143DE9B3F7316900
 
-	std::clog << "Error: ls-gpg-keys is not yet implemented." << std::endl;
+	std::clog << "Error: ls-gpg-users is not yet implemented." << std::endl;
 	return 1;
 }
 
