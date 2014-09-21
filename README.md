@@ -111,17 +111,17 @@ Files encrypted with git-crypt are not compressible.  Even the smallest
 change to an encrypted file requires git to store the entire changed file,
 instead of just a delta.
 
-Files encrypted with git-crypt cannot be patched with git-apply, unless
-the patch itself is encrypted.  To generate an encrypted patch, use `git
-diff --no-textconv --binary`.  Alternatively, you can apply a plaintext
-patch outside of git using the patch command.
-
 Although git-crypt protects individual file contents with a SHA-1
 HMAC, git-crypt cannot be used securely unless the entire repository is
 protected against tampering (an attacker who can mutate your repository
 can alter your .gitattributes file to disable encryption).  If necessary,
 use git features such as signed tags instead of relying solely on
 git-crypt for integrity.
+
+Files encrypted with git-crypt cannot be patched with git-apply, unless
+the patch itself is encrypted.  To generate an encrypted patch, use `git
+diff --no-textconv --binary`.  Alternatively, you can apply a plaintext
+patch outside of git using the patch command.
 
 git-crypt does [not work reliably with Atlassian
 SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511).  Files might
