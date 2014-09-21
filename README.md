@@ -133,7 +133,7 @@ Gitattributes File
 The .gitattributes file is documented in the gitattributes(5) man page.
 The file pattern format is the same as the one used by .gitignore,
 as documented in the gitignore(5) man page, with the exception that
-specifying a directory name in .gitattributes is not sufficient to
+specifying merely a directory (e.g. `/dir/`) is *not* sufficient to
 encrypt all files beneath it.
 
 Also note that the pattern `dir/*` does not match files under
