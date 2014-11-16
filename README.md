@@ -1,5 +1,5 @@
-GIT-CRYPT
-=========
+git-crypt - transparent file encryption in git
+==============================================
 
 git-crypt enables transparent encryption and decryption of files in a
 git repository.  Files which you choose to protect are encrypted when
@@ -11,8 +11,8 @@ you store your secret material (such as keys or passwords) in the same
 repository as your code, without requiring you to lock down your entire
 repository.
 
-git-crypt was written by Andrew Ayer <agwa at andrewayer dot name>.  For
-more information, see <https://www.agwa.name/projects/git-crypt>.
+git-crypt was written by [Andrew Ayer](https://www.agwa.name) (agwa@andrewayer.name).
+For more information, see <https://www.agwa.name/projects/git-crypt>.
 
 Building git-crypt
 ------------------
