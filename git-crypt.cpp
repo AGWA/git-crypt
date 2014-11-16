@@ -48,25 +48,25 @@ static void print_usage (std::ostream& out)
 	out << std::endl;
 	//     |--------------------------------------------------------------------------------| 80 characters
 	out << "Common commands:" << std::endl;
-	out << "  init               generate a key and prepare repo to use git-crypt" << std::endl;
-	out << "  status             display which files are encrypted" << std::endl;
-	//out << "  refresh            ensure all files in the repo are properly decrypted" << std::endl;
-	out << "  lock               de-configure git-crypt and re-encrypt files in working tree" << std::endl;
+	out << "  init                 generate a key and prepare repo to use git-crypt" << std::endl;
+	out << "  status               display which files are encrypted" << std::endl;
+	//out << "  refresh              ensure all files in the repo are properly decrypted" << std::endl;
+	out << "  lock                 de-configure git-crypt and re-encrypt files in work tree" << std::endl;
 	out << std::endl;
 	out << "GPG commands:" << std::endl;
-	out << "  add-gpg-user ID    add the user with the given GPG user ID as a collaborator" << std::endl;
-	//out << "  rm-gpg-user ID      revoke collaborator status from the given GPG user ID" << std::endl;
-	//out << "  ls-gpg-users        list the GPG key IDs of collaborators" << std::endl;
-	out << "  unlock             decrypt this repo using the in-repo GPG-encrypted key" << std::endl;
+	out << "  add-gpg-user USERID  add the user with the given GPG user ID as a collaborator" << std::endl;
+	//out << "  rm-gpg-user USERID   revoke collaborator status from the given GPG user ID" << std::endl;
+	//out << "  ls-gpg-users         list the GPG key IDs of collaborators" << std::endl;
+	out << "  unlock               decrypt this repo using the in-repo GPG-encrypted key" << std::endl;
 	out << std::endl;
 	out << "Symmetric key commands:" << std::endl;
-	out << "  export-key FILE    export this repo's symmetric key to the given file" << std::endl;
-	out << "  unlock KEYFILE     decrypt this repo using the given symmetric key" << std::endl;
+	out << "  export-key FILE      export this repo's symmetric key to the given file" << std::endl;
+	out << "  unlock KEYFILE       decrypt this repo using the given symmetric key" << std::endl;
 	out << std::endl;
 	out << "Legacy commands:" << std::endl;
-	out << "  init KEYFILE       alias for 'unlock KEYFILE'" << std::endl;
-	out << "  keygen KEYFILE     generate a git-crypt key in the given file" << std::endl;
-	out << "  migrate-key FILE   migrate the given legacy key file to the latest format" << std::endl;
+	out << "  init KEYFILE         alias for 'unlock KEYFILE'" << std::endl;
+	out << "  keygen KEYFILE       generate a git-crypt key in the given file" << std::endl;
+	out << "  migrate-key OLD NEW  migrate the legacy key file OLD to the new format in NEW" << std::endl;
 	/*
 	out << std::endl;
 	out << "Plumbing commands (not to be used directly):" << std::endl;
