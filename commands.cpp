@@ -813,7 +813,7 @@ int unlock (int argc, const char** argv)
 			} catch (Key_file::Malformed) {
 				std::clog << "Error: " << symmetric_key_file << ": not a valid git-crypt key file" << std::endl;
 				std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
-				std::clog << "by running 'git-crypt migrate-key /path/to/key/file'." << std::endl;
+				std::clog << "by running 'git-crypt migrate-key /path/to/old_key /path/to/migrated_key'." << std::endl;
 				return 1;
 			}
 
@@ -1183,25 +1183,25 @@ int keygen (int argc, const char** argv)
 void help_migrate_key (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt migrate-key FILENAME" << std::endl;
+	out << "Usage: git-crypt migrate-key OLDFILENAME NEWFILENAME" << std::endl;
 	out << std::endl;
-	out << "When FILENAME is -, read from standard in and write to standard out." << std::endl;
+	out << "Use - to read from standard in/write to standard out." << std::endl;
 }
 int migrate_key (int argc, const char** argv)
 {
-	if (argc != 1) {
-		std::clog << "Error: no filename specified" << std::endl;
+	if (argc != 2) {
+		std::clog << "Error: filenames not specified" << std::endl;
 		help_migrate_key(std::clog);
 		return 2;
 	}
 
 	const char*		key_file_name = argv[0];
+	const char*		new_key_file_name = argv[1];
 	Key_file		key_file;
 
 	try {
 		if (std::strcmp(key_file_name, "-") == 0) {
 			key_file.load_legacy(std::cin);
-			key_file.store(std::cout);
 		} else {
 			std::ifstream	in(key_file_name, std::fstream::binary);
 			if (!in) {
@@ -1209,24 +1209,13 @@ int migrate_key (int argc, const char** argv)
 				return 1;
 			}
 			key_file.load_legacy(in);
-			in.close();
+		}
 
-			std::string	new_key_file_name(key_file_name);
-			new_key_file_name += ".new";
-
-			if (access(new_key_file_name.c_str(), F_OK) == 0) {
-				std::clog << new_key_file_name << ": File already exists" << std::endl;
-				return 1;
-			}
-
-			if (!key_file.store_to_file(new_key_file_name.c_str())) {
+		if (std::strcmp(new_key_file_name, "-") == 0) {
+			key_file.store(std::cout);
+		} else {
+			if (!key_file.store_to_file(new_key_file_name)) {
 				std::clog << "Error: " << new_key_file_name << ": unable to write key file" << std::endl;
-				return 1;
-			}
-
-			if (util_rename(new_key_file_name.c_str(), key_file_name) == -1) {
-				std::clog << "Error: " << key_file_name << ": " << strerror(errno) << std::endl;
-				unlink(new_key_file_name.c_str());
 				return 1;
 			}
 		}
