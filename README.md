@@ -147,5 +147,5 @@ Mailing Lists
 To stay abreast of, and provide input to, git-crypt development,
 consider subscribing to one or both of our mailing lists:
 
-* [Announcements](http://lists.cloudmutt.com/mailman/listinfo/git-crypt-announce)
-* [Discussion](http://lists.cloudmutt.com/mailman/listinfo/git-crypt-discuss)
+* [Announcements](https://lists.cloudmutt.com/mailman/listinfo/git-crypt-announce)
+* [Discussion](https://lists.cloudmutt.com/mailman/listinfo/git-crypt-discuss)
