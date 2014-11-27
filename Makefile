@@ -25,7 +25,7 @@ util.o: util.cpp util-unix.cpp util-win32.cpp
 clean:
 	rm -f *.o git-crypt
 
-install:
+install: git-crypt
 	install -m 755 git-crypt $(DESTDIR)$(PREFIX)/bin/
 
 .PHONY: all clean install
