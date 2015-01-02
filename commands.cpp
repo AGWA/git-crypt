@@ -1040,6 +1040,19 @@ int add_gpg_user (int argc, const char** argv)
 
 	encrypt_repo_key(key_name, *key, collab_keys, get_repo_keys_path(state_path), &new_files);
 
+	// Add a .gitatributes file to the repo state directory to prevent files in it from being encrypted.
+	const std::string		state_gitattributes_path(state_path + "/.gitattributes");
+	if (access(state_gitattributes_path.c_str(), F_OK) != 0) {
+		std::ofstream		state_gitattributes_file(state_gitattributes_path.c_str());
+		state_gitattributes_file << "* !filter !diff\n";
+		state_gitattributes_file.close();
+		if (!state_gitattributes_file) {
+			std::clog << "Error: unable to write " << state_gitattributes_path << std::endl;
+			return 1;
+		}
+		new_files.push_back(state_gitattributes_path);
+	}
+
 	// add/commit the new files
 	if (!new_files.empty()) {
 		// git add NEW_FILE ...
