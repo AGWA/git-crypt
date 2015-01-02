@@ -146,7 +146,7 @@ static void validate_key_name_or_throw (const char* key_name)
 	}
 }
 
-static std::string get_internal_keys_path ()
+static std::string get_internal_state_path ()
 {
 	// git rev-parse --git-dir
 	std::vector<std::string>	command;
@@ -162,9 +162,19 @@ static std::string get_internal_keys_path ()
 
 	std::string			path;
 	std::getline(output, path);
-	path += "/git-crypt/keys";
+	path += "/git-crypt";
 
 	return path;
+}
+
+static std::string get_internal_keys_path (const std::string& internal_state_path)
+{
+	return internal_state_path + "/keys";
+}
+
+static std::string get_internal_keys_path ()
+{
+	return get_internal_keys_path(get_internal_state_path());
 }
 
 static std::string get_internal_key_path (const char* key_name)
@@ -176,7 +186,7 @@ static std::string get_internal_key_path (const char* key_name)
 	return path;
 }
 
-static std::string get_repo_keys_path ()
+static std::string get_repo_state_path ()
 {
 	// git rev-parse --show-toplevel
 	std::vector<std::string>	command;
@@ -198,8 +208,18 @@ static std::string get_repo_keys_path ()
 		throw Error("Could not determine Git working tree - is this a non-bare repo?");
 	}
 
-	path += "/.git-crypt/keys";
+	path += "/.git-crypt";
 	return path;
+}
+
+static std::string get_repo_keys_path (const std::string& repo_state_path)
+{
+	return repo_state_path + "/keys";
+}
+
+static std::string get_repo_keys_path ()
+{
+	return get_repo_keys_path(get_repo_state_path());
 }
 
 static std::string get_path_to_top ()
@@ -1015,10 +1035,10 @@ int add_gpg_user (int argc, const char** argv)
 		return 1;
 	}
 
-	std::string			keys_path(get_repo_keys_path());
+	const std::string		state_path(get_repo_state_path());
 	std::vector<std::string>	new_files;
 
-	encrypt_repo_key(key_name, *key, collab_keys, keys_path, &new_files);
+	encrypt_repo_key(key_name, *key, collab_keys, get_repo_keys_path(state_path), &new_files);
 
 	// add/commit the new files
 	if (!new_files.empty()) {
