@@ -78,6 +78,11 @@ static void print_usage (std::ostream& out)
 	out << "See 'git-crypt help COMMAND' for more information on a specific command." << std::endl;
 }
 
+static void print_version (std::ostream& out)
+{
+	out << "git-crypt " << VERSION << std::endl;
+}
+
 static bool help_for_command (const char* command, std::ostream& out)
 {
 	if (std::strcmp(command, "init") == 0) {
@@ -121,6 +126,12 @@ static int help (int argc, const char** argv)
 	return 0;
 }
 
+static int version (int argc, const char** argv)
+{
+	print_version(std::cout);
+	return 0;
+}
+
 
 int main (int argc, const char** argv)
 try {
@@ -140,6 +151,9 @@ try {
 	while (arg_index < argc && argv[arg_index][0] == '-') {
 		if (std::strcmp(argv[arg_index], "--help") == 0) {
 			print_usage(std::clog);
+			return 0;
+		} else if (std::strcmp(argv[arg_index], "--version") == 0) {
+			print_version(std::clog);
 			return 0;
 		} else if (std::strcmp(argv[arg_index], "--") == 0) {
 			++arg_index;
@@ -170,6 +184,9 @@ try {
 		// Public commands:
 		if (std::strcmp(command, "help") == 0) {
 			return help(argc, argv);
+		}
+		if (std::strcmp(command, "version") == 0) {
+			return version(argc, argv);
 		}
 		if (std::strcmp(command, "init") == 0) {
 			return init(argc, argv);
