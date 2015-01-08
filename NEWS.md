@@ -1,6 +1,11 @@
 News
 ====
 
+######v0.4.1 (2015-01-08)
+* Important usability fix to ensure that the .git-crypt directory
+  can't be encrypted by accident (see
+  [the release notes](RELEASE_NOTES-0.4.1.md) for more information).
+
 ######v0.4 (2014-11-16)
 (See [the release notes](RELEASE_NOTES-0.4.md) for important details.)
 *   Add optional GPG support: GPG can be used to share the repository
