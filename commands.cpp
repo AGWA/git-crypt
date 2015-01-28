@@ -114,20 +114,16 @@ static void unconfigure_git_filters (const char* key_name)
 	git_unconfig("diff." + attribute_name(key_name));
 }
 
-static bool git_checkout_head (const std::string& top_dir)
+static bool git_checkout (const std::vector<std::string>& paths)
 {
 	std::vector<std::string>	command;
 
 	command.push_back("git");
 	command.push_back("checkout");
-	command.push_back("-f");
-	command.push_back("HEAD");
 	command.push_back("--");
 
-	if (top_dir.empty()) {
-		command.push_back(".");
-	} else {
-		command.push_back(top_dir);
+	for (std::vector<std::string>::const_iterator path(paths.begin()); path != paths.end(); ++path) {
+		command.push_back(*path);
 	}
 
 	if (!successful_exit(exec_command(command))) {
@@ -260,18 +256,6 @@ static void get_git_status (std::ostream& output)
 	}
 }
 
-static bool check_if_head_exists ()
-{
-	// git rev-parse HEAD
-	std::vector<std::string>	command;
-	command.push_back("git");
-	command.push_back("rev-parse");
-	command.push_back("HEAD");
-
-	std::stringstream		output;
-	return successful_exit(exec_command(command, output));
-}
-
 // returns filter and diff attributes as a pair
 static std::pair<std::string, std::string> get_file_attributes (const std::string& filename)
 {
@@ -370,6 +354,35 @@ static bool check_if_file_is_encrypted (const std::string& filename)
 	output >> mode >> object_id;
 
 	return check_if_blob_is_encrypted(object_id);
+}
+
+static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
+{
+	// git ls-files -cz -- path_to_top
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("ls-files");
+	command.push_back("-cz");
+	command.push_back("--");
+	const std::string		path_to_top(get_path_to_top());
+	if (!path_to_top.empty()) {
+		command.push_back(path_to_top);
+	}
+
+	std::stringstream		output;
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git ls-files' failed - is this a Git repository?");
+	}
+
+	while (output.peek() != -1) {
+		std::string		filename;
+		std::getline(output, filename, '\0');
+
+		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
+		if (get_file_attributes(filename).first == attribute_name(key_name)) {
+			files.push_back(filename);
+		}
+	}
 }
 
 static void load_key (Key_file& key_file, const char* key_name, const char* key_path =0, const char* legacy_path =0)
@@ -785,23 +798,16 @@ void help_unlock (std::ostream& out)
 }
 int unlock (int argc, const char** argv)
 {
-	// 0. Make sure working directory is clean (ignoring untracked files)
-	// We do this because we run 'git checkout -f HEAD' later and we don't
-	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
-	// untracked files so it's safe to ignore those.
+	// 1. Make sure working directory is clean (ignoring untracked files)
+	// We do this because we check out files later, and we don't want the
+	// user to lose any changes.  (TODO: only care if encrypted files are
+	// modified, since we only check out encrypted files)
 
 	// Running 'git status' also serves as a check that the Git repo is accessible.
 
 	std::stringstream	status_output;
 	get_git_status(status_output);
-
-	// 1. Check to see if HEAD exists.  See below why we do this.
-	bool			head_exists = check_if_head_exists();
-
-	if (status_output.peek() != -1 && head_exists) {
-		// We only care that the working directory is dirty if HEAD exists.
-		// If HEAD doesn't exist, we won't be resetting to it (see below) so
-		// it doesn't matter that the working directory is dirty.
+	if (status_output.peek() != -1) {
 		std::clog << "Error: Working directory not clean." << std::endl;
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt unlock'." << std::endl;
 		return 1;
@@ -861,6 +867,7 @@ int unlock (int argc, const char** argv)
 
 
 	// 4. Install the key(s) and configure the git filters
+	std::vector<std::string>	encrypted_files;
 	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
 		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
 		// TODO: croak if internal_key_path already exists???
@@ -871,18 +878,18 @@ int unlock (int argc, const char** argv)
 		}
 
 		configure_git_filters(key_file->get_key_name());
+		get_encrypted_files(encrypted_files, key_file->get_key_name());
 	}
 
-	// 5. Do a force checkout so any files that were previously checked out encrypted
-	//    will now be checked out decrypted.
-	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
-	// just skip the checkout.
-	if (head_exists) {
-		if (!git_checkout_head(path_to_top)) {
-			std::clog << "Error: 'git checkout' failed" << std::endl;
-			std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
-			return 1;
-		}
+	// 5. Check out the files that are currently encrypted.
+	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
+	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
+		touch_file(*file);
+	}
+	if (!git_checkout(encrypted_files)) {
+		std::clog << "Error: 'git checkout' failed" << std::endl;
+		std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
+		return 1;
 	}
 
 	return 0;
@@ -920,23 +927,16 @@ int lock (int argc, const char** argv)
 		return 2;
 	}
 
-	// 0. Make sure working directory is clean (ignoring untracked files)
-	// We do this because we run 'git checkout -f HEAD' later and we don't
-	// want the user to lose any changes.  'git checkout -f HEAD' doesn't touch
-	// untracked files so it's safe to ignore those.
+	// 1. Make sure working directory is clean (ignoring untracked files)
+	// We do this because we check out files later, and we don't want the
+	// user to lose any changes.  (TODO: only care if encrypted files are
+	// modified, since we only check out encrypted files)
 
 	// Running 'git status' also serves as a check that the Git repo is accessible.
 
 	std::stringstream	status_output;
 	get_git_status(status_output);
-
-	// 1. Check to see if HEAD exists.  See below why we do this.
-	bool			head_exists = check_if_head_exists();
-
-	if (status_output.peek() != -1 && head_exists) {
-		// We only care that the working directory is dirty if HEAD exists.
-		// If HEAD doesn't exist, we won't be resetting to it (see below) so
-		// it doesn't matter that the working directory is dirty.
+	if (status_output.peek() != -1) {
 		std::clog << "Error: Working directory not clean." << std::endl;
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt lock'." << std::endl;
 		return 1;
@@ -948,6 +948,7 @@ int lock (int argc, const char** argv)
 	std::string		path_to_top(get_path_to_top());
 
 	// 3. unconfigure the git filters and remove decrypted keys
+	std::vector<std::string>	encrypted_files;
 	if (all_keys) {
 		// unconfigure for all keys
 		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
@@ -956,6 +957,7 @@ int lock (int argc, const char** argv)
 			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
 			remove_file(get_internal_key_path(this_key_name));
 			unconfigure_git_filters(this_key_name);
+			get_encrypted_files(encrypted_files, this_key_name);
 		}
 	} else {
 		// just handle the given key
@@ -971,18 +973,18 @@ int lock (int argc, const char** argv)
 
 		remove_file(internal_key_path);
 		unconfigure_git_filters(key_name);
+		get_encrypted_files(encrypted_files, key_name);
 	}
 
-	// 4. Do a force checkout so any files that were previously checked out decrypted
-	//    will now be checked out encrypted.
-	// If HEAD doesn't exist (perhaps because this repo doesn't have any files yet)
-	// just skip the checkout.
-	if (head_exists) {
-		if (!git_checkout_head(path_to_top)) {
-			std::clog << "Error: 'git checkout' failed" << std::endl;
-			std::clog << "git-crypt has been locked but up but existing decrypted files have not been encrypted" << std::endl;
-			return 1;
-		}
+	// 4. Check out the files that are currently decrypted but should be encrypted.
+	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
+	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
+		touch_file(*file);
+	}
+	if (!git_checkout(encrypted_files)) {
+		std::clog << "Error: 'git checkout' failed" << std::endl;
+		std::clog << "git-crypt has been locked but up but existing decrypted files have not been encrypted" << std::endl;
+		return 1;
 	}
 
 	return 0;
