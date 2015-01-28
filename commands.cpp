@@ -49,6 +49,17 @@
 #include <errno.h>
 #include <vector>
 
+static std::string attribute_name (const char* key_name)
+{
+	if (key_name) {
+		// named key
+		return std::string("git-crypt-") + key_name;
+	} else {
+		// default key
+		return "git-crypt";
+	}
+}
+
 static void git_config (const std::string& name, const std::string& value)
 {
 	std::vector<std::string>	command;
@@ -99,15 +110,8 @@ static void configure_git_filters (const char* key_name)
 static void unconfigure_git_filters (const char* key_name)
 {
 	// unconfigure the git-crypt filters
-	if (key_name) {
-		// named key
-		git_unconfig(std::string("filter.git-crypt-") + key_name);
-		git_unconfig(std::string("diff.git-crypt-") + key_name);
-	} else {
-		// default key
-		git_unconfig("filter.git-crypt");
-		git_unconfig("diff.git-crypt");
-	}
+	git_unconfig("filter." + attribute_name(key_name));
+	git_unconfig("diff." + attribute_name(key_name));
 }
 
 static bool git_checkout_head (const std::string& top_dir)
