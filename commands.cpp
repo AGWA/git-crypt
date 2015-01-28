@@ -803,7 +803,7 @@ int unlock (int argc, const char** argv)
 		// If HEAD doesn't exist, we won't be resetting to it (see below) so
 		// it doesn't matter that the working directory is dirty.
 		std::clog << "Error: Working directory not clean." << std::endl;
-		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt' unlock." << std::endl;
+		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt unlock'." << std::endl;
 		return 1;
 	}
 
@@ -938,7 +938,7 @@ int lock (int argc, const char** argv)
 		// If HEAD doesn't exist, we won't be resetting to it (see below) so
 		// it doesn't matter that the working directory is dirty.
 		std::clog << "Error: Working directory not clean." << std::endl;
-		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt' lock." << std::endl;
+		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt lock'." << std::endl;
 		return 1;
 	}
 
