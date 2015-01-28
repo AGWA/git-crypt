@@ -850,7 +850,7 @@ int unlock (int argc, const char** argv)
 		if (!decrypt_repo_keys(key_files, 0, gpg_secret_keys, repo_keys_path)) {
 			std::clog << "Error: no GPG secret key available to unlock this repository." << std::endl;
 			std::clog << "To unlock with a shared symmetric key instead, specify the path to the symmetric key as an argument to 'git-crypt unlock'." << std::endl;
-			std::clog << "To see a list of GPG keys authorized to unlock this repository, run 'git-crypt ls-collabs'." << std::endl;
+			// TODO std::clog << "To see a list of GPG keys authorized to unlock this repository, run 'git-crypt ls-gpg-users'." << std::endl;
 			return 1;
 		}
 	}
