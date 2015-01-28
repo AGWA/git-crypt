@@ -1,0 +1,17 @@
+Subject: Collected Debian patches for git-crypt
+Author: Andrew Ayer <agwa@andrewayer.name>
+
+Since I am also upstream for this package, there will normally not be
+any patches to apply to the upstream source.  However, occasionally
+I'll pull up specific upstream commits prior to making an upstream
+release.  When this happens, this patch will collect all of those
+modifications.
+
+I use Git to maintain both the upstream source and the Debian
+packages, and generating individual patches rather than using git
+cherry-pick takes extra work for no gain.  Since I'm also upstream,
+there's no need to separate the patches for later upstream submission.
+Hence, I take this approach with a unified patch when it's necessary.
+
+For full commit history and separated commits, see the upstream Git
+repository.

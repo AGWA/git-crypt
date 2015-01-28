@@ -3,13 +3,14 @@ Maintainer: Andrew Ayer <agwa@andrewayer.name>
 Section: vcs
 Priority: optional
 Standards-Version: 3.9.4
-Build-Depends: debhelper (>= 9), make (>= 3.81-5), libc6-dev (>= 2.7-18), gcc (>= 4:4.3.2-2), coreutils (>= 6.10-6), libssl-dev (>= 0.9.8o-4)
+Build-Depends: debhelper (>= 9), libssl-dev
 Vcs-Git: https://www.agwa.name/git/git-crypt.git -b debian
 Homepage: https://www.agwa.name/projects/git-crypt
 
 Package: git-crypt
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, git (>= 1.7.2)
+Recommends: gnupg
 Enhances: git
 Description: Transparent file encryption in git
  git-crypt enables transparent encryption and decryption of files in a

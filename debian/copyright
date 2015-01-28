@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: git-crypt
-Source: https://github.com/AGWA/git-crypt
+Source: https://www.agwa.name/projects/git-crypt
 
 Files: *
 Copyright: Copyright 2014 Andrew Ayer <agwa@andrewayer.name>
