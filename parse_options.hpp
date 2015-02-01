@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, 2014 Andrew Ayer
+ * Copyright 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,46 +28,33 @@
  * as that of the covered work.
  */
 
-#ifndef GIT_CRYPT_COMMANDS_HPP
-#define GIT_CRYPT_COMMANDS_HPP
+#ifndef PARSE_OPTIONS_HPP
+#define PARSE_OPTIONS_HPP
 
 #include <string>
-#include <iosfwd>
+#include <vector>
 
-struct Error {
-	std::string	message;
+struct Option_def {
+	std::string	name;
+	bool*		is_set;
+	const char**	value;
 
-	explicit Error (std::string m) : message(m) { }
+	Option_def () : is_set(0), value(0) { }
+	Option_def (const std::string& arg_name, bool* arg_is_set)
+	: name(arg_name), is_set(arg_is_set), value(0) { }
+	Option_def (const std::string& arg_name, const char** arg_value)
+	: name(arg_name), is_set(0), value(arg_value) { }
 };
 
-// Plumbing commands:
-int clean (int argc, const char** argv);
-int smudge (int argc, const char** argv);
-int diff (int argc, const char** argv);
-// Public commands:
-int init (int argc, const char** argv);
-int unlock (int argc, const char** argv);
-int lock (int argc, const char** argv);
-int add_gpg_user (int argc, const char** argv);
-int rm_gpg_user (int argc, const char** argv);
-int ls_gpg_users (int argc, const char** argv);
-int export_key (int argc, const char** argv);
-int keygen (int argc, const char** argv);
-int migrate_key (int argc, const char** argv);
-int refresh (int argc, const char** argv);
-int status (int argc, const char** argv);
+typedef std::vector<Option_def> Options_list;
 
-// Help messages:
-void help_init (std::ostream&);
-void help_unlock (std::ostream&);
-void help_lock (std::ostream&);
-void help_add_gpg_user (std::ostream&);
-void help_rm_gpg_user (std::ostream&);
-void help_ls_gpg_users (std::ostream&);
-void help_export_key (std::ostream&);
-void help_keygen (std::ostream&);
-void help_migrate_key (std::ostream&);
-void help_refresh (std::ostream&);
-void help_status (std::ostream&);
+int parse_options (const Options_list& options, int argc, const char** argv);
+
+struct Option_error {
+	std::string	option_name;
+	std::string	message;
+
+	Option_error (const std::string& n, const std::string& m) : option_name(n), message(m) { }
+};
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Andrew Ayer
+ * Copyright 2012, 2014 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,102 +28,54 @@
  * as that of the covered work.
  */
 
-#define _BSD_SOURCE
 #include "crypto.hpp"
-#include <openssl/aes.h>
-#include <openssl/sha.h>
-#include <openssl/hmac.h>
-#include <openssl/evp.h>
-#include <fstream>
-#include <iostream>
+#include "util.hpp"
 #include <cstring>
-#include <cstdlib>
-#include <arpa/inet.h>
 
-void load_keys (const char* filepath, keys_t* keys)
+Aes_ctr_encryptor::Aes_ctr_encryptor (const unsigned char* raw_key, const unsigned char* nonce)
+: ecb(raw_key)
 {
-	std::ifstream	file(filepath);
-	if (!file) {
-		perror(filepath);
-		std::exit(1);
-	}
-	char	buffer[AES_KEY_BITS/8 + HMAC_KEY_LEN];
-	file.read(buffer, sizeof(buffer));
-	if (file.gcount() != sizeof(buffer)) {
-		std::clog << filepath << ": Premature end of key file\n";
-		std::exit(1);
-	}
-
-	// First comes the AES encryption key
-	if (AES_set_encrypt_key(reinterpret_cast<uint8_t*>(buffer), AES_KEY_BITS, &keys->enc) != 0) {
-		std::clog << filepath << ": Failed to initialize AES encryption key\n";
-		std::exit(1);
-	}
-
-	// Then it's the HMAC key
-	memcpy(keys->hmac, buffer + AES_KEY_BITS/8, HMAC_KEY_LEN);
-}
-
-
-aes_ctr_state::aes_ctr_state (const uint8_t* arg_nonce, size_t arg_nonce_len)
-{
-	memset(nonce, '\0', sizeof(nonce));
-	memcpy(nonce, arg_nonce, std::min(arg_nonce_len, sizeof(nonce)));
+	// Set first 12 bytes of the CTR value to the nonce.
+	// This stays the same for the entirety of this object's lifetime.
+	std::memcpy(ctr_value, nonce, NONCE_LEN);
 	byte_counter = 0;
-	memset(otp, '\0', sizeof(otp));
 }
 
-void aes_ctr_state::process (const AES_KEY* key, const uint8_t* in, uint8_t* out, size_t len)
+Aes_ctr_encryptor::~Aes_ctr_encryptor ()
+{
+	explicit_memset(pad, '\0', BLOCK_LEN);
+}
+
+void Aes_ctr_encryptor::process (const unsigned char* in, unsigned char* out, size_t len)
 {
 	for (size_t i = 0; i < len; ++i) {
-		if (byte_counter % 16 == 0) {
-			// Generate a new OTP
-			// CTR value:
-			//  first 12 bytes - nonce
-			//  last   4 bytes - block number (sequentially increasing with each block)
-			uint8_t		ctr[16];
-			uint32_t	blockno = htonl(byte_counter / 16);
-			memcpy(ctr, nonce, 12);
-			memcpy(ctr + 12, &blockno, 4);
-			AES_encrypt(ctr, otp, key);
+		if (byte_counter % BLOCK_LEN == 0) {
+			// Set last 4 bytes of CTR to the (big-endian) block number (sequentially increasing with each block)
+			store_be32(ctr_value + NONCE_LEN, byte_counter / BLOCK_LEN);
+
+			// Generate a new pad
+			ecb.encrypt(ctr_value, pad);
 		}
 
 		// encrypt one byte
-		out[i] = in[i] ^ otp[byte_counter++ % 16];
+		out[i] = in[i] ^ pad[byte_counter++ % BLOCK_LEN];
+
+		if (byte_counter == 0) {
+			throw Crypto_error("Aes_ctr_encryptor::process", "Too much data to encrypt securely");
+		}
 	}
 }
 
-hmac_sha1_state::hmac_sha1_state (const uint8_t* key, size_t key_len)
-{
-	HMAC_Init(&ctx, key, key_len, EVP_sha1());
-}
-
-hmac_sha1_state::~hmac_sha1_state ()
-{
-	HMAC_cleanup(&ctx);
-}
-
-void hmac_sha1_state::add (const uint8_t* buffer, size_t buffer_len)
-{
-	HMAC_Update(&ctx, buffer, buffer_len);
-}
-
-void hmac_sha1_state::get (uint8_t* digest)
-{
-	unsigned int len;
-	HMAC_Final(&ctx, digest, &len);
-}
-
-
 // Encrypt/decrypt an entire input stream, writing to the given output stream
-void process_stream (std::istream& in, std::ostream& out, const AES_KEY* enc_key, const uint8_t* nonce)
+void Aes_ctr_encryptor::process_stream (std::istream& in, std::ostream& out, const unsigned char* key, const unsigned char* nonce)
 {
-	aes_ctr_state	state(nonce, 12);
+	Aes_ctr_encryptor	aes(key, nonce);
 
-	uint8_t		buffer[1024];
+	unsigned char		buffer[1024];
 	while (in) {
 		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
-		state.process(enc_key, buffer, buffer, in.gcount());
+		aes.process(buffer, buffer, in.gcount());
 		out.write(reinterpret_cast<char*>(buffer), in.gcount());
 	}
 }
+
