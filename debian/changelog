@@ -1,3 +1,10 @@
+git-crypt (0.4.2-1~agwa1) unstable; urgency=low
+
+  * New upstream release.
+  * Various packaging improvements.
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Sat, 31 Jan 2015 19:43:06 -0800
+
 git-crypt (0.3-1) unstable; urgency=low
 
   * Initial release.
