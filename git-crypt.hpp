@@ -31,7 +31,7 @@
 #ifndef GIT_CRYPT_GIT_CRYPT_HPP
 #define GIT_CRYPT_GIT_CRYPT_HPP
 
-#define VERSION "0.4.1"
+#define VERSION "0.4.2"
 
 extern const char*	argv0;	// initialized in main() to argv[0]
 

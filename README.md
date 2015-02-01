@@ -67,8 +67,8 @@ encryption and decryption happen transparently.
 Current Status
 --------------
 
-The latest version of git-crypt is [0.4.1](RELEASE_NOTES-0.4.1.md), released on
-2015-01-08.  git-crypt aims to be bug-free and reliable, meaning it
+The latest version of git-crypt is [0.4.2](NEWS.md), released on
+2015-01-31.  git-crypt aims to be bug-free and reliable, meaning it
 shouldn't crash, malfunction, or expose your confidential data.
 However, it has not yet reached maturity, meaning it is not as
 documented, featureful, or easy-to-use as it should be.  Additionally,

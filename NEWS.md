@@ -1,6 +1,11 @@
 News
 ====
 
+######v0.4.2 (2015-01-31)
+* Fix unlock and lock under Git 2.2.2 and higher.
+* Drop support for versions of Git older than 1.7.2.
+* Minor improvements to some help/error messages.
+
 ######v0.4.1 (2015-01-08)
 * Important usability fix to ensure that the .git-crypt directory
   can't be encrypted by accident (see
