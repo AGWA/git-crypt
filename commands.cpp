@@ -963,7 +963,7 @@ int lock (int argc, const char** argv)
 		// just handle the given key
 		std::string	internal_key_path(get_internal_key_path(key_name));
 		if (access(internal_key_path.c_str(), F_OK) == -1 && errno == ENOENT) {
-			std::clog << "Error: this repository is not currently locked";
+			std::clog << "Error: this repository is not currently unlocked";
 			if (key_name) {
 				std::clog << " with key '" << key_name << "'";
 			}
