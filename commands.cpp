@@ -919,19 +919,23 @@ void help_lock (std::ostream& out)
 	//     |--------------------------------------------------------------------------------| 80 chars
 	out << "Usage: git-crypt lock [OPTIONS]" << std::endl;
 	out << std::endl;
-	out << "    -a, --all                   Lock all keys, instead of just the default" << std::endl;
-	out << "    -k, --key-name KEYNAME      Lock the given key, instead of the default" << std::endl;
+	out << "    -a, --all                Lock all keys, instead of just the default" << std::endl;
+	out << "    -k, --key-name KEYNAME   Lock the given key, instead of the default" << std::endl;
+	out << "    -f, --force              Lock even if unclean (you may lose uncommited work)" << std::endl;
 	out << std::endl;
 }
 int lock (int argc, const char** argv)
 {
 	const char*	key_name = 0;
-	bool all_keys = false;
+	bool		all_keys = false;
+	bool		force = false;
 	Options_list	options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
 	options.push_back(Option_def("-a", &all_keys));
 	options.push_back(Option_def("--all", &all_keys));
+	options.push_back(Option_def("-f", &force));
+	options.push_back(Option_def("--force", &force));
 
 	int			argi = parse_options(options, argc, argv);
 
@@ -955,9 +959,10 @@ int lock (int argc, const char** argv)
 
 	std::stringstream	status_output;
 	get_git_status(status_output);
-	if (status_output.peek() != -1) {
+	if (!force && status_output.peek() != -1) {
 		std::clog << "Error: Working directory not clean." << std::endl;
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt lock'." << std::endl;
+		std::clog << "Or, use 'git-crypt lock --force' and possibly lose uncommitted changes." << std::endl;
 		return 1;
 	}
 
