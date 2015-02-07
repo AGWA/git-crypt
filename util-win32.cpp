@@ -325,7 +325,12 @@ void	touch_file (const std::string& filename)
 {
 	HANDLE	fh = CreateFileA(filename.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	if (fh == INVALID_HANDLE_VALUE) {
-		throw System_error("CreateFileA", filename, GetLastError());
+		DWORD	error = GetLastError();
+		if (error == ERROR_FILE_NOT_FOUND) {
+			return;
+		} else {
+			throw System_error("CreateFileA", filename, error);
+		}
 	}
 	SYSTEMTIME	system_time;
 	GetSystemTime(&system_time);
@@ -343,7 +348,12 @@ void	touch_file (const std::string& filename)
 void	remove_file (const std::string& filename)
 {
 	if (!DeleteFileA(filename.c_str())) {
-		throw System_error("DeleteFileA", filename, GetLastError());
+		DWORD	error = GetLastError();
+		if (error == ERROR_FILE_NOT_FOUND) {
+			return;
+		} else {
+			throw System_error("DeleteFileA", filename, error);
+		}
 	}
 }
 

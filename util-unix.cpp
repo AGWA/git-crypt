@@ -280,14 +280,14 @@ int	exit_status (int wait_status)
 
 void	touch_file (const std::string& filename)
 {
-	if (utimes(filename.c_str(), NULL) == -1) {
+	if (utimes(filename.c_str(), NULL) == -1 && errno != ENOENT) {
 		throw System_error("utimes", filename, errno);
 	}
 }
 
 void	remove_file (const std::string& filename)
 {
-	if (unlink(filename.c_str()) == -1) {
+	if (unlink(filename.c_str()) == -1 && errno != ENOENT) {
 		throw System_error("unlink", filename, errno);
 	}
 }
