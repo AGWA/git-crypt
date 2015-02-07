@@ -837,12 +837,7 @@ int unlock (int argc, const char** argv)
 		return 1;
 	}
 
-	// 2. Determine the path to the top of the repository.  We pass this as the argument
-	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
-	// mucked with the git config.)
-	std::string		path_to_top(get_path_to_top());
-
-	// 3. Load the key(s)
+	// 2. Load the key(s)
 	std::vector<Key_file>	key_files;
 	if (argc > 0) {
 		// Read from the symmetric key file(s)
@@ -890,7 +885,7 @@ int unlock (int argc, const char** argv)
 	}
 
 
-	// 4. Install the key(s) and configure the git filters
+	// 3. Install the key(s) and configure the git filters
 	std::vector<std::string>	encrypted_files;
 	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
 		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
@@ -905,7 +900,7 @@ int unlock (int argc, const char** argv)
 		get_encrypted_files(encrypted_files, key_file->get_key_name());
 	}
 
-	// 5. Check out the files that are currently encrypted.
+	// 4. Check out the files that are currently encrypted.
 	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
 	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
 		touch_file(*file);
@@ -966,12 +961,7 @@ int lock (int argc, const char** argv)
 		return 1;
 	}
 
-	// 2. Determine the path to the top of the repository.  We pass this as the argument
-	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
-	// mucked with the git config.)
-	std::string		path_to_top(get_path_to_top());
-
-	// 3. deconfigure the git filters and remove decrypted keys
+	// 2. deconfigure the git filters and remove decrypted keys
 	std::vector<std::string>	encrypted_files;
 	if (all_keys) {
 		// deconfigure for all keys
@@ -1000,7 +990,7 @@ int lock (int argc, const char** argv)
 		get_encrypted_files(encrypted_files, key_name);
 	}
 
-	// 4. Check out the files that are currently decrypted but should be encrypted.
+	// 3. Check out the files that are currently decrypted but should be encrypted.
 	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
 	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
 		touch_file(*file);
