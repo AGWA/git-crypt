@@ -73,7 +73,7 @@ static void git_config (const std::string& name, const std::string& value)
 	}
 }
 
-static void git_unconfig (const std::string& name)
+static void git_deconfig (const std::string& name)
 {
 	std::vector<std::string>	command;
 	command.push_back("git");
@@ -107,11 +107,11 @@ static void configure_git_filters (const char* key_name)
 	}
 }
 
-static void unconfigure_git_filters (const char* key_name)
+static void deconfigure_git_filters (const char* key_name)
 {
-	// unconfigure the git-crypt filters
-	git_unconfig("filter." + attribute_name(key_name));
-	git_unconfig("diff." + attribute_name(key_name));
+	// deconfigure the git-crypt filters
+	git_deconfig("filter." + attribute_name(key_name));
+	git_deconfig("diff." + attribute_name(key_name));
 }
 
 static bool git_checkout (const std::vector<std::string>& paths)
@@ -947,16 +947,16 @@ int lock (int argc, const char** argv)
 	// mucked with the git config.)
 	std::string		path_to_top(get_path_to_top());
 
-	// 3. unconfigure the git filters and remove decrypted keys
+	// 3. deconfigure the git filters and remove decrypted keys
 	std::vector<std::string>	encrypted_files;
 	if (all_keys) {
-		// unconfigure for all keys
+		// deconfigure for all keys
 		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
 			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
 			remove_file(get_internal_key_path(this_key_name));
-			unconfigure_git_filters(this_key_name);
+			deconfigure_git_filters(this_key_name);
 			get_encrypted_files(encrypted_files, this_key_name);
 		}
 	} else {
@@ -972,7 +972,7 @@ int lock (int argc, const char** argv)
 		}
 
 		remove_file(internal_key_path);
-		unconfigure_git_filters(key_name);
+		deconfigure_git_filters(key_name);
 		get_encrypted_files(encrypted_files, key_name);
 	}
 
