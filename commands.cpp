@@ -73,6 +73,22 @@ static void git_config (const std::string& name, const std::string& value)
 	}
 }
 
+static bool git_has_config (const std::string& name)
+{
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--get-all");
+	command.push_back(name);
+
+	std::stringstream		output;
+	switch (exit_status(exec_command(command, output))) {
+		case 0:  return true;
+		case 1:  return false;
+		default: throw Error("'git config' failed");
+	}
+}
+
 static void git_deconfig (const std::string& name)
 {
 	std::vector<std::string>	command;
@@ -110,8 +126,16 @@ static void configure_git_filters (const char* key_name)
 static void deconfigure_git_filters (const char* key_name)
 {
 	// deconfigure the git-crypt filters
-	git_deconfig("filter." + attribute_name(key_name));
-	git_deconfig("diff." + attribute_name(key_name));
+	if (git_has_config("filter." + attribute_name(key_name) + ".smudge") ||
+			git_has_config("filter." + attribute_name(key_name) + ".clean") ||
+			git_has_config("filter." + attribute_name(key_name) + ".required")) {
+
+		git_deconfig("filter." + attribute_name(key_name));
+	}
+
+	if (git_has_config("diff." + attribute_name(key_name) + ".textconv")) {
+		git_deconfig("diff." + attribute_name(key_name));
+	}
 }
 
 static bool git_checkout (const std::vector<std::string>& paths)
