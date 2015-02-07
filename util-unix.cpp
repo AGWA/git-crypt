@@ -273,9 +273,9 @@ int exec_command_with_input (const std::vector<std::string>& command, const char
 	return status;
 }
 
-bool successful_exit (int status)
+int	exit_status (int wait_status)
 {
-	return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	return wait_status != -1 && WIFEXITED(wait_status) ? WEXITSTATUS(wait_status) : -1;
 }
 
 void	touch_file (const std::string& filename)

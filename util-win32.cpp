@@ -316,9 +316,9 @@ int exec_command_with_input (const std::vector<std::string>& command, const char
 	return exit_code;
 }
 
-bool successful_exit (int status)
+int exit_status (int status)
 {
-	return status == 0;
+	return status;
 }
 
 void	touch_file (const std::string& filename)
