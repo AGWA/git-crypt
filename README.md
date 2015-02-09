@@ -118,9 +118,9 @@ the patch itself is encrypted.  To generate an encrypted patch, use `git
 diff --no-textconv --binary`.  Alternatively, you can apply a plaintext
 patch outside of git using the patch command.
 
-git-crypt does [not work reliably with Atlassian
-SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511).  Files might
-be left in an unencrypted state.
+git-crypt does not work reliably with some third-party git GUIs, such
+as [Atlassian SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511)
+and GitHub for Mac.  Files might be left in an unencrypted state.
 
 Gitattributes File
 ------------------
