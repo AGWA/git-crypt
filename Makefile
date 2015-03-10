@@ -26,6 +26,7 @@ clean:
 	rm -f *.o git-crypt
 
 install: git-crypt
+	install -d $(DESTDIR)$(PREFIX)/bin/
 	install -m 755 git-crypt $(DESTDIR)$(PREFIX)/bin/
 
 .PHONY: all clean install
