@@ -380,13 +380,18 @@ static bool check_if_file_is_encrypted (const std::string& filename)
 	return check_if_blob_is_encrypted(object_id);
 }
 
+static bool is_git_file_mode (const std::string& mode)
+{
+	return (std::strtoul(mode.c_str(), NULL, 8) & 0170000) == 0100000;
+}
+
 static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
 {
 	// git ls-files -cz -- path_to_top
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("ls-files");
-	command.push_back("-cz");
+	command.push_back("-csz");
 	command.push_back("--");
 	const std::string		path_to_top(get_path_to_top());
 	if (!path_to_top.empty()) {
@@ -399,11 +404,15 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 	}
 
 	while (output.peek() != -1) {
+		std::string		mode;
+		std::string		object_id;
+		std::string		stage;
 		std::string		filename;
+		output >> mode >> object_id >> stage >> std::ws;
 		std::getline(output, filename, '\0');
 
 		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
-		if (get_file_attributes(filename).first == attribute_name(key_name)) {
+		if (is_git_file_mode(mode) && get_file_attributes(filename).first == attribute_name(key_name)) {
 			files.push_back(filename);
 		}
 	}
@@ -1420,6 +1429,9 @@ int status (int argc, const char** argv)
 			std::string	mode;
 			std::string	stage;
 			output >> mode >> object_id >> stage;
+			if (!is_git_file_mode(mode)) {
+				continue;
+			}
 		}
 		output >> std::ws;
 		std::getline(output, filename, '\0');
