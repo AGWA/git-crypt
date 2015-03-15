@@ -33,7 +33,8 @@ Specify files to encrypt by creating a .gitattributes file:
 
 Like a .gitignore file, it can match wildcards and should be checked into
 the repository.  See below for more information about .gitattributes.
-Make sure you don't accidentally encrypt the .gitattributes file itself!
+Make sure you don't accidentally encrypt the .gitattributes file itself
+(or other git files like .gitignore or .gitmodules).
 
 Share the repository with others (or with yourself) using GPG:
 
@@ -98,7 +99,8 @@ need to encrypt.  For encrypting an entire repository, consider using a
 system like git-remote-gcrypt <https://github.com/joeyh/git-remote-gcrypt>
 instead.  (Note: no endorsement is made of git-remote-gcrypt's security.)
 
-git-crypt does not encrypt file names, commit messages, or other metadata.
+git-crypt does not encrypt file names, commit messages, symlink targets,
+gitlinks, or other metadata.
 
 Files encrypted with git-crypt are not compressible.  Even the smallest
 change to an encrypted file requires git to store the entire changed file,
