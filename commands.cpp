@@ -495,7 +495,7 @@ static bool decrypt_repo_keys (std::vector<Key_file>& key_files, uint32_t key_ve
 	return successful;
 }
 
-static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
+static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::pair<std::string, bool> >& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
 {
 	std::string	key_file_data;
 	{
@@ -505,9 +505,11 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		key_file_data = this_version_key_file.store_to_string();
 	}
 
-	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+	for (std::vector<std::pair<std::string, bool> >::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+		const std::string&	fingerprint(collab->first);
+		const bool		key_is_trusted(collab->second);
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << *collab << ".gpg";
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << fingerprint << ".gpg";
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
@@ -515,7 +517,7 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		}
 
 		mkdir_parent(path);
-		gpg_encrypt_to_file(path, *collab, key_file_data.data(), key_file_data.size());
+		gpg_encrypt_to_file(path, fingerprint, key_is_trusted, key_file_data.data(), key_file_data.size());
 		new_files->push_back(path);
 	}
 }
@@ -1025,17 +1027,20 @@ void help_add_gpg_user (std::ostream& out)
 	out << std::endl;
 	out << "    -k, --key-name KEYNAME      Add GPG user to given key, instead of default" << std::endl;
 	out << "    -n, --no-commit             Don't automatically commit" << std::endl;
+	out << "    --trusted                   Assume the GPG user IDs are trusted" << std::endl;
 	out << std::endl;
 }
 int add_gpg_user (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	bool			no_commit = false;
+	bool			trusted = false;
 	Options_list		options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
 	options.push_back(Option_def("-n", &no_commit));
 	options.push_back(Option_def("--no-commit", &no_commit));
+	options.push_back(Option_def("--trusted", &trusted));
 
 	int			argi = parse_options(options, argc, argv);
 	if (argc - argi == 0) {
@@ -1044,8 +1049,8 @@ int add_gpg_user (int argc, const char** argv)
 		return 2;
 	}
 
-	// build a list of key fingerprints for every collaborator specified on the command line
-	std::vector<std::string>	collab_keys;
+	// build a list of key fingerprints, and whether the key is trusted, for every collaborator specified on the command line
+	std::vector<std::pair<std::string, bool> >	collab_keys;
 
 	for (int i = argi; i < argc; ++i) {
 		std::vector<std::string> keys(gpg_lookup_key(argv[i]));
@@ -1057,7 +1062,9 @@ int add_gpg_user (int argc, const char** argv)
 			std::clog << "Error: more than one public key matches '" << argv[i] << "' - please be more specific" << std::endl;
 			return 1;
 		}
-		collab_keys.push_back(keys[0]);
+
+		const bool is_full_fingerprint(std::strncmp(argv[i], "0x", 2) == 0 && std::strlen(argv[i]) == 42);
+		collab_keys.push_back(std::make_pair(keys[0], trusted || is_full_fingerprint));
 	}
 
 	// TODO: have a retroactive option to grant access to all key versions, not just the most recent
@@ -1108,8 +1115,8 @@ int add_gpg_user (int argc, const char** argv)
 			// TODO: include key_name in commit message
 			std::ostringstream	commit_message_builder;
 			commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
-			for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
-				commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
+			for (std::vector<std::pair<std::string, bool> >::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+				commit_message_builder << '\t' << gpg_shorten_fingerprint(collab->first) << ' ' << gpg_get_uid(collab->first) << '\n';
 			}
 
 			// git commit -m MESSAGE NEW_FILE ...

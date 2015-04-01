@@ -45,7 +45,7 @@ std::string			gpg_shorten_fingerprint (const std::string& fingerprint);
 std::string			gpg_get_uid (const std::string& fingerprint);
 std::vector<std::string>	gpg_lookup_key (const std::string& query);
 std::vector<std::string>	gpg_list_secret_keys ();
-void				gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, const char* p, size_t len);
+void				gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, bool key_is_trusted, const char* p, size_t len);
 void				gpg_decrypt_from_file (const std::string& filename, std::ostream&);
 
 #endif
