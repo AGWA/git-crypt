@@ -42,13 +42,16 @@ Using the brew package manager, simply run:
 Red Hat Enterprise Linux
 ------------------------
 
-In addition to installing git and openssl, you will need the following
-support packages:
 
-yum install perl-CPAN
-yum install gettext-devel
-yum install expat-devel
-yum install openssl-devel
+    sudo su
+    yum install git
+    yum install openssl
+    yum install openssl-devel
+    exit
+    git clone https://github.com/AGWA/git-crypt.git
+    cd git-crypt
+    make
+    
 
 Experimental Windows Support
 ----------------------------
