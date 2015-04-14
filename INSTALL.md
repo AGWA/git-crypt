@@ -39,6 +39,20 @@ Using the brew package manager, simply run:
 
     brew install git-crypt
 
+Red Hat Enterprise Linux
+------------------------
+
+
+    sudo su
+    yum install git
+    yum install openssl
+    yum install openssl-devel
+    exit
+    git clone https://github.com/AGWA/git-crypt.git
+    cd git-crypt
+    make
+    
+
 Experimental Windows Support
 ----------------------------
 
