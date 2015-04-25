@@ -1,23 +1,34 @@
 DEPENDENCIES
 
+To build git-crypt, you need:
+
+                                Debian/Ubuntu package   RHEL/CentOS package
+  -----------------------------------------------------------------------------
+  Make                          make                    make
+  A C++ compiler (e.g. gcc)     g++                     gcc-c++
+  OpenSSL development files     libssl-dev              openssl-devel
+
+
 To use git-crypt, you need:
 
-	* Git 1.7.2 or newer
-	* OpenSSL
-
-To build git-crypt, you need a C++ compiler and OpenSSL development
-headers.
+                                Debian/Ubuntu package   RHEL/CentOS package
+  -----------------------------------------------------------------------------
+  Git 1.7.2 or newer            git                     git
+  OpenSSL                       openssl                 openssl
 
 
 BUILDING GIT-CRYPT
 
-The Makefile is tailored for g++, but should work with other compilers.
+Run:
 
 	$ make
-	$ cp git-crypt /usr/local/bin/
+	$ make install
 
-It doesn't matter where you install the git-crypt binary - choose wherever
-is most convenient for you.
+To install to a specific location:
+
+	$ make install PREFIX=/usr/local
+
+Or, just copy the git-crypt binary to wherever is most convenient for you.
 
 
 BUILDING A DEBIAN PACKAGE
