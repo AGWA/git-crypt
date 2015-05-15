@@ -60,6 +60,23 @@ static std::string attribute_name (const char* key_name)
 	}
 }
 
+static std::string git_version ()
+{
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("version");
+
+	std::stringstream		output;
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git version' failed - is Git installed?");
+	}
+	std::string			word;
+	output >> word; // "git"
+	output >> word; // "version"
+	output >> word; // "1.7.10.4"
+	return word;
+}
+
 static void git_config (const std::string& name, const std::string& value)
 {
 	std::vector<std::string>	command;
