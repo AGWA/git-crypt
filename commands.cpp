@@ -60,7 +60,7 @@ static std::string attribute_name (const char* key_name)
 	}
 }
 
-static std::string git_version ()
+static std::string git_version_string ()
 {
 	std::vector<std::string>	command;
 	command.push_back("git");
@@ -75,6 +75,31 @@ static std::string git_version ()
 	output >> word; // "version"
 	output >> word; // "1.7.10.4"
 	return word;
+}
+
+static std::vector<int> parse_version (const std::string& str)
+{
+	std::istringstream	in(str);
+	std::vector<int>	version;
+	std::string		component;
+	while (std::getline(in, component, '.')) {
+		version.push_back(std::atoi(component.c_str()));
+	}
+	return version;
+}
+
+static std::vector<int> git_version ()
+{
+	return parse_version(git_version_string());
+}
+
+static std::vector<int> make_version (int a, int b, int c)
+{
+	std::vector<int>	version;
+	version.push_back(a);
+	version.push_back(b);
+	version.push_back(c);
+	return version;
 }
 
 static void git_config (const std::string& name, const std::string& value)
