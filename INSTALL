@@ -16,6 +16,8 @@ To use git-crypt, you need:
   Git 1.7.2 or newer            git                     git
   OpenSSL                       openssl                 openssl
 
+Note: Git 1.8.5 or newer is recommended for best performance.
+
 
 BUILDING GIT-CRYPT
 
