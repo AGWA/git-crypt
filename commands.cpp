@@ -89,9 +89,10 @@ static std::vector<int> parse_version (const std::string& str)
 	return version;
 }
 
-static std::vector<int> git_version ()
+static const std::vector<int>& git_version ()
 {
-	return parse_version(git_version_string());
+	static const std::vector<int> version(parse_version(git_version_string()));
+	return version;
 }
 
 static std::vector<int> make_version (int a, int b, int c)
