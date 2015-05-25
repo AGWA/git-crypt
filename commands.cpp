@@ -34,6 +34,7 @@
 #include "key.hpp"
 #include "gpg.hpp"
 #include "parse_options.hpp"
+#include "coprocess.hpp"
 #include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
@@ -326,7 +327,6 @@ static void get_git_status (std::ostream& output)
 static std::pair<std::string, std::string> get_file_attributes (const std::string& filename)
 {
 	// git check-attr filter diff -- filename
-	// TODO: pass -z to get machine-parseable output (this requires Git 1.8.5 or higher, which was released on 27 Nov 2013)
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("check-attr");
@@ -362,6 +362,36 @@ static std::pair<std::string, std::string> get_file_attributes (const std::strin
 
 		const std::string		attr_name(line.substr(name_pos + 2, value_pos - (name_pos + 2)));
 		const std::string		attr_value(line.substr(value_pos + 2));
+
+		if (attr_value != "unspecified" && attr_value != "unset" && attr_value != "set") {
+			if (attr_name == "filter") {
+				filter_attr = attr_value;
+			} else if (attr_name == "diff") {
+				diff_attr = attr_value;
+			}
+		}
+	}
+
+	return std::make_pair(filter_attr, diff_attr);
+}
+
+// returns filter and diff attributes as a pair
+static std::pair<std::string, std::string> get_file_attributes (const std::string& filename, std::ostream& check_attr_stdin, std::istream& check_attr_stdout)
+{
+	check_attr_stdin << filename << '\0' << std::flush;
+
+	std::string			filter_attr;
+	std::string			diff_attr;
+
+	// Example output:
+	// filename\0filter\0git-crypt\0filename\0diff\0git-crypt\0
+	for (int i = 0; i < 2; ++i) {
+		std::string		filename;
+		std::string		attr_name;
+		std::string		attr_value;
+		std::getline(check_attr_stdout, filename, '\0');
+		std::getline(check_attr_stdout, attr_name, '\0');
+		std::getline(check_attr_stdout, attr_value, '\0');
 
 		if (attr_value != "unspecified" && attr_value != "unset" && attr_value != "set") {
 			if (attr_name == "filter") {
@@ -430,32 +460,72 @@ static bool is_git_file_mode (const std::string& mode)
 static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
 {
 	// git ls-files -cz -- path_to_top
-	std::vector<std::string>	command;
-	command.push_back("git");
-	command.push_back("ls-files");
-	command.push_back("-csz");
-	command.push_back("--");
+	std::vector<std::string>	ls_files_command;
+	ls_files_command.push_back("git");
+	ls_files_command.push_back("ls-files");
+	ls_files_command.push_back("-csz");
+	ls_files_command.push_back("--");
 	const std::string		path_to_top(get_path_to_top());
 	if (!path_to_top.empty()) {
-		command.push_back(path_to_top);
+		ls_files_command.push_back(path_to_top);
 	}
 
-	std::stringstream		output;
-	if (!successful_exit(exec_command(command, output))) {
-		throw Error("'git ls-files' failed - is this a Git repository?");
+	Coprocess			ls_files;
+	std::istream*			ls_files_stdout = ls_files.stdout_pipe();
+	ls_files.spawn(ls_files_command);
+
+	Coprocess			check_attr;
+	std::ostream*			check_attr_stdin = NULL;
+	std::istream*			check_attr_stdout = NULL;
+	if (git_version() >= make_version(1, 8, 5)) {
+		// In Git 1.8.5 (released 27 Nov 2013) and higher, we use a single `git check-attr` process
+		// to get the attributes of all files at once.  In prior versions, we have to fork and exec
+		// a separate `git check-attr` process for each file, since -z and --stdin aren't supported.
+		// In a repository with thousands of files, this results in an almost 100x speedup.
+		std::vector<std::string>	check_attr_command;
+		check_attr_command.push_back("git");
+		check_attr_command.push_back("check-attr");
+		check_attr_command.push_back("--stdin");
+		check_attr_command.push_back("-z");
+		check_attr_command.push_back("filter");
+		check_attr_command.push_back("diff");
+
+		check_attr_stdin = check_attr.stdin_pipe();
+		check_attr_stdout = check_attr.stdout_pipe();
+		check_attr.spawn(check_attr_command);
 	}
 
-	while (output.peek() != -1) {
+	while (ls_files_stdout->peek() != -1) {
 		std::string		mode;
 		std::string		object_id;
 		std::string		stage;
 		std::string		filename;
-		output >> mode >> object_id >> stage >> std::ws;
-		std::getline(output, filename, '\0');
+		*ls_files_stdout >> mode >> object_id >> stage >> std::ws;
+		std::getline(*ls_files_stdout, filename, '\0');
 
-		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
-		if (is_git_file_mode(mode) && get_file_attributes(filename).first == attribute_name(key_name)) {
-			files.push_back(filename);
+		if (is_git_file_mode(mode)) {
+			std::string	filter_attribute;
+
+			if (check_attr_stdin) {
+				filter_attribute = get_file_attributes(filename, *check_attr_stdin, *check_attr_stdout).first;
+			} else {
+				filter_attribute = get_file_attributes(filename).first;
+			}
+
+			if (filter_attribute == attribute_name(key_name)) {
+				files.push_back(filename);
+			}
+		}
+	}
+
+	if (!successful_exit(ls_files.wait())) {
+		throw Error("'git ls-files' failed - is this a Git repository?");
+	}
+
+	if (check_attr_stdin) {
+		check_attr.close_stdin();
+		if (!successful_exit(check_attr.wait())) {
+			throw Error("'git check-attr' failed - is this a Git repository?");
 		}
 	}
 }
