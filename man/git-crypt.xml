@@ -1,0 +1,493 @@
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+<refentry>
+	<!--
+		Copyright (c) 2015 Andrew Ayer
+
+		See COPYING file for license information.
+	-->
+	<refentryinfo>
+		<title>git-crypt</title>
+		<date>2015-05-17</date>
+		<productname>git-crypt 0.4.3</productname>
+
+		<author>
+			<othername>Andrew Ayer</othername>
+			<contrib></contrib>
+			<email>agwa@andrewayer.name</email>
+			<uri>https://www.agwa.name</uri>
+		</author>
+	</refentryinfo>
+
+	<refmeta>
+		<refentrytitle>git-crypt</refentrytitle>
+		<manvolnum>1</manvolnum>
+	</refmeta>
+
+	<refnamediv>
+		<refname>git-crypt</refname>
+		<refpurpose>transparent file encryption in Git</refpurpose>
+	</refnamediv>
+
+	<refsynopsisdiv>
+		<cmdsynopsis>
+			<command>git-crypt <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="plain"><replaceable>COMMAND</replaceable></arg> <arg choice="opt" rep="repeat"><replaceable>ARGS</replaceable></arg></command>
+		</cmdsynopsis>
+	</refsynopsisdiv>
+
+	<refsynopsisdiv>
+		<title>Common commands</title>
+		<cmdsynopsis>
+			<command>git-crypt init</command>
+		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>git-crypt status</command>
+		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>git-crypt lock</command>
+		</cmdsynopsis>
+	</refsynopsisdiv>
+	<refsynopsisdiv>
+		<title>GPG commands</title>
+		<cmdsynopsis>
+			<command>git-crypt add-gpg-user <arg choice="plain"><replaceable>GPG_USER_ID</replaceable></arg></command>
+		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>git-crypt unlock</command>
+		</cmdsynopsis>
+	</refsynopsisdiv>
+	<refsynopsisdiv>
+		<title>Symmetric key commands</title>
+		<cmdsynopsis>
+			<command>git-crypt export-key <arg choice="plain"><replaceable>OUTPUT_KEY_FILE</replaceable></arg></command>
+		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>git-crypt unlock <arg choice="plain"><replaceable>KEY_FILE</replaceable></arg></command>
+		</cmdsynopsis>
+	</refsynopsisdiv>
+
+	<refsect1>
+		<title>Description</title>
+
+		<para>
+			<command>git-crypt</command> enables transparent encryption and decryption
+			of files in a git repository. Files which you choose to protect are encrypted when committed,
+			and decrypted when checked out. git-crypt lets you freely share a repository containing a mix of
+			public and private content. git-crypt gracefully degrades, so developers without the secret key
+			can still clone and commit to a repository with encrypted files. This lets you store your secret
+			material (such as keys or passwords) in the same repository as your code, without requiring you
+			to lock down your entire repository.  
+		</para>
+	</refsect1>
+
+	<refsect1>
+		<title>Commands</title>
+
+		<para>
+			<command>git-crypt</command> is logically divided into several sub-commands which
+			perform distinct tasks.  Each sub-command, and its arguments,
+			are documented below.  Note that arguments and options to sub-commands must be
+			specified on the command line <emphasis>after</emphasis> the name of the sub-command.
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><option>init <arg choice="opt"><replaceable>OPTIONS</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Generate a key and prepare the current Git repository to use git-crypt.
+					</para>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-k</option> <replaceable>KEY_NAME</replaceable></term>
+							<term><option>--key-name</option> <replaceable>KEY_NAME</replaceable></term>
+
+							<listitem>
+								<para>
+									Initialize the given key instead of the default key.  git-crypt
+									supports multiple keys per repository, allowing you to share
+									different files with different sets of collaborators.
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>status <arg choice="opt"><replaceable>OPTIONS</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Display a list of files in the repository, with their status (encrypted or unencrypted).
+					</para>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-e</option></term>
+
+							<listitem>
+								<para>
+									Show only encrypted files.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-u</option></term>
+
+							<listitem>
+								<para>
+									Show only unencrypted files.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-f</option></term>
+							<term><option>--fix</option></term>
+
+							<listitem>
+								<para>
+									Encrypt files that should be encrypted but were
+									committed to the repository or added to the index
+									without encryption.  (This can happen if a file
+									is added before git-crypt is initialized or before
+									the file is added to the gitattributes file.)
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>add-gpg-user <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="plain" rep="repeat"><replaceable>GPG_USER_ID</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Add the users with the given GPG user IDs as collaborators.  Specifically,
+						git-crypt uses <citerefentry><refentrytitle>gpg</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+						to encrypt the shared symmetric key
+						to the public keys of each GPG user ID, and stores the GPG-encrypted
+						keys in the <filename>.git-crypt</filename> directory at the root of the repository.
+					</para>
+
+					<para>
+						<replaceable>GPG_USER_ID</replaceable> can be a key ID, a full fingerprint, an email address, or anything
+						else that uniquely identifies a public key to GPG (see "HOW TO SPECIFY
+						A USER ID" in the <citerefentry><refentrytitle>gpg</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+						man page).
+					</para>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-k</option> <replaceable>KEY_NAME</replaceable></term>
+							<term><option>--key-name</option> <replaceable>KEY_NAME</replaceable></term>
+
+							<listitem>
+								<para>
+									Grant access to the given key, rather than the default key.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-n</option></term>
+							<term><option>--no-commit</option></term>
+
+							<listitem>
+								<para>
+									Don't automatically commit the changes to the <filename>.git-crypt</filename>
+									directory.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>--trusted</option></term>
+
+							<listitem>
+								<para>
+									Assume that the GPG keys specified on the command line are trusted;
+									i.e. they actually belong to the users that they claim to belong to.
+								</para>
+								<para>
+									Without this option, git-crypt uses the same trust model as GPG,
+									which is based on the Web of Trust by default.  Under this
+									model, git-crypt will reject GPG keys that do not have
+									trusted signatures.
+								</para>
+								<para>
+									If you don't want to use the Web of Trust, you can either change
+									GPG's trust model by setting the <option>trust-model</option>
+									option in <filename>~/.gnupg/gpg.conf</filename> (see
+									<citerefentry><refentrytitle>gpg</refentrytitle><manvolnum>1</manvolnum></citerefentry>),
+									or use the <option>--trusted</option> option to <command>add-gpg-user</command>
+									on a case-by-case basis.
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>unlock <!--<arg choice="opt"><replaceable>OPTIONS</replaceable></arg> --><arg choice="opt" rep="repeat"><replaceable>KEY_FILE</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Decrypt the repository.  If one or more key files are specified on the command line,
+						git-crypt attempts to decrypt using those shared symmetric keys.  If no key files
+						are specified, git-crypt attempts to decrypt using a GPG-encrypted key stored in
+						the repository's .git-crypt directory.
+					</para>
+
+					<para>
+						This command takes no options.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>export-key <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="plain"><replaceable>FILENAME</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Export the repository's shared symmetric key to the given file.
+					</para>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-k</option> <replaceable>KEY_NAME</replaceable></term>
+							<term><option>--key-name</option> <replaceable>KEY_NAME</replaceable></term>
+
+							<listitem>
+								<para>
+									Export the given key, rather than the default key.
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>help <arg choice="opt"><replaceable>COMMAND</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Display help for the given <arg choice="plain"><replaceable>COMMAND</replaceable></arg>,
+						or an overview of all commands if no command is specified.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>version</option></term>
+				<listitem>
+					<para>
+						Print the currently-installed version of <command>git-crypt</command>.
+						The format of the output is always "git-crypt", followed by a space,
+						followed by the dotted version number.
+					</para>
+				</listitem>
+			</varlistentry>
+
+		</variablelist>
+	</refsect1>
+
+	<refsect1>
+		<title>Using git-crypt</title>
+
+		<para>
+			First, you prepare a repository to use git-crypt by running <command>git-crypt init</command>.
+		</para>
+
+		<para>
+			Then, you specify the files to encrypt by creating a
+			<citerefentry><refentrytitle>gitattributes</refentrytitle><manvolnum>5</manvolnum></citerefentry> file.
+			Each file which you want to encrypt should be assigned the "<literal>filter=git-crypt diff=git-crypt</literal>"
+			attributes.  For example:
+		</para>
+
+		<screen>secretfile filter=git-crypt diff=git-crypt&#10;*.key filter=git-crypt diff=git-crypt</screen>
+
+		<para>
+			Like a <filename>.gitignore</filename> file, <filename>.gitattributes</filename> files can match wildcards and
+			should be checked into the repository.  Make sure you don't accidentally encrypt the
+			<filename>.gitattributes</filename> file itself (or other git files like <filename>.gitignore</filename>
+			or <filename>.gitmodules</filename>).  Make sure your <filename>.gitattributes</filename> rules
+			are in place <emphasis>before</emphasis> you add sensitive files, or those files won't be encrypted!
+		</para>
+
+		<para>
+			To share the repository with others (or with yourself) using GPG, run:
+		</para>
+
+		<screen>git-crypt add-gpg-user <replaceable>GPG_USER_ID</replaceable></screen>
+
+		<para>
+			<replaceable>GPG_USER_ID</replaceable> can be a key ID, a full fingerprint, an email address, or anything
+			else that uniquely identifies a public key to GPG.  Note: <command>git-crypt add-gpg-user</command> will
+			add and commit a GPG-encrypted key file in the <filename>.git-crypt</filename> directory of
+			the root of your repository.
+		</para>
+
+		<para>
+			Alternatively, you can export a symmetric secret key, which you must
+			securely convey to collaborators (GPG is not required, and no files
+			are added to your repository):
+		</para>
+
+		<screen>git-crypt export-key <replaceable>/path/to/key</replaceable></screen>
+
+		<para>
+			After cloning a repository with encrypted files, unlock with with GPG:
+		</para>
+
+		<screen>git-crypt unlock</screen>
+
+		<para>
+			Or with a symmetric key:
+		</para>
+
+		<screen>git-crypt unlock /path/to/key</screen>
+
+		<para>
+			That's all you need to do - after git-crypt is set up (either with
+			<command>git-crypt init</command> or <command>git-crypt unlock</command>),
+			you can use git normally - encryption and decryption happen transparently.
+		</para>
+
+	</refsect1>
+
+	<refsect1>
+		<title>The .gitattributes file</title>
+
+		<para>
+			The <filename>.gitattributes</filename> file is documented in
+			<citerefentry><refentrytitle>gitattributes</refentrytitle><manvolnum>5</manvolnum></citerefentry>.
+			The file pattern format is the same as the one used by <filename>.gitignore</filename>,
+			as documented in <citerefentry><refentrytitle>gitignore</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
+			with the exception that specifying merely a directory (e.g. "<literal>/dir/</literal>")
+			is <emphasis>not</emphasis> sufficient to encrypt all files beneath it.
+		</para>
+
+		<para>
+			Also note that the pattern "<literal>dir/*</literal>" does not match files under
+			sub-directories of dir/.  To encrypt an entire sub-tree dir/, place the
+			following in <filename>dir/.gitattributes</filename>:
+		</para>
+
+		<screen>* filter=git-crypt diff=git-crypt&#10;.gitattributes !filter !diff</screen>
+
+		<para>
+			The second pattern is essential for ensuring that <filename>.gitattributes</filename> itself
+			is not encrypted.
+		</para>
+	</refsect1>
+
+	<refsect1>
+		<title>Multiple Key Support</title>
+
+		<para>
+			In addition to the implicit default key, git-crypt supports alternative
+			keys which can be used to encrypt specific files and can be shared with
+			specific GPG users.  This is useful if you want to grant different
+			collaborators access to different sets of files.
+		</para>
+
+		<para>
+			To generate an alternative key named <replaceable>KEYNAME</replaceable>,
+			pass the <command>-k <replaceable>KEYNAME</replaceable></command>
+			option to <command>git-crypt init</command> as follows:
+		</para>
+
+		<screen>git-crypt init -k <replaceable>KEYNAME</replaceable></screen>
+
+		<para>
+			To encrypt a file with an alternative key, use the <literal>git-crypt-<replaceable>KEYNAME</replaceable></literal>
+			filter in <filename>.gitattributes</filename> as follows:
+		</para>
+
+		<screen><replaceable>secretfile</replaceable> filter=git-crypt-<replaceable>KEYNAME</replaceable> diff=git-crypt-<replaceable>KEYNAME</replaceable></screen>
+
+		<para>
+			To export an alternative key or share it with a GPG user, pass the
+			<command>-k <replaceable>KEYNAME</replaceable></command> option to
+			<command>git-crypt export-key</command> or <command>git-crypt add-gpg-user</command>
+			as follows:
+		</para>
+
+		<screen>git-crypt export-key -k <replaceable>KEYNAME</replaceable> <filename><replaceable>/path/to/keyfile</replaceable></filename>&#10;git-crypt add-gpg-user -k <replaceable>KEYNAME</replaceable> <replaceable>GPG_USER_ID</replaceable></screen>
+
+		<para>
+			To unlock a repository with an alternative key, use <command>git-crypt unlock</command>
+			normally.  git-crypt will automatically determine which key is being used.
+		</para>
+	</refsect1>
+	<!--
+	<refsect1>
+		<title>Global options</title>
+
+		<para>
+			The following options are understood by <command>git-crypt</command> and can
+			be used with any sub-command.  Since they apply globally
+			to <command>git-crypt</command>, they must be specified on the command line
+			<emphasis>before</emphasis> the sub-command name.
+		</para>
+		<variablelist>
+		</variablelist>
+	</refsect1>
+	-->
+
+	<!--
+	<refsect1>
+		<title>Files</title>
+		<variablelist>
+			<varlistentry>
+				<term><filename>/path/to/file</filename></term>
+				<listitem><para>Description.</para></listitem>
+			</varlistentry>
+		</variablelist>
+	</refsect1>
+	-->
+
+	<!--
+	<refsect1>
+		<title>Environment Variables</title>
+
+		<variablelist class='environment-variables'>
+			<varlistentry>
+				<term><varname>NAME</varname></term>
+				<listitem>
+					<para>Description.</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+	</refsect1>
+	-->
+
+	<!-- TODO: examples section
+	<refsect1>
+		<title>Examples</title>
+
+		<para>Hello world?</para>
+	</refsect1>
+	-->
+
+	<refsect1>
+		<title>See Also</title>
+		<para>
+			<citerefentry><refentrytitle>git</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+			<citerefentry><refentrytitle>gitattributes</refentrytitle><manvolnum>5</manvolnum></citerefentry>,
+			<ulink url="https://www.agwa.name/projects/git-crypt">git-crypt home page</ulink>,
+			<ulink url="https://github.com/AGWA/git-crypt">GitHub repository</ulink>
+		</para>
+	</refsect1>
+
+</refentry>
