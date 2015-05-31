@@ -1,6 +1,17 @@
 News
 ====
 
+######v0.5.0 (2015-05-30)
+* Drastically speed up lock/unlock when used with Git 1.8.5 or newer.
+* Add git-crypt(1) man page (pass `ENABLE_MAN=yes` to make to build).
+* Add --trusted option to `git-crypt gpg-add-user` to add user even if
+  GPG doesn't trust user's key.
+* Improve `git-crypt lock` usability, add --force option.
+* Ignore symlinks and other non-files when running `git-crypt status`.
+* Fix compilation on old versions of Mac OS X.
+* Fix GPG mode when with-fingerprint enabled in gpg.conf.
+* Minor bug fixes and improvements to help/error messages.
+
 ######v0.4.2 (2015-01-31)
 * Fix unlock and lock under Git 2.2.2 and higher.
 * Drop support for versions of Git older than 1.7.2.
