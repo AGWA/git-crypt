@@ -102,10 +102,15 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 	command.push_back(query);
 	std::stringstream		command_output;
 	if (successful_exit(exec_command(command, command_output))) {
+		bool			is_pubkey = false;
 		while (command_output.peek() != -1) {
 			std::string		line;
 			std::getline(command_output, line);
-			if (line.substr(0, 4) == "fpr:") {
+			if (line.substr(0, 4) == "pub:") {
+				is_pubkey = true;
+			} else if (line.substr(0, 4) == "sub:") {
+				is_pubkey = false;
+			} else if (is_pubkey && line.substr(0, 4) == "fpr:") {
 				// fpr:::::::::7A399B2DB06D039020CD1CE1D0F3702D61489532:
 				// want the 9th column (counting from 0)
 				fingerprints.push_back(gpg_nth_column(line, 9));
@@ -145,12 +150,16 @@ std::vector<std::string> gpg_list_secret_keys ()
 	return secret_keys;
 }
 
-void gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, const char* p, size_t len)
+void gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, bool key_is_trusted, const char* p, size_t len)
 {
 	// gpg --batch -o FILENAME -r RECIPIENT -e
 	std::vector<std::string>	command;
 	command.push_back("gpg");
 	command.push_back("--batch");
+	if (key_is_trusted) {
+		command.push_back("--trust-model");
+		command.push_back("always");
+	}
 	command.push_back("-o");
 	command.push_back(filename);
 	command.push_back("-r");

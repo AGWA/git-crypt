@@ -43,6 +43,8 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <cstddef>
+#include <algorithm>
 
 std::string System_error::message () const
 {
@@ -160,134 +162,21 @@ std::string our_exe_path ()
 	}
 }
 
-static int execvp (const std::string& file, const std::vector<std::string>& args)
+int	exit_status (int wait_status)
 {
-	std::vector<const char*>	args_c_str;
-	args_c_str.reserve(args.size());
-	for (std::vector<std::string>::const_iterator arg(args.begin()); arg != args.end(); ++arg) {
-		args_c_str.push_back(arg->c_str());
-	}
-	args_c_str.push_back(NULL);
-	return execvp(file.c_str(), const_cast<char**>(&args_c_str[0]));
-}
-
-int exec_command (const std::vector<std::string>& command)
-{
-	pid_t		child = fork();
-	if (child == -1) {
-		throw System_error("fork", "", errno);
-	}
-	if (child == 0) {
-		execvp(command[0], command);
-		perror(command[0].c_str());
-		_exit(-1);
-	}
-	int		status = 0;
-	if (waitpid(child, &status, 0) == -1) {
-		throw System_error("waitpid", "", errno);
-	}
-	return status;
-}
-
-int exec_command (const std::vector<std::string>& command, std::ostream& output)
-{
-	int		pipefd[2];
-	if (pipe(pipefd) == -1) {
-		throw System_error("pipe", "", errno);
-	}
-	pid_t		child = fork();
-	if (child == -1) {
-		int	fork_errno = errno;
-		close(pipefd[0]);
-		close(pipefd[1]);
-		throw System_error("fork", "", fork_errno);
-	}
-	if (child == 0) {
-		close(pipefd[0]);
-		if (pipefd[1] != 1) {
-			dup2(pipefd[1], 1);
-			close(pipefd[1]);
-		}
-		execvp(command[0], command);
-		perror(command[0].c_str());
-		_exit(-1);
-	}
-	close(pipefd[1]);
-	char		buffer[1024];
-	ssize_t		bytes_read;
-	while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
-		output.write(buffer, bytes_read);
-	}
-	if (bytes_read == -1) {
-		int	read_errno = errno;
-		close(pipefd[0]);
-		throw System_error("read", "", read_errno);
-	}
-	close(pipefd[0]);
-	int		status = 0;
-	if (waitpid(child, &status, 0) == -1) {
-		throw System_error("waitpid", "", errno);
-	}
-	return status;
-}
-
-int exec_command_with_input (const std::vector<std::string>& command, const char* p, size_t len)
-{
-	int		pipefd[2];
-	if (pipe(pipefd) == -1) {
-		throw System_error("pipe", "", errno);
-	}
-	pid_t		child = fork();
-	if (child == -1) {
-		int	fork_errno = errno;
-		close(pipefd[0]);
-		close(pipefd[1]);
-		throw System_error("fork", "", fork_errno);
-	}
-	if (child == 0) {
-		close(pipefd[1]);
-		if (pipefd[0] != 0) {
-			dup2(pipefd[0], 0);
-			close(pipefd[0]);
-		}
-		execvp(command[0], command);
-		perror(command[0].c_str());
-		_exit(-1);
-	}
-	close(pipefd[0]);
-	while (len > 0) {
-		ssize_t	bytes_written = write(pipefd[1], p, len);
-		if (bytes_written == -1) {
-			int	write_errno = errno;
-			close(pipefd[1]);
-			throw System_error("write", "", write_errno);
-		}
-		p += bytes_written;
-		len -= bytes_written;
-	}
-	close(pipefd[1]);
-	int		status = 0;
-	if (waitpid(child, &status, 0) == -1) {
-		throw System_error("waitpid", "", errno);
-	}
-	return status;
-}
-
-bool successful_exit (int status)
-{
-	return status != -1 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	return wait_status != -1 && WIFEXITED(wait_status) ? WEXITSTATUS(wait_status) : -1;
 }
 
 void	touch_file (const std::string& filename)
 {
-	if (utimes(filename.c_str(), NULL) == -1) {
+	if (utimes(filename.c_str(), NULL) == -1 && errno != ENOENT) {
 		throw System_error("utimes", filename, errno);
 	}
 }
 
 void	remove_file (const std::string& filename)
 {
-	if (unlink(filename.c_str()) == -1) {
+	if (unlink(filename.c_str()) == -1 && errno != ENOENT) {
 		throw System_error("unlink", filename, errno);
 	}
 }
@@ -310,25 +199,47 @@ int util_rename (const char* from, const char* to)
 	return rename(from, to);
 }
 
-static int dirfilter (const struct dirent* ent)
+static size_t sizeof_dirent_for (DIR* p)
 {
-	// filter out . and ..
-	return std::strcmp(ent->d_name, ".") != 0 && std::strcmp(ent->d_name, "..") != 0;
+	long name_max = fpathconf(dirfd(p), _PC_NAME_MAX);
+	if (name_max == -1) {
+		#ifdef NAME_MAX
+		name_max = NAME_MAX;
+		#else
+		name_max = 255;
+		#endif
+	}
+	return offsetof(struct dirent, d_name) + name_max + 1; // final +1 is for d_name's null terminator
 }
 
 std::vector<std::string> get_directory_contents (const char* path)
 {
-	struct dirent**		namelist;
-	int			n = scandir(path, &namelist, dirfilter, alphasort);
-	if (n == -1) {
-		throw System_error("scandir", path, errno);
-	}
-	std::vector<std::string>	contents(n);
-	for (int i = 0; i < n; ++i) {
-		contents[i] = namelist[i]->d_name;
-		free(namelist[i]);
-	}
-	free(namelist);
+	std::vector<std::string>		contents;
 
+	DIR*					dir = opendir(path);
+	if (!dir) {
+		throw System_error("opendir", path, errno);
+	}
+	try {
+		std::vector<unsigned char>	buffer(sizeof_dirent_for(dir));
+		struct dirent*			dirent_buffer = reinterpret_cast<struct dirent*>(&buffer[0]);
+		struct dirent*			ent = NULL;
+		int				err = 0;
+		while ((err = readdir_r(dir, dirent_buffer, &ent)) == 0 && ent != NULL) {
+			if (std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0) {
+				continue;
+			}
+			contents.push_back(ent->d_name);
+		}
+		if (err != 0) {
+			throw System_error("readdir_r", path, errno);
+		}
+	} catch (...) {
+		closedir(dir);
+		throw;
+	}
+	closedir(dir);
+
+	std::sort(contents.begin(), contents.end());
 	return contents;
 }

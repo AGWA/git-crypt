@@ -30,8 +30,35 @@
 
 #include "git-crypt.hpp"
 #include "util.hpp"
+#include "coprocess.hpp"
 #include <string>
 #include <iostream>
+
+int exec_command (const std::vector<std::string>& args)
+{
+	Coprocess	proc;
+	proc.spawn(args);
+	return proc.wait();
+}
+
+int exec_command (const std::vector<std::string>& args, std::ostream& output)
+{
+	Coprocess	proc;
+	std::istream*	proc_stdout = proc.stdout_pipe();
+	proc.spawn(args);
+	output << proc_stdout->rdbuf();
+	return proc.wait();
+}
+
+int exec_command_with_input (const std::vector<std::string>& args, const char* p, size_t len)
+{
+	Coprocess	proc;
+	std::ostream*	proc_stdin = proc.stdin_pipe();
+	proc.spawn(args);
+	proc_stdin->write(p, len);
+	proc.close_stdin();
+	return proc.wait();
+}
 
 std::string	escape_shell_arg (const std::string& str)
 {

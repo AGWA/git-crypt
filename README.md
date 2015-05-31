@@ -34,7 +34,10 @@ Specify files to encrypt by creating a .gitattributes file:
 
 Like a .gitignore file, it can match wildcards and should be checked into
 the repository.  See below for more information about .gitattributes.
-Make sure you don't accidentally encrypt the .gitattributes file itself!
+Make sure you don't accidentally encrypt the .gitattributes file itself
+(or other git files like .gitignore or .gitmodules).  Make sure your
+.gitattributes rules are in place *before* you add sensitive files, or
+those files won't be encrypted!
 
 Share the repository with others (or with yourself) using GPG:
 
@@ -67,8 +70,8 @@ encryption and decryption happen transparently.
 Current Status
 --------------
 
-The latest version of git-crypt is [0.4.2](NEWS.md), released on
-2015-01-31.  git-crypt aims to be bug-free and reliable, meaning it
+The latest version of git-crypt is [0.5.0](NEWS.md), released on
+2015-05-30.  git-crypt aims to be bug-free and reliable, meaning it
 shouldn't crash, malfunction, or expose your confidential data.
 However, it has not yet reached maturity, meaning it is not as
 documented, featureful, or easy-to-use as it should be.  Additionally,
@@ -80,13 +83,13 @@ Security
 
 git-crypt is more secure that other transparent git encryption systems.
 git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
-derived from the SHA-1 HMAC of the file.  This is provably semantically
-secure under deterministic chosen-plaintext attack.  That means that
-although the encryption is deterministic (which is required so git can
-distinguish when a file has and hasn't changed), it leaks no information
-beyond whether two files are identical or not.  Other proposals for
-transparent git encryption use ECB or CBC with a fixed IV.  These
-systems are not semantically secure and leak information.
+derived from the SHA-1 HMAC of the file.  This mode of operation is
+provably semantically secure under deterministic chosen-plaintext attack.
+That means that although the encryption is deterministic (which is
+required so git can distinguish when a file has and hasn't changed),
+it leaks no information beyond whether two files are identical or not.
+Other proposals for transparent git encryption use ECB or CBC with a
+fixed IV.  These systems are not semantically secure and leak information.
 
 Limitations
 -----------
@@ -100,7 +103,12 @@ need to encrypt.  For encrypting an entire repository, consider using a
 system like [git-remote-gcrypt](https://github.com/joeyh/git-remote-gcrypt)
 instead.  (Note: no endorsement is made of git-remote-gcrypt's security.)
 
-git-crypt does not encrypt file names, commit messages, or other metadata.
+git-crypt does not encrypt file names, commit messages, symlink targets,
+gitlinks, or other metadata.
+
+git-crypt does not hide when a file does or doesn't change, the length
+of a file, or the fact that two files are identical (see "Security"
+section above).
 
 Files encrypted with git-crypt are not compressible.  Even the smallest
 change to an encrypted file requires git to store the entire changed file,
@@ -118,9 +126,9 @@ the patch itself is encrypted.  To generate an encrypted patch, use `git
 diff --no-textconv --binary`.  Alternatively, you can apply a plaintext
 patch outside of git using the patch command.
 
-git-crypt does [not work reliably with Atlassian
-SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511).  Files might
-be left in an unencrypted state.
+git-crypt does not work reliably with some third-party git GUIs, such
+as [Atlassian SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511)
+and GitHub for Mac.  Files might be left in an unencrypted state.
 
 Gitattributes File
 ------------------

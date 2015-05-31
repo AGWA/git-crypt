@@ -34,6 +34,7 @@
 #include "key.hpp"
 #include "gpg.hpp"
 #include "parse_options.hpp"
+#include "coprocess.hpp"
 #include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
@@ -60,6 +61,49 @@ static std::string attribute_name (const char* key_name)
 	}
 }
 
+static std::string git_version_string ()
+{
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("version");
+
+	std::stringstream		output;
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git version' failed - is Git installed?");
+	}
+	std::string			word;
+	output >> word; // "git"
+	output >> word; // "version"
+	output >> word; // "1.7.10.4"
+	return word;
+}
+
+static std::vector<int> parse_version (const std::string& str)
+{
+	std::istringstream	in(str);
+	std::vector<int>	version;
+	std::string		component;
+	while (std::getline(in, component, '.')) {
+		version.push_back(std::atoi(component.c_str()));
+	}
+	return version;
+}
+
+static const std::vector<int>& git_version ()
+{
+	static const std::vector<int> version(parse_version(git_version_string()));
+	return version;
+}
+
+static std::vector<int> make_version (int a, int b, int c)
+{
+	std::vector<int>	version;
+	version.push_back(a);
+	version.push_back(b);
+	version.push_back(c);
+	return version;
+}
+
 static void git_config (const std::string& name, const std::string& value)
 {
 	std::vector<std::string>	command;
@@ -73,7 +117,23 @@ static void git_config (const std::string& name, const std::string& value)
 	}
 }
 
-static void git_unconfig (const std::string& name)
+static bool git_has_config (const std::string& name)
+{
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--get-all");
+	command.push_back(name);
+
+	std::stringstream		output;
+	switch (exit_status(exec_command(command, output))) {
+		case 0:  return true;
+		case 1:  return false;
+		default: throw Error("'git config' failed");
+	}
+}
+
+static void git_deconfig (const std::string& name)
 {
 	std::vector<std::string>	command;
 	command.push_back("git");
@@ -107,11 +167,19 @@ static void configure_git_filters (const char* key_name)
 	}
 }
 
-static void unconfigure_git_filters (const char* key_name)
+static void deconfigure_git_filters (const char* key_name)
 {
-	// unconfigure the git-crypt filters
-	git_unconfig("filter." + attribute_name(key_name));
-	git_unconfig("diff." + attribute_name(key_name));
+	// deconfigure the git-crypt filters
+	if (git_has_config("filter." + attribute_name(key_name) + ".smudge") ||
+			git_has_config("filter." + attribute_name(key_name) + ".clean") ||
+			git_has_config("filter." + attribute_name(key_name) + ".required")) {
+
+		git_deconfig("filter." + attribute_name(key_name));
+	}
+
+	if (git_has_config("diff." + attribute_name(key_name) + ".textconv")) {
+		git_deconfig("diff." + attribute_name(key_name));
+	}
 }
 
 static bool git_checkout (const std::vector<std::string>& paths)
@@ -260,7 +328,6 @@ static void get_git_status (std::ostream& output)
 static std::pair<std::string, std::string> get_file_attributes (const std::string& filename)
 {
 	// git check-attr filter diff -- filename
-	// TODO: pass -z to get machine-parseable output (this requires Git 1.8.5 or higher, which was released on 27 Nov 2013)
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("check-attr");
@@ -296,6 +363,36 @@ static std::pair<std::string, std::string> get_file_attributes (const std::strin
 
 		const std::string		attr_name(line.substr(name_pos + 2, value_pos - (name_pos + 2)));
 		const std::string		attr_value(line.substr(value_pos + 2));
+
+		if (attr_value != "unspecified" && attr_value != "unset" && attr_value != "set") {
+			if (attr_name == "filter") {
+				filter_attr = attr_value;
+			} else if (attr_name == "diff") {
+				diff_attr = attr_value;
+			}
+		}
+	}
+
+	return std::make_pair(filter_attr, diff_attr);
+}
+
+// returns filter and diff attributes as a pair
+static std::pair<std::string, std::string> get_file_attributes (const std::string& filename, std::ostream& check_attr_stdin, std::istream& check_attr_stdout)
+{
+	check_attr_stdin << filename << '\0' << std::flush;
+
+	std::string			filter_attr;
+	std::string			diff_attr;
+
+	// Example output:
+	// filename\0filter\0git-crypt\0filename\0diff\0git-crypt\0
+	for (int i = 0; i < 2; ++i) {
+		std::string		filename;
+		std::string		attr_name;
+		std::string		attr_value;
+		std::getline(check_attr_stdout, filename, '\0');
+		std::getline(check_attr_stdout, attr_name, '\0');
+		std::getline(check_attr_stdout, attr_value, '\0');
 
 		if (attr_value != "unspecified" && attr_value != "unset" && attr_value != "set") {
 			if (attr_name == "filter") {
@@ -356,31 +453,80 @@ static bool check_if_file_is_encrypted (const std::string& filename)
 	return check_if_blob_is_encrypted(object_id);
 }
 
+static bool is_git_file_mode (const std::string& mode)
+{
+	return (std::strtoul(mode.c_str(), NULL, 8) & 0170000) == 0100000;
+}
+
 static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
 {
 	// git ls-files -cz -- path_to_top
-	std::vector<std::string>	command;
-	command.push_back("git");
-	command.push_back("ls-files");
-	command.push_back("-cz");
-	command.push_back("--");
+	std::vector<std::string>	ls_files_command;
+	ls_files_command.push_back("git");
+	ls_files_command.push_back("ls-files");
+	ls_files_command.push_back("-csz");
+	ls_files_command.push_back("--");
 	const std::string		path_to_top(get_path_to_top());
 	if (!path_to_top.empty()) {
-		command.push_back(path_to_top);
+		ls_files_command.push_back(path_to_top);
 	}
 
-	std::stringstream		output;
-	if (!successful_exit(exec_command(command, output))) {
+	Coprocess			ls_files;
+	std::istream*			ls_files_stdout = ls_files.stdout_pipe();
+	ls_files.spawn(ls_files_command);
+
+	Coprocess			check_attr;
+	std::ostream*			check_attr_stdin = NULL;
+	std::istream*			check_attr_stdout = NULL;
+	if (git_version() >= make_version(1, 8, 5)) {
+		// In Git 1.8.5 (released 27 Nov 2013) and higher, we use a single `git check-attr` process
+		// to get the attributes of all files at once.  In prior versions, we have to fork and exec
+		// a separate `git check-attr` process for each file, since -z and --stdin aren't supported.
+		// In a repository with thousands of files, this results in an almost 100x speedup.
+		std::vector<std::string>	check_attr_command;
+		check_attr_command.push_back("git");
+		check_attr_command.push_back("check-attr");
+		check_attr_command.push_back("--stdin");
+		check_attr_command.push_back("-z");
+		check_attr_command.push_back("filter");
+		check_attr_command.push_back("diff");
+
+		check_attr_stdin = check_attr.stdin_pipe();
+		check_attr_stdout = check_attr.stdout_pipe();
+		check_attr.spawn(check_attr_command);
+	}
+
+	while (ls_files_stdout->peek() != -1) {
+		std::string		mode;
+		std::string		object_id;
+		std::string		stage;
+		std::string		filename;
+		*ls_files_stdout >> mode >> object_id >> stage >> std::ws;
+		std::getline(*ls_files_stdout, filename, '\0');
+
+		if (is_git_file_mode(mode)) {
+			std::string	filter_attribute;
+
+			if (check_attr_stdin) {
+				filter_attribute = get_file_attributes(filename, *check_attr_stdin, *check_attr_stdout).first;
+			} else {
+				filter_attribute = get_file_attributes(filename).first;
+			}
+
+			if (filter_attribute == attribute_name(key_name)) {
+				files.push_back(filename);
+			}
+		}
+	}
+
+	if (!successful_exit(ls_files.wait())) {
 		throw Error("'git ls-files' failed - is this a Git repository?");
 	}
 
-	while (output.peek() != -1) {
-		std::string		filename;
-		std::getline(output, filename, '\0');
-
-		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
-		if (get_file_attributes(filename).first == attribute_name(key_name)) {
-			files.push_back(filename);
+	if (check_attr_stdin) {
+		check_attr.close_stdin();
+		if (!successful_exit(check_attr.wait())) {
+			throw Error("'git check-attr' failed - is this a Git repository?");
 		}
 	}
 }
@@ -462,7 +608,7 @@ static bool decrypt_repo_keys (std::vector<Key_file>& key_files, uint32_t key_ve
 	return successful;
 }
 
-static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::string>& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
+static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, const std::vector<std::pair<std::string, bool> >& collab_keys, const std::string& keys_path, std::vector<std::string>* new_files)
 {
 	std::string	key_file_data;
 	{
@@ -472,9 +618,11 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		key_file_data = this_version_key_file.store_to_string();
 	}
 
-	for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+	for (std::vector<std::pair<std::string, bool> >::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+		const std::string&	fingerprint(collab->first);
+		const bool		key_is_trusted(collab->second);
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << *collab << ".gpg";
+		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << fingerprint << ".gpg";
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
@@ -482,7 +630,7 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		}
 
 		mkdir_parent(path);
-		gpg_encrypt_to_file(path, *collab, key_file_data.data(), key_file_data.size());
+		gpg_encrypt_to_file(path, fingerprint, key_is_trusted, key_file_data.data(), key_file_data.size());
 		new_files->push_back(path);
 	}
 }
@@ -813,12 +961,7 @@ int unlock (int argc, const char** argv)
 		return 1;
 	}
 
-	// 2. Determine the path to the top of the repository.  We pass this as the argument
-	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
-	// mucked with the git config.)
-	std::string		path_to_top(get_path_to_top());
-
-	// 3. Load the key(s)
+	// 2. Load the key(s)
 	std::vector<Key_file>	key_files;
 	if (argc > 0) {
 		// Read from the symmetric key file(s)
@@ -866,7 +1009,7 @@ int unlock (int argc, const char** argv)
 	}
 
 
-	// 4. Install the key(s) and configure the git filters
+	// 3. Install the key(s) and configure the git filters
 	std::vector<std::string>	encrypted_files;
 	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
 		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
@@ -881,7 +1024,7 @@ int unlock (int argc, const char** argv)
 		get_encrypted_files(encrypted_files, key_file->get_key_name());
 	}
 
-	// 5. Check out the files that are currently encrypted.
+	// 4. Check out the files that are currently encrypted.
 	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
 	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
 		touch_file(*file);
@@ -900,19 +1043,23 @@ void help_lock (std::ostream& out)
 	//     |--------------------------------------------------------------------------------| 80 chars
 	out << "Usage: git-crypt lock [OPTIONS]" << std::endl;
 	out << std::endl;
-	out << "    -a, --all                   Lock all keys, instead of just the default" << std::endl;
-	out << "    -k, --key-name KEYNAME      Lock the given key, instead of the default" << std::endl;
+	out << "    -a, --all                Lock all keys, instead of just the default" << std::endl;
+	out << "    -k, --key-name KEYNAME   Lock the given key, instead of the default" << std::endl;
+	out << "    -f, --force              Lock even if unclean (you may lose uncommited work)" << std::endl;
 	out << std::endl;
 }
 int lock (int argc, const char** argv)
 {
 	const char*	key_name = 0;
-	bool all_keys = false;
+	bool		all_keys = false;
+	bool		force = false;
 	Options_list	options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
 	options.push_back(Option_def("-a", &all_keys));
 	options.push_back(Option_def("--all", &all_keys));
+	options.push_back(Option_def("-f", &force));
+	options.push_back(Option_def("--force", &force));
 
 	int			argi = parse_options(options, argc, argv);
 
@@ -936,34 +1083,30 @@ int lock (int argc, const char** argv)
 
 	std::stringstream	status_output;
 	get_git_status(status_output);
-	if (status_output.peek() != -1) {
+	if (!force && status_output.peek() != -1) {
 		std::clog << "Error: Working directory not clean." << std::endl;
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt lock'." << std::endl;
+		std::clog << "Or, use 'git-crypt lock --force' and possibly lose uncommitted changes." << std::endl;
 		return 1;
 	}
 
-	// 2. Determine the path to the top of the repository.  We pass this as the argument
-	// to 'git checkout' below. (Determine the path now so in case it fails we haven't already
-	// mucked with the git config.)
-	std::string		path_to_top(get_path_to_top());
-
-	// 3. unconfigure the git filters and remove decrypted keys
+	// 2. deconfigure the git filters and remove decrypted keys
 	std::vector<std::string>	encrypted_files;
 	if (all_keys) {
-		// unconfigure for all keys
+		// deconfigure for all keys
 		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
 			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
 			remove_file(get_internal_key_path(this_key_name));
-			unconfigure_git_filters(this_key_name);
+			deconfigure_git_filters(this_key_name);
 			get_encrypted_files(encrypted_files, this_key_name);
 		}
 	} else {
 		// just handle the given key
 		std::string	internal_key_path(get_internal_key_path(key_name));
 		if (access(internal_key_path.c_str(), F_OK) == -1 && errno == ENOENT) {
-			std::clog << "Error: this repository is not currently locked";
+			std::clog << "Error: this repository is already locked";
 			if (key_name) {
 				std::clog << " with key '" << key_name << "'";
 			}
@@ -972,11 +1115,11 @@ int lock (int argc, const char** argv)
 		}
 
 		remove_file(internal_key_path);
-		unconfigure_git_filters(key_name);
+		deconfigure_git_filters(key_name);
 		get_encrypted_files(encrypted_files, key_name);
 	}
 
-	// 4. Check out the files that are currently decrypted but should be encrypted.
+	// 3. Check out the files that are currently decrypted but should be encrypted.
 	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
 	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
 		touch_file(*file);
@@ -997,17 +1140,20 @@ void help_add_gpg_user (std::ostream& out)
 	out << std::endl;
 	out << "    -k, --key-name KEYNAME      Add GPG user to given key, instead of default" << std::endl;
 	out << "    -n, --no-commit             Don't automatically commit" << std::endl;
+	out << "    --trusted                   Assume the GPG user IDs are trusted" << std::endl;
 	out << std::endl;
 }
 int add_gpg_user (int argc, const char** argv)
 {
 	const char*		key_name = 0;
 	bool			no_commit = false;
+	bool			trusted = false;
 	Options_list		options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
 	options.push_back(Option_def("-n", &no_commit));
 	options.push_back(Option_def("--no-commit", &no_commit));
+	options.push_back(Option_def("--trusted", &trusted));
 
 	int			argi = parse_options(options, argc, argv);
 	if (argc - argi == 0) {
@@ -1016,8 +1162,8 @@ int add_gpg_user (int argc, const char** argv)
 		return 2;
 	}
 
-	// build a list of key fingerprints for every collaborator specified on the command line
-	std::vector<std::string>	collab_keys;
+	// build a list of key fingerprints, and whether the key is trusted, for every collaborator specified on the command line
+	std::vector<std::pair<std::string, bool> >	collab_keys;
 
 	for (int i = argi; i < argc; ++i) {
 		std::vector<std::string> keys(gpg_lookup_key(argv[i]));
@@ -1029,7 +1175,9 @@ int add_gpg_user (int argc, const char** argv)
 			std::clog << "Error: more than one public key matches '" << argv[i] << "' - please be more specific" << std::endl;
 			return 1;
 		}
-		collab_keys.push_back(keys[0]);
+
+		const bool is_full_fingerprint(std::strncmp(argv[i], "0x", 2) == 0 && std::strlen(argv[i]) == 42);
+		collab_keys.push_back(std::make_pair(keys[0], trusted || is_full_fingerprint));
 	}
 
 	// TODO: have a retroactive option to grant access to all key versions, not just the most recent
@@ -1050,6 +1198,9 @@ int add_gpg_user (int argc, const char** argv)
 	const std::string		state_gitattributes_path(state_path + "/.gitattributes");
 	if (access(state_gitattributes_path.c_str(), F_OK) != 0) {
 		std::ofstream		state_gitattributes_file(state_gitattributes_path.c_str());
+		//                          |--------------------------------------------------------------------------------| 80 chars
+		state_gitattributes_file << "# Do not edit this file.  To specify the files to encrypt, create your own\n";
+		state_gitattributes_file << "# .gitattributes file in the directory where your files are.\n";
 		state_gitattributes_file << "* !filter !diff\n";
 		state_gitattributes_file.close();
 		if (!state_gitattributes_file) {
@@ -1077,8 +1228,8 @@ int add_gpg_user (int argc, const char** argv)
 			// TODO: include key_name in commit message
 			std::ostringstream	commit_message_builder;
 			commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
-			for (std::vector<std::string>::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
-				commit_message_builder << '\t' << gpg_shorten_fingerprint(*collab) << ' ' << gpg_get_uid(*collab) << '\n';
+			for (std::vector<std::pair<std::string, bool> >::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
+				commit_message_builder << '\t' << gpg_shorten_fingerprint(collab->first) << ' ' << gpg_get_uid(collab->first) << '\n';
 			}
 
 			// git commit -m MESSAGE NEW_FILE ...
@@ -1398,6 +1549,9 @@ int status (int argc, const char** argv)
 			std::string	mode;
 			std::string	stage;
 			output >> mode >> object_id >> stage;
+			if (!is_git_file_mode(mode)) {
+				continue;
+			}
 		}
 		output >> std::ws;
 		std::getline(output, filename, '\0');

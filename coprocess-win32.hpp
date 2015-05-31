@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Andrew Ayer
+ * Copyright 2015 Andrew Ayer
  *
  * This file is part of git-crypt.
  *
@@ -28,24 +28,41 @@
  * as that of the covered work.
  */
 
-#ifndef GIT_CRYPT_GPG_HPP
-#define GIT_CRYPT_GPG_HPP
+#ifndef GIT_CRYPT_COPROCESS_HPP
+#define GIT_CRYPT_COPROCESS_HPP
 
-#include <string>
+#include "fhstream.hpp"
+#include <windows.h>
 #include <vector>
-#include <cstddef>
 
-struct Gpg_error {
-	std::string	message;
+class Coprocess {
+	HANDLE		proc_handle;
 
-	explicit Gpg_error (std::string m) : message(m) { }
+	HANDLE		stdin_pipe_reader;
+	HANDLE		stdin_pipe_writer;
+	ofhstream*	stdin_pipe_ostream;
+	static size_t	write_stdin (void*, const void*, size_t);
+
+	HANDLE		stdout_pipe_reader;
+	HANDLE		stdout_pipe_writer;
+	ifhstream*	stdout_pipe_istream;
+	static size_t	read_stdout (void*, void*, size_t);
+
+			Coprocess (const Coprocess&);	// Disallow copy
+	Coprocess&	operator= (const Coprocess&);	// Disallow assignment
+public:
+			Coprocess ();
+			~Coprocess ();
+
+	std::ostream*	stdin_pipe ();
+	void		close_stdin ();
+
+	std::istream*	stdout_pipe ();
+	void		close_stdout ();
+
+	void		spawn (const std::vector<std::string>&);
+
+	int		wait ();
 };
-
-std::string			gpg_shorten_fingerprint (const std::string& fingerprint);
-std::string			gpg_get_uid (const std::string& fingerprint);
-std::vector<std::string>	gpg_lookup_key (const std::string& query);
-std::vector<std::string>	gpg_list_secret_keys ();
-void				gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, bool key_is_trusted, const char* p, size_t len);
-void				gpg_decrypt_from_file (const std::string& filename, std::ostream&);
 
 #endif
