@@ -1,3 +1,9 @@
+#
+# Copyright (c) 2015 Andrew Ayer
+#
+# See COPYING file for license information.
+#
+
 CXXFLAGS ?= -Wall -pedantic -Wno-long-long -O2
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
