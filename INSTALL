@@ -33,6 +33,16 @@ To install to a specific location:
 Or, just copy the git-crypt binary to wherever is most convenient for you.
 
 
+BUILDING THE MAN PAGE
+
+To build and install the git-crypt(1) man page, pass HAS_DOCBOOK=yes to make:
+
+	$ make HAS_DOCBOOK=yes
+	$ make HAS_DOCBOOK=yes install
+
+The Docbook XSLT stylesheets are required to build the man page.
+
+
 BUILDING A DEBIAN PACKAGE
 
 Debian packaging can be found in the 'debian' branch of the project
