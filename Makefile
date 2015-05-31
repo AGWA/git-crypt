@@ -9,7 +9,7 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
-HAS_DOCBOOK ?= no
+ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
 
 OBJFILES = \
@@ -30,8 +30,7 @@ XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
 		 --stringparam man.output.base.dir man/ \
 		 --param man.output.subdirs.enabled 1 \
-		 --param man.authors.section.enabled 1 \
-		 --nonet
+		 --param man.authors.section.enabled 1
 
 all: build
 
@@ -40,7 +39,7 @@ all: build
 #
 BUILD_MAN_TARGETS-yes = build-man
 BUILD_MAN_TARGETS-no =
-BUILD_TARGETS := build-bin $(BUILD_MAN_TARGETS-$(HAS_DOCBOOK))
+BUILD_TARGETS := build-bin $(BUILD_MAN_TARGETS-$(ENABLE_MAN))
 
 build: $(BUILD_TARGETS)
 
@@ -62,7 +61,7 @@ man/man1/git-crypt.1: man/git-crypt.xml
 #
 CLEAN_MAN_TARGETS-yes = clean-man
 CLEAN_MAN_TARGETS-no =
-CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(HAS_DOCBOOK))
+CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(ENABLE_MAN))
 
 clean: $(CLEAN_TARGETS)
 
@@ -77,7 +76,7 @@ clean-man:
 #
 INSTALL_MAN_TARGETS-yes = install-man
 INSTALL_MAN_TARGETS-no =
-INSTALL_TARGETS := install-bin $(INSTALL_MAN_TARGETS-$(HAS_DOCBOOK))
+INSTALL_TARGETS := install-bin $(INSTALL_MAN_TARGETS-$(ENABLE_MAN))
 
 install: $(INSTALL_TARGETS)
 

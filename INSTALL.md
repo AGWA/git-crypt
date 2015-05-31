@@ -35,12 +35,14 @@ Or, just copy the git-crypt binary to wherever is most convenient for you.
 
 ### Building The Man Page
 
-To build and install the git-crypt(1) man page, pass `HAS_DOCBOOK=yes` to make:
+To build and install the git-crypt(1) man page, pass `ENABLE_MAN=yes` to make:
 
-    make HAS_DOCBOOK=yes
-    make HAS_DOCBOOK=yes install
+    make ENABLE_MAN=yes
+    make ENABLE_MAN=yes install
 
-The Docbook XSLT stylesheets are required to build the man page.
+xsltproc is required to build the man page.  Note that xsltproc will access
+the Internet to retrieve its stylesheet unless the Docbook stylesheet is
+installed locally and registered in the system's XML catalog.
 
 
 ### Building A Debian Package
