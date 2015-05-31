@@ -10,6 +10,7 @@ BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
 HAS_DOCBOOK ?= no
+DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
 
 OBJFILES = \
     git-crypt.o \
@@ -25,13 +26,12 @@ OBJFILES = \
 OBJFILES += crypto-openssl.o
 LDFLAGS += -lcrypto
 
-DOCBOOK = xsltproc \
-	--param man.output.in.separate.dir 1 \
-	--stringparam man.output.base.dir man/ \
-	--param man.output.subdirs.enabled 1 \
-	--param man.authors.section.enabled 1 \
-	--nonet \
-	http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
+XSLTPROC ?= xsltproc
+DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
+		 --stringparam man.output.base.dir man/ \
+		 --param man.output.subdirs.enabled 1 \
+		 --param man.authors.section.enabled 1 \
+		 --nonet
 
 all: build
 
@@ -55,7 +55,7 @@ coprocess.o: coprocess.cpp coprocess-unix.cpp coprocess-win32.cpp
 build-man: man/man1/git-crypt.1
 
 man/man1/git-crypt.1: man/git-crypt.xml
-	$(DOCBOOK) $<
+	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) $<
 
 #
 # Clean
