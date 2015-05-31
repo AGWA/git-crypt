@@ -1,0 +1,2 @@
+version=3
+opts=pgpsigurlmangle=s/$/.asc/ https://www.agwa.name/projects/git-crypt/ .*/git-crypt-(\d.*)\.(?:zip|tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
