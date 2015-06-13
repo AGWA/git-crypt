@@ -54,7 +54,7 @@ coprocess.o: coprocess.cpp coprocess-unix.cpp coprocess-win32.cpp
 build-man: man/man1/git-crypt.1
 
 man/man1/git-crypt.1: man/git-crypt.xml
-	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) $<
+	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) man/git-crypt.xml
 
 #
 # Clean
