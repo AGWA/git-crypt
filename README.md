@@ -81,7 +81,19 @@ there may be backwards-incompatible changes introduced before version
 Security
 --------
 
-git-crypt is more secure that other transparent git encryption systems.
+Currently git-crypt doesn't support revoking access to an encrypted
+repository which was previously granted. This first of all applies
+to multi-user GPG mode (put simple, there's no del-gpg-user command
+to complement add-gpg-user), but also applies to symmetric key mode
+(there's no support to rotate this key). It's because this is inherently
+complex problem in the context of historical data. For example, even
+if a key was rotated at one point of history, a user having previous
+key can still access previous repository history. This issue is discussed
+in more detail in
+https://github.com/AGWA/git-crypt/issues/47 .
+
+On the bare encryption level, git-crypt is more secure than other
+transparent git encryption systems.
 git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
 derived from the SHA-1 HMAC of the file.  This mode of operation is
 provably semantically secure under deterministic chosen-plaintext attack.
