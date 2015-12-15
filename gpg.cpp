@@ -39,7 +39,7 @@ static std::string gpg_nth_column (const std::string& line, unsigned int col)
 	for (unsigned int i = 0; i < col; ++i) {
 		pos = line.find_first_of(':', pos);
 		if (pos == std::string::npos) {
-			throw Gpg_error("Malformed output from gpg");
+			throw Gpg_error("Malformed output from gpg2");
 		}
 		pos = pos + 1;
 	}
@@ -60,9 +60,9 @@ std::string gpg_shorten_fingerprint (const std::string& fingerprint)
 // given a key fingerprint, return the key's UID (e.g. "John Smith <jsmith@example.com>")
 std::string gpg_get_uid (const std::string& fingerprint)
 {
-	// gpg --batch --with-colons --fixed-list-mode --list-keys 0x7A399B2DB06D039020CD1CE1D0F3702D61489532
+	// gpg2 --batch --with-colons --fixed-list-mode --list-keys 0x7A399B2DB06D039020CD1CE1D0F3702D61489532
 	std::vector<std::string>	command;
-	command.push_back("gpg");
+	command.push_back("gpg2");
 	command.push_back("--batch");
 	command.push_back("--with-colons");
 	command.push_back("--fixed-list-mode");
@@ -92,9 +92,9 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 {
 	std::vector<std::string>	fingerprints;
 
-	// gpg --batch --with-colons --fingerprint --list-keys jsmith@example.com
+	// gpg2 --batch --with-colons --fingerprint --list-keys jsmith@example.com
 	std::vector<std::string>	command;
-	command.push_back("gpg");
+	command.push_back("gpg2");
 	command.push_back("--batch");
 	command.push_back("--with-colons");
 	command.push_back("--fingerprint");
@@ -123,16 +123,16 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 
 std::vector<std::string> gpg_list_secret_keys ()
 {
-	// gpg --batch --with-colons --list-secret-keys --fingerprint
+	// gpg2 --batch --with-colons --list-secret-keys --fingerprint
 	std::vector<std::string>	command;
-	command.push_back("gpg");
+	command.push_back("gpg2");
 	command.push_back("--batch");
 	command.push_back("--with-colons");
 	command.push_back("--list-secret-keys");
 	command.push_back("--fingerprint");
 	std::stringstream		command_output;
 	if (!successful_exit(exec_command(command, command_output))) {
-		throw Gpg_error("gpg --list-secret-keys failed");
+		throw Gpg_error("gpg2 --list-secret-keys failed");
 	}
 
 	std::vector<std::string>	secret_keys;
@@ -152,9 +152,9 @@ std::vector<std::string> gpg_list_secret_keys ()
 
 void gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, bool key_is_trusted, const char* p, size_t len)
 {
-	// gpg --batch -o FILENAME -r RECIPIENT -e
+	// gpg2 --batch -o FILENAME -r RECIPIENT -e
 	std::vector<std::string>	command;
-	command.push_back("gpg");
+	command.push_back("gpg2");
 	command.push_back("--batch");
 	if (key_is_trusted) {
 		command.push_back("--trust-model");
@@ -172,9 +172,9 @@ void gpg_encrypt_to_file (const std::string& filename, const std::string& recipi
 
 void gpg_decrypt_from_file (const std::string& filename, std::ostream& output)
 {
-	// gpg -q -d FILENAME
+	// gpg2 -q -d FILENAME
 	std::vector<std::string>	command;
-	command.push_back("gpg");
+	command.push_back("gpg2");
 	command.push_back("-q");
 	command.push_back("-d");
 	command.push_back(filename);
