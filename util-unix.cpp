@@ -125,40 +125,20 @@ void	mkdir_parent (const std::string& path)
 	}
 }
 
-static std::string readlink (const char* pathname)
-{
-	std::vector<char>	buffer(64);
-	ssize_t			len;
-
-	while ((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size())) {
-		// buffer may have been truncated - grow and try again
-		buffer.resize(buffer.size() * 2);
-	}
-	if (len == -1) {
-		throw System_error("readlink", pathname, errno);
-	}
-
-	return std::string(buffer.begin(), buffer.begin() + len);
-}
-
 std::string our_exe_path ()
 {
-	try {
-		return readlink("/proc/self/exe");
-	} catch (const System_error&) {
-		if (argv0[0] == '/') {
-			// argv[0] starts with / => it's an absolute path
-			return argv0;
-		} else if (std::strchr(argv0, '/')) {
-			// argv[0] contains / => it a relative path that should be resolved
-			char*		resolved_path_p = realpath(argv0, NULL);
-			std::string	resolved_path(resolved_path_p);
-			free(resolved_path_p);
-			return resolved_path;
-		} else {
-			// argv[0] is just a bare filename => not much we can do
-			return argv0;
-		}
+	if (argv0[0] == '/') {
+		// argv[0] starts with / => it's an absolute path
+		return argv0;
+	} else if (std::strchr(argv0, '/')) {
+		// argv[0] contains / => it a relative path that should be resolved
+		char*		resolved_path_p = realpath(argv0, NULL);
+		std::string	resolved_path(resolved_path_p);
+		free(resolved_path_p);
+		return resolved_path;
+	} else {
+		// argv[0] is just a bare filename => not much we can do
+		return argv0;
 	}
 }
 
