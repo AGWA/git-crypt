@@ -24,7 +24,13 @@ OBJFILES = \
     fhstream.o
 
 OBJFILES += crypto-openssl.o
-LDFLAGS += -lcrypto
+
+ifeq ($(OS),Windows_NT)
+	CXXFLAGS += -static -static-libgcc
+	LDFLAGS += -lcrypto -lgdi32
+else
+	LDFLAGS += -lcrypto
+endif
 
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
