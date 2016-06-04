@@ -254,6 +254,27 @@ static std::string get_internal_key_path (const char* key_name)
 	return path;
 }
 
+static std::string get_git_config (const std::string& name)
+{
+	// git config --get
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--get");
+	command.push_back(name);
+
+	std::stringstream	output;
+
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git config' missing value for key '" + name +"'");
+	}
+
+	std::string		repoStateDir;
+	std::getline(output, repoStateDir);
+
+	return repoStateDir;
+}
+
 static std::string get_repo_state_path ()
 {
 	// git rev-parse --show-toplevel
@@ -276,7 +297,18 @@ static std::string get_repo_state_path ()
 		throw Error("Could not determine Git working tree - is this a non-bare repo?");
 	}
 
-	path += "/.git-crypt";
+	// Check if the repo state dir has been explicitly configured. If so, use that in path construction.
+	if (git_has_config("git-crypt.repoStateDir")) {
+		std::string		repoStateDir = get_git_config("git-crypt.repoStateDir");
+
+		// The repoStateDir value must always be relative to git work tree to ensure the repoStateDir can be committed
+		// along with the remainder of the repository.
+		path += '/' + repoStateDir;
+	} else {
+		// There is no explicitly configured repo state dir configured, so use the default.
+		path += "/.git-crypt";
+	}
+
 	return path;
 }
 
