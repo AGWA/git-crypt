@@ -69,3 +69,32 @@ and does not currently create key files with restrictive permissions,
 making it unsuitable for use on a multi-user system.  Windows support
 will mature in a future version of git-crypt.  Bug reports and patches
 are most welcome!
+
+Prerequisites:
+
+> This documentation is for 64 bit hosts
+
+Download and install msys2 POSIX compatibility layer from http://msys2.github.io/ (get the `msys2-x86_64-*.exe`)
+
+In the newly installed MSYS2 Shell, invoke the following commands to upgrade to the most recent version:
+
+```sh
+pacman --sync --refresh --noconfirm pacman
+pacman --sync --sysupgrade --noconfirm
+```
+
+(You might be asked to close the shell and run the sysupgrade command again.)
+
+```sh
+pacman --sync --refresh --noconfirm \
+  mingw-w64-x86_64-gcc \
+  mingw-w64-x86_64-make \
+  mingw-w64-x86_64-openssl
+```
+
+In MinGW-w64 64-bit Shell:
+
+```sh
+cd "$YOUR_GIT_CRYPT_DIR"
+make && make install
+```

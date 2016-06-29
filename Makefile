@@ -24,7 +24,13 @@ OBJFILES = \
     fhstream.o
 
 OBJFILES += crypto-openssl.o
-LDFLAGS += -lcrypto
+
+ifeq ($(OS),Windows_NT)
+	CXXFLAGS += -static -static-libgcc
+	LDFLAGS += -lcrypto -lgdi32
+else
+	LDFLAGS += -lcrypto
+endif
 
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
@@ -66,7 +72,7 @@ CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(ENABLE_MAN))
 clean: $(CLEAN_TARGETS)
 
 clean-bin:
-	rm -f $(OBJFILES) git-crypt
+	rm -f $(OBJFILES) git-crypt git-crypt.exe
 
 clean-man:
 	rm -f man/man1/git-crypt.1
