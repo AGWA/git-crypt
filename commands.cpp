@@ -48,6 +48,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <exception>
 #include <vector>
 
 static std::string attribute_name (const char* key_name)
@@ -589,13 +590,20 @@ static void load_key (Key_file& key_file, const char* key_name, const char* key_
 
 static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t key_version, const std::vector<std::string>& secret_keys, const std::string& keys_path)
 {
+	std::exception_ptr gpg_error;
+
 	for (std::vector<std::string>::const_iterator seckey(secret_keys.begin()); seckey != secret_keys.end(); ++seckey) {
 		std::ostringstream		path_builder;
 		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key_version << '/' << *seckey << ".gpg";
 		std::string			path(path_builder.str());
 		if (access(path.c_str(), F_OK) == 0) {
 			std::stringstream	decrypted_contents;
-			gpg_decrypt_from_file(path, decrypted_contents);
+			try {
+				gpg_decrypt_from_file(path, decrypted_contents);
+			} catch (Gpg_error &e) {
+				gpg_error = std::current_exception();
+				continue;
+			}
 			Key_file		this_version_key_file;
 			this_version_key_file.load(decrypted_contents);
 			const Key_file::Entry*	this_version_entry = this_version_key_file.get(key_version);
@@ -610,6 +618,11 @@ static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t
 			return true;
 		}
 	}
+
+	if(gpg_error) {
+		std::rethrow_exception(gpg_error);
+	}
+
 	return false;
 }
 
