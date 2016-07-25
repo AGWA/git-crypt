@@ -35,9 +35,10 @@
 
 static std::string gpg_get_executable()
 {
-    std::string gpgbin = get_git_config("gpg.program");
-    if (gpgbin == "") {
-        gpgbin = "gpg";
+    std::string gpgbin = "gpg";
+    try {
+        gpgbin = get_git_config("gpg.program");
+    } catch (...) {
     }
     return gpgbin;
 }
