@@ -5,6 +5,7 @@
 #
 
 CXXFLAGS ?= -Wall -pedantic -Wno-long-long -O2
+CXXFLAGS += -std=c++11
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
