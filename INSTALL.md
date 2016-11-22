@@ -78,13 +78,10 @@ To build and bundle git-crypt as a container, simply run:
 
 To build, bundle and deploy to your specific container registry, simply run:
 
-    ```bash
     IMAGE_REPO=my-fancy-repo make build-image
     IMAGE_REPO=my-fancy-repo make push-image
-    ```
 
 or
-    ```bash
+
     make build-image IMAGE_REPO=my-fancy-repo
     make push-image IMAGE_REPO=my-fancy-repo
-    ```
