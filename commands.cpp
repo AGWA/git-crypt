@@ -1318,7 +1318,7 @@ int ls_gpg_users (int argc, const char** argv) // TODO
 	//  0x4E386D9C9C61702F ???
 	// ====
 	// To resolve a long hex ID, use a command like this:
-	//  gpg --options /dev/null --fixed-list-mode --batch --with-colons --list-keys 0x143DE9B3F7316900
+	//  gpg2 --options /dev/null --fixed-list-mode --batch --with-colons --list-keys 0x143DE9B3F7316900
 
 	std::clog << "Error: ls-gpg-users is not yet implemented." << std::endl;
 	return 1;
