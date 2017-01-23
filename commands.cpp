@@ -50,6 +50,9 @@
 #include <errno.h>
 #include <vector>
 
+#define GITCRYPT_HEADER     "\0GITCRYPT\0"
+#define GITCRYPT_HEADER_LEN 10
+
 static std::string attribute_name (const char* key_name)
 {
 	if (key_name) {
@@ -159,11 +162,16 @@ static void configure_git_filters (const char* key_name)
 		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
 		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
 		           escaped_git_crypt_path + " diff --key-name=" + key_name);
+		git_config(std::string("merge.git-crypt-") + key_name + ".name", "git-crypt merge driver");
+		git_config(std::string("merge.git-crypt-") + key_name + ".driver",
+		           escaped_git_crypt_path + " merge --yours=%A --ancestor=%O --theirs=%B --marker_size=%L --key-name=" + key_name);
 	} else {
 		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
 		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
 		git_config("filter.git-crypt.required", "true");
 		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+		git_config("merge.git-crypt.name", "git-crypt merge driver");
+		git_config("merge.git-crypt.driver", escaped_git_crypt_path + " merge --yours=%A --ancestor=%O --theirs=%B --marker_size=%L");
 	}
 }
 
@@ -456,7 +464,7 @@ static bool check_if_blob_is_encrypted (const std::string& object_id)
 
 	char				header[10];
 	output.read(header, sizeof(header));
-	return output.gcount() == sizeof(header) && std::memcmp(header, "\0GITCRYPT\0", 10) == 0;
+	return output.gcount() == sizeof(header) && std::memcmp(header, GITCRYPT_HEADER, GITCRYPT_HEADER_LEN) == 0;
 }
 
 static bool check_if_file_is_encrypted (const std::string& filename)
@@ -669,16 +677,25 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 
 static int parse_plumbing_options (const char** key_name, const char** key_file, int argc, const char** argv)
 {
+        const char*     yours = 0;
+        const char*     ancestor = 0;
+        const char*     theirs = 0;
+        const char*     marker_size = 0;
+
 	Options_list	options;
 	options.push_back(Option_def("-k", key_name));
 	options.push_back(Option_def("--key-name", key_name));
 	options.push_back(Option_def("--key-file", key_file));
+        options.push_back(Option_def("--yours", &yours));
+        options.push_back(Option_def("--ancestor", &ancestor));
+        options.push_back(Option_def("--theirs", &theirs));
+        options.push_back(Option_def("--marker_size", &marker_size));
 
 	return parse_options(options, argc, argv);
 }
 
 // Encrypt contents of stdin and write to stdout
-int clean (int argc, const char** argv)
+int clean (int argc, const char** argv, std::istream &in, std::ostream &out)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -711,10 +728,10 @@ int clean (int argc, const char** argv)
 
 	char			buffer[1024];
 
-	while (std::cin && file_size < Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
-		std::cin.read(buffer, sizeof(buffer));
+	while (in && file_size < Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
+		in.read(buffer, sizeof(buffer));
 
-		const size_t	bytes_read = std::cin.gcount();
+		const size_t	bytes_read = in.gcount();
 
 		hmac.add(reinterpret_cast<unsigned char*>(buffer), bytes_read);
 		file_size += bytes_read;
@@ -761,20 +778,29 @@ int clean (int argc, const char** argv)
 	unsigned char		digest[Hmac_sha1_state::LEN];
 	hmac.get(digest);
 
-	// Write a header that...
-	std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
-	std::cout.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
-
 	// Now encrypt the file and write to stdout
 	Aes_ctr_encryptor	aes(key->aes_key, digest);
 
 	// First read from the in-memory copy
 	const unsigned char*	file_data = reinterpret_cast<const unsigned char*>(file_contents.data());
 	size_t			file_data_len = file_contents.size();
+
+	// Check if file is decrypted (or already encrypted)
+	bool is_decrypted = (file_data_len < GITCRYPT_HEADER_LEN) || std::memcmp(file_data, GITCRYPT_HEADER, GITCRYPT_HEADER_LEN) != 0;
+
+        if (is_decrypted) {
+		// Write a header that...
+		out.write(GITCRYPT_HEADER, GITCRYPT_HEADER_LEN); // ...identifies this as an encrypted file
+		out.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
+	}
+
 	while (file_data_len > 0) {
 		const size_t	buffer_len = std::min(sizeof(buffer), file_data_len);
-		aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
-		std::cout.write(buffer, buffer_len);
+		if (is_decrypted)
+			aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
+		else
+			std::memcpy(buffer, file_data, buffer_len);
+		out.write(buffer, buffer_len);
 		file_data += buffer_len;
 		file_data_len -= buffer_len;
 	}
@@ -787,17 +813,18 @@ int clean (int argc, const char** argv)
 
 			const size_t	buffer_len = temp_file.gcount();
 
-			aes.process(reinterpret_cast<unsigned char*>(buffer),
-			            reinterpret_cast<unsigned char*>(buffer),
-			            buffer_len);
-			std::cout.write(buffer, buffer_len);
+			if (is_decrypted)
+				aes.process(reinterpret_cast<unsigned char*>(buffer),
+					    reinterpret_cast<unsigned char*>(buffer),
+				            buffer_len);
+			out.write(buffer, buffer_len);
 		}
 	}
 
 	return 0;
 }
 
-static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char* header, std::istream& in)
+static int decrypt_file_to_stream (const Key_file& key_file, const unsigned char* header, std::istream& in, std::ostream& out = std::cout)
 {
 	const unsigned char*	nonce = header + 10;
 	uint32_t		key_version = 0; // TODO: get the version from the file header
@@ -815,7 +842,7 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
 		aes.process(buffer, buffer, in.gcount());
 		hmac.add(buffer, in.gcount());
-		std::cout.write(reinterpret_cast<char*>(buffer), in.gcount());
+		out.write(reinterpret_cast<char*>(buffer), in.gcount());
 	}
 
 	unsigned char		digest[Hmac_sha1_state::LEN];
@@ -832,7 +859,7 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 }
 
 // Decrypt contents of stdin and write to stdout
-int smudge (int argc, const char** argv)
+int smudge (int argc, const char** argv, std::istream& in, std::ostream& out)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -851,8 +878,8 @@ int smudge (int argc, const char** argv)
 
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
-	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
+	in.read(reinterpret_cast<char*>(header), sizeof(header));
+	if (in.gcount() != sizeof(header) || std::memcmp(header, GITCRYPT_HEADER, GITCRYPT_HEADER_LEN) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
 		std::clog << "git-crypt: Run 'git-crypt status' to make sure all files are properly encrypted." << std::endl;
@@ -860,12 +887,12 @@ int smudge (int argc, const char** argv)
 		std::clog << "git-crypt: this file may be unencrypted in the repository's history.  If this" << std::endl;
 		std::clog << "git-crypt: file contains sensitive information, you can use 'git filter-branch'" << std::endl;
 		std::clog << "git-crypt: to remove its old versions from the history." << std::endl;
-		std::cout.write(reinterpret_cast<char*>(header), std::cin.gcount()); // include the bytes which we already read
-		std::cout << std::cin.rdbuf();
+		out.write(reinterpret_cast<char*>(header), in.gcount()); // include the bytes which we already read
+		out << in.rdbuf();
 		return 0;
 	}
 
-	return decrypt_file_to_stdout(key_file, header, std::cin);
+	return decrypt_file_to_stream(key_file, header, in, out);
 }
 
 int diff (int argc, const char** argv)
@@ -899,7 +926,7 @@ int diff (int argc, const char** argv)
 	// Read the header to get the nonce and determine if it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	in.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
+	if (in.gcount() != sizeof(header) || std::memcmp(header, GITCRYPT_HEADER, GITCRYPT_HEADER_LEN) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::cout.write(reinterpret_cast<char*>(header), in.gcount()); // include the bytes which we already read
 		std::cout << in.rdbuf();
@@ -907,7 +934,91 @@ int diff (int argc, const char** argv)
 	}
 
 	// Go ahead and decrypt it
-	return decrypt_file_to_stdout(key_file, header, in);
+	return decrypt_file_to_stream(key_file, header, in);
+}
+
+int merge (int argc, const char** argv)
+{
+	const char*	yours = 0;    // %A
+	const char*	ancestor = 0;   // %O
+	const char*	theirs = 0;      // %B
+	const char*	marker_size = 0;// %L
+
+	Options_list	options;
+	options.push_back(Option_def("--yours", &yours));
+	options.push_back(Option_def("--ancestor", &ancestor));
+	options.push_back(Option_def("--theirs", &theirs));
+	options.push_back(Option_def("--marker_size", &marker_size));
+
+	int	argi = parse_options(options, argc, argv);
+	if (argi != 4) {
+		std::clog << "Error: missing arguments: unable to merge file" << std::endl;
+		return 1;
+	}
+
+	// run smudge on input files
+	std::vector<std::string> smudge_files;
+	smudge_files.push_back(yours);
+	smudge_files.push_back(ancestor);
+	smudge_files.push_back(theirs);
+	for (std::vector<std::string>::const_iterator file(smudge_files.begin()); file != smudge_files.end(); ++file) {
+		std::ifstream in;
+		std::ofstream out;
+		std::string fn = *file;
+
+		in.open(fn.c_str(), std::ifstream::in);
+		fn.append(".tmp");
+		out.open(fn.c_str(), std::ofstream::out | std::ofstream::trunc);
+		if (smudge (argc, argv, in, out) != 0) {
+			std::clog << "Error: failed to smudge " << *file << ": unable to merge file" << std::endl;
+			return 1;
+		}
+		in.close();
+		out.close();
+	}
+
+	// git merge-file --marker-size <marker_size> <yours> <ancestor> <theirs>
+	std::vector<std::string> command;
+	command.push_back("git");
+	command.push_back("merge-file");
+	command.push_back("-L");
+	command.push_back("yours");
+	command.push_back("-L");
+	command.push_back("ancestor");
+	command.push_back("-L");
+	command.push_back("theirs");
+	command.push_back("--marker-size");
+	command.push_back(marker_size);
+	command.push_back(std::string(yours) + ".tmp");
+	command.push_back(std::string(ancestor) + ".tmp");
+	command.push_back(std::string(theirs) + ".tmp");
+	int ret = exit_status(exec_command(command));
+
+	// run clean on output file
+	std::vector<std::string> clear_files;
+	clear_files.push_back(yours);
+	for (std::vector<std::string>::const_iterator file(clear_files.begin()); file != clear_files.end(); ++file) {
+		std::ifstream in;
+		std::ofstream out;
+		std::string fn = *file;
+
+		out.open(fn.c_str(), std::ofstream::out | std::ofstream::trunc);
+		fn.append(".tmp");
+		in.open(fn.c_str(), std::ifstream::in);
+		if (clean(argc, argv, in, out) != 0) {
+			std::clog << "Error: failed to clean" << *file << ": unable to merge file" << std::endl;
+			return 1;
+		}
+		in.close();
+		out.close();
+	}
+
+	// clean-up temporary files
+	for (std::vector<std::string>::const_iterator file(smudge_files.begin()); file != smudge_files.end(); ++file) {
+		remove_file(*file + ".tmp");
+	}
+
+	return ret;
 }
 
 void help_init (std::ostream& out)
