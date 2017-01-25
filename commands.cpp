@@ -939,19 +939,24 @@ int diff (int argc, const char** argv)
 
 int merge (int argc, const char** argv)
 {
-	const char*	yours = 0;    // %A
-	const char*	ancestor = 0;   // %O
-	const char*	theirs = 0;      // %B
-	const char*	marker_size = 0;// %L
+	const char*	key_name = 0;
+	const char*	key_file = 0;
+	const char*	yours = 0;		// %A
+	const char*	ancestor = 0;		// %O
+	const char*	theirs = 0;		// %B
+	const char*	marker_size = 0;	// %L
 
 	Options_list	options;
+	options.push_back(Option_def("-k", &key_name));
+	options.push_back(Option_def("--key-name", &key_name));
+	options.push_back(Option_def("--key-file", &key_file));
 	options.push_back(Option_def("--yours", &yours));
 	options.push_back(Option_def("--ancestor", &ancestor));
 	options.push_back(Option_def("--theirs", &theirs));
 	options.push_back(Option_def("--marker_size", &marker_size));
 
-	int	argi = parse_options(options, argc, argv);
-	if (argi != 4) {
+	parse_options(options, argc, argv);
+	if (!yours || !ancestor || !theirs || !marker_size) {
 		std::clog << "Error: missing arguments: unable to merge file" << std::endl;
 		return 1;
 	}
