@@ -193,8 +193,10 @@ std::vector<std::string> get_directory_contents (const char* path)
 		errno = 0;
 
 		while((ent = readdir(dir)) != NULL && errno == 0) {
-			if (std::strcmp(ent->d_name, ".") && std::strcmp(ent->d_name, ".."))
-				contents.push_back(ent->d_name);
+			if (std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0) {
+				continue;
+			}
+			contents.push_back(ent->d_name);
 		}
 
 		if(errno)
