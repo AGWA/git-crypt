@@ -57,7 +57,7 @@ public:
 private:
 	struct Aes_impl;
 
-	std::auto_ptr<Aes_impl>	impl;
+	std::unique_ptr<Aes_impl>	impl;
 
 public:
 	Aes_ecb_encryptor (const unsigned char* key);
@@ -102,7 +102,7 @@ public:
 private:
 	struct Hmac_impl;
 
-	std::auto_ptr<Hmac_impl>	impl;
+	std::unique_ptr<Hmac_impl>	impl;
 
 public:
 	Hmac_sha1_state (const unsigned char* key, size_t key_len);

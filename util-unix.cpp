@@ -179,19 +179,6 @@ int util_rename (const char* from, const char* to)
 	return rename(from, to);
 }
 
-static size_t sizeof_dirent_for (DIR* p)
-{
-	long name_max = fpathconf(dirfd(p), _PC_NAME_MAX);
-	if (name_max == -1) {
-		#ifdef NAME_MAX
-		name_max = NAME_MAX;
-		#else
-		name_max = 255;
-		#endif
-	}
-	return offsetof(struct dirent, d_name) + name_max + 1; // final +1 is for d_name's null terminator
-}
-
 std::vector<std::string> get_directory_contents (const char* path)
 {
 	std::vector<std::string>		contents;
@@ -201,19 +188,20 @@ std::vector<std::string> get_directory_contents (const char* path)
 		throw System_error("opendir", path, errno);
 	}
 	try {
-		std::vector<unsigned char>	buffer(sizeof_dirent_for(dir));
-		struct dirent*			dirent_buffer = reinterpret_cast<struct dirent*>(&buffer[0]);
 		struct dirent*			ent = NULL;
-		int				err = 0;
-		while ((err = readdir_r(dir, dirent_buffer, &ent)) == 0 && ent != NULL) {
+
+		errno = 0;
+
+		while((ent = readdir(dir)) != NULL && errno == 0) {
 			if (std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0) {
 				continue;
 			}
 			contents.push_back(ent->d_name);
 		}
-		if (err != 0) {
-			throw System_error("readdir_r", path, errno);
-		}
+
+		if(errno)
+			throw System_error("readdir", path, errno);
+
 	} catch (...) {
 		closedir(dir);
 		throw;
