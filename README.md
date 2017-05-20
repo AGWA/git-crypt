@@ -67,6 +67,11 @@ That's all you need to do - after git-crypt is set up (either with
 `git-crypt init` or `git-crypt unlock`), you can use git normally -
 encryption and decryption happen transparently.
 
+To check if your precious files are encrypted as intended use:
+
+    git-crypt status
+
+
 Current Status
 --------------
 
