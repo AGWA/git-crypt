@@ -1,6 +1,8 @@
 git-crypt - transparent file encryption in git
 ==============================================
 
+![](http://standard3d.com/assets/img/git-crypt-logo.png)
+
 git-crypt enables transparent encryption and decryption of files in a
 git repository.  Files which you choose to protect are encrypted when
 committed, and decrypted when checked out.  git-crypt lets you freely
