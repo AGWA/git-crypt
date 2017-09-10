@@ -63,8 +63,8 @@ Aes_ecb_encryptor::Aes_ecb_encryptor (const unsigned char* raw_key)
 
 Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 {
-	// Note: Explicit destructor necessary because class contains an auto_ptr
-	// which contains an incomplete type when the auto_ptr is declared.
+	// Note: Explicit destructor necessary because class contains an unique_ptr
+	// which contains an incomplete type when the unique_ptr is declared.
 
 	explicit_memset(&impl->key, '\0', sizeof(impl->key));
 }
