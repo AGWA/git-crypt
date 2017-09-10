@@ -188,17 +188,22 @@ std::vector<std::string> get_directory_contents (const char* path)
 		throw System_error("opendir", path, errno);
 	}
 	try {
-		struct dirent*			ent = NULL;
-
 		errno = 0;
-
-		while((ent = readdir(dir)) != NULL && errno == 0) {
-			if (std::strcmp(ent->d_name, ".") && std::strcmp(ent->d_name, ".."))
+		// Note: readdir is reentrant in new implementations. In old implementations,
+		// it might not be, but git-crypt isn't multi-threaded so that's OK.
+		// We don't use readdir_r because it's buggy and deprecated:
+		//  https://womble.decadent.org.uk/readdir_r-advisory.html
+		//  http://austingroupbugs.net/view.php?id=696
+		//  http://man7.org/linux/man-pages/man3/readdir_r.3.html
+		while (struct dirent* ent = readdir(dir)) {
+			if (!(std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0)) {
 				contents.push_back(ent->d_name);
+			}
 		}
 
-		if(errno)
+		if (errno) {
 			throw System_error("readdir", path, errno);
+		}
 
 	} catch (...) {
 		closedir(dir);
