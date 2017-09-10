@@ -70,4 +70,7 @@ void help_migrate_key (std::ostream&);
 void help_refresh (std::ostream&);
 void help_status (std::ostream&);
 
+// other
+std::string get_git_config (const std::string& name);
+
 #endif

@@ -254,7 +254,7 @@ static std::string get_internal_key_path (const char* key_name)
 	return path;
 }
 
-static std::string get_git_config (const std::string& name)
+std::string get_git_config (const std::string& name)
 {
 	// git config --get
 	std::vector<std::string>	command;
