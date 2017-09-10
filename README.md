@@ -100,7 +100,7 @@ all of the files in a repository. Where git-crypt really shines is where
 most of your repository is public, but you have a few files (perhaps
 private keys named *.key, or a file with API credentials) which you
 need to encrypt.  For encrypting an entire repository, consider using a
-system like [git-remote-gcrypt](https://github.com/joeyh/git-remote-gcrypt)
+system like [git-remote-gcrypt](https://github.com/spwhitton/git-remote-gcrypt)
 instead.  (Note: no endorsement is made of git-remote-gcrypt's security.)
 
 git-crypt does not encrypt file names, commit messages, symlink targets,
