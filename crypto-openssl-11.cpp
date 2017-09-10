@@ -28,6 +28,8 @@
  * as that of the covered work.
  */
 
+#include <openssl/opensslconf.h>
+
 #if defined(OPENSSL_API_COMPAT)
 
 #include "crypto.hpp"
