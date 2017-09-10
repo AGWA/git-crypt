@@ -132,7 +132,7 @@ std::string our_exe_path ()
 		return argv0;
 	} else if (std::strchr(argv0, '/')) {
 		// argv[0] contains / => it a relative path that should be resolved
-		char*		resolved_path_p = realpath(argv0, NULL);
+		char*		resolved_path_p = realpath(argv0, nullptr);
 		std::string	resolved_path(resolved_path_p);
 		free(resolved_path_p);
 		return resolved_path;
@@ -149,7 +149,7 @@ int	exit_status (int wait_status)
 
 void	touch_file (const std::string& filename)
 {
-	if (utimes(filename.c_str(), NULL) == -1 && errno != ENOENT) {
+	if (utimes(filename.c_str(), nullptr) == -1 && errno != ENOENT) {
 		throw System_error("utimes", filename, errno);
 	}
 }

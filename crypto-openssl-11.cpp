@@ -83,7 +83,7 @@ Hmac_sha1_state::Hmac_sha1_state (const unsigned char* key, size_t key_len)
 {
 
 	impl->ctx = HMAC_CTX_new();
-	HMAC_Init_ex(impl->ctx, key, key_len, EVP_sha1(), NULL);
+	HMAC_Init_ex(impl->ctx, key, key_len, EVP_sha1(), nullptr);
 }
 
 Hmac_sha1_state::~Hmac_sha1_state ()

@@ -488,7 +488,7 @@ static bool check_if_file_is_encrypted (const std::string& filename)
 
 static bool is_git_file_mode (const std::string& mode)
 {
-	return (std::strtoul(mode.c_str(), NULL, 8) & 0170000) == 0100000;
+	return (std::strtoul(mode.c_str(), nullptr, 8) & 0170000) == 0100000;
 }
 
 static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
@@ -509,8 +509,8 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 	ls_files.spawn(ls_files_command);
 
 	Coprocess			check_attr;
-	std::ostream*			check_attr_stdin = NULL;
-	std::istream*			check_attr_stdout = NULL;
+	std::ostream*			check_attr_stdin = nullptr;
+	std::istream*			check_attr_stdout = nullptr;
 	if (git_version() >= make_version(1, 8, 5)) {
 		// In Git 1.8.5 (released 27 Nov 2013) and higher, we use a single `git check-attr` process
 		// to get the attributes of all files at once.  In prior versions, we have to fork and exec

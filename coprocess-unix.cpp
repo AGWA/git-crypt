@@ -41,7 +41,7 @@ static int execvp (const std::string& file, const std::vector<std::string>& args
 	for (std::vector<std::string>::const_iterator arg(args.begin()); arg != args.end(); ++arg) {
 		args_c_str.push_back(arg->c_str());
 	}
-	args_c_str.push_back(NULL);
+	args_c_str.push_back(nullptr);
 	return execvp(file.c_str(), const_cast<char**>(&args_c_str[0]));
 }
 
@@ -50,10 +50,10 @@ Coprocess::Coprocess ()
 	pid = -1;
 	stdin_pipe_reader = -1;
 	stdin_pipe_writer = -1;
-	stdin_pipe_ostream = NULL;
+	stdin_pipe_ostream = nullptr;
 	stdout_pipe_reader = -1;
 	stdout_pipe_writer = -1;
-	stdout_pipe_istream = NULL;
+	stdout_pipe_istream = nullptr;
 }
 
 Coprocess::~Coprocess ()
@@ -79,7 +79,7 @@ std::ostream*	Coprocess::stdin_pipe ()
 void		Coprocess::close_stdin ()
 {
 	delete stdin_pipe_ostream;
-	stdin_pipe_ostream = NULL;
+	stdin_pipe_ostream = nullptr;
 	if (stdin_pipe_writer != -1) {
 		close(stdin_pipe_writer);
 		stdin_pipe_writer = -1;
@@ -107,7 +107,7 @@ std::istream*	Coprocess::stdout_pipe ()
 void		Coprocess::close_stdout ()
 {
 	delete stdout_pipe_istream;
-	stdout_pipe_istream = NULL;
+	stdout_pipe_istream = nullptr;
 	if (stdout_pipe_writer != -1) {
 		close(stdout_pipe_writer);
 		stdout_pipe_writer = -1;
