@@ -23,7 +23,7 @@ OBJFILES = \
     coprocess.o \
     fhstream.o
 
-OBJFILES += crypto-openssl.o
+OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
 LDFLAGS += -lcrypto
 
 XSLTPROC ?= xsltproc
