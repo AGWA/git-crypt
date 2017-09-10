@@ -81,10 +81,10 @@ there may be backwards-incompatible changes introduced before version
 Security
 --------
 
-git-crypt is more secure that other transparent git encryption systems.
+git-crypt is more secure than other transparent git encryption systems.
 git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
 derived from the SHA-1 HMAC of the file.  This mode of operation is
-provably semantically secure under deterministic chosen-plaintext attack.
+provably semantically secure under a deterministic chosen-plaintext attack.
 That means that although the encryption is deterministic (which is
 required so git can distinguish when a file has and hasn't changed),
 it leaks no information beyond whether two files are identical or not.
