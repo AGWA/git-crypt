@@ -1,3 +1,10 @@
+git-crypt (0.6.0-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Build against OpenSSL 1.1.  (Closes: #851078)
+
+ -- Andrew Ayer <agwa@andrewayer.name>  Sun, 26 Nov 2017 10:35:27 -0800
+
 git-crypt (0.5.0-2) unstable; urgency=medium
 
   * Build against OpenSSL 1.0.x.  (Closes: #828312)
