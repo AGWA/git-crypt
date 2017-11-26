@@ -46,12 +46,12 @@ std::string System_error::message () const
 		LPTSTR	error_message;
 		FormatMessageA(
 			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL,
+			nullptr,
 			error,
 			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
 			reinterpret_cast<LPTSTR>(&error_message),
 			0,
-			NULL);
+			nullptr);
 		mesg += error_message;
 		LocalFree(error_message);
 	}
@@ -100,7 +100,7 @@ void	mkdir_parent (const std::string& path)
 		std::string		prefix(path.substr(0, slash));
 		if (GetFileAttributes(prefix.c_str()) == INVALID_FILE_ATTRIBUTES) {
 			// prefix does not exist, so try to create it
-			if (!CreateDirectory(prefix.c_str(), NULL)) {
+			if (!CreateDirectory(prefix.c_str(), nullptr)) {
 				throw System_error("CreateDirectory", prefix, GetLastError());
 			}
 		}
@@ -114,7 +114,7 @@ std::string our_exe_path ()
 	std::vector<char>	buffer(128);
 	size_t			len;
 
-	while ((len = GetModuleFileNameA(NULL, &buffer[0], buffer.size())) == buffer.size()) {
+	while ((len = GetModuleFileNameA(nullptr, &buffer[0], buffer.size())) == buffer.size()) {
 		// buffer may have been truncated - grow and try again
 		buffer.resize(buffer.size() * 2);
 	}
@@ -132,7 +132,7 @@ int exit_status (int status)
 
 void	touch_file (const std::string& filename)
 {
-	HANDLE	fh = CreateFileA(filename.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	HANDLE	fh = CreateFileA(filename.c_str(), FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
 	if (fh == INVALID_HANDLE_VALUE) {
 		DWORD	error = GetLastError();
 		if (error == ERROR_FILE_NOT_FOUND) {
@@ -146,7 +146,7 @@ void	touch_file (const std::string& filename)
 	FILETIME	file_time;
 	SystemTimeToFileTime(&system_time, &file_time);
 
-	if (!SetFileTime(fh, NULL, NULL, &file_time)) {
+	if (!SetFileTime(fh, nullptr, nullptr, &file_time)) {
 		DWORD	error = GetLastError();
 		CloseHandle(fh);
 		throw System_error("SetFileTime", filename, error);

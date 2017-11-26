@@ -5,6 +5,7 @@
 #
 
 CXXFLAGS ?= -Wall -pedantic -Wno-long-long -O2
+CXXFLAGS += -std=c++11
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
@@ -23,7 +24,7 @@ OBJFILES = \
     coprocess.o \
     fhstream.o
 
-OBJFILES += crypto-openssl.o
+OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
 LDFLAGS += -lcrypto
 
 XSLTPROC ?= xsltproc
@@ -54,7 +55,7 @@ coprocess.o: coprocess.cpp coprocess-unix.cpp coprocess-win32.cpp
 build-man: man/man1/git-crypt.1
 
 man/man1/git-crypt.1: man/git-crypt.xml
-	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) $<
+	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) man/git-crypt.xml
 
 #
 # Clean

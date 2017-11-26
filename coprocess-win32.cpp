@@ -96,14 +96,14 @@ static HANDLE spawn_command (const std::vector<std::string>& command, HANDLE std
 
 	std::string		cmdline(format_cmdline(command));
 
-	if (!CreateProcessA(NULL,		// application name (NULL to use command line)
+	if (!CreateProcessA(nullptr,		// application name (nullptr to use command line)
 				const_cast<char*>(cmdline.c_str()),
-				NULL,		// process security attributes
-				NULL,		// primary thread security attributes
+				nullptr,	// process security attributes
+				nullptr,	// primary thread security attributes
 				TRUE,		// handles are inherited
 				0,		// creation flags
-				NULL,		// use parent's environment
-				NULL,		// use parent's current directory
+				nullptr,	// use parent's environment
+				nullptr,	// use parent's current directory
 				&start_info,
 				&proc_info)) {
 		throw System_error("CreateProcess", cmdline, GetLastError());
@@ -117,13 +117,13 @@ static HANDLE spawn_command (const std::vector<std::string>& command, HANDLE std
 
 Coprocess::Coprocess ()
 {
-	proc_handle = NULL;
-	stdin_pipe_reader = NULL;
-	stdin_pipe_writer = NULL;
-	stdin_pipe_ostream = NULL;
-	stdout_pipe_reader = NULL;
-	stdout_pipe_writer = NULL;
-	stdout_pipe_istream = NULL;
+	proc_handle = nullptr;
+	stdin_pipe_reader = nullptr;
+	stdin_pipe_writer = nullptr;
+	stdin_pipe_ostream = nullptr;
+	stdout_pipe_reader = nullptr;
+	stdout_pipe_writer = nullptr;
+	stdout_pipe_istream = nullptr;
 }
 
 Coprocess::~Coprocess ()
@@ -143,7 +143,7 @@ std::ostream*	Coprocess::stdin_pipe ()
 		// Set the bInheritHandle flag so pipe handles are inherited.
 		sec_attr.nLength = sizeof(SECURITY_ATTRIBUTES);
 		sec_attr.bInheritHandle = TRUE;
-		sec_attr.lpSecurityDescriptor = NULL;
+		sec_attr.lpSecurityDescriptor = nullptr;
 
 		// Create a pipe for the child process's STDIN.
 		if (!CreatePipe(&stdin_pipe_reader, &stdin_pipe_writer, &sec_attr, 0)) {
@@ -163,14 +163,14 @@ std::ostream*	Coprocess::stdin_pipe ()
 void		Coprocess::close_stdin ()
 {
 	delete stdin_pipe_ostream;
-	stdin_pipe_ostream = NULL;
+	stdin_pipe_ostream = nullptr;
 	if (stdin_pipe_writer) {
 		CloseHandle(stdin_pipe_writer);
-		stdin_pipe_writer = NULL;
+		stdin_pipe_writer = nullptr;
 	}
 	if (stdin_pipe_reader) {
 		CloseHandle(stdin_pipe_reader);
-		stdin_pipe_reader = NULL;
+		stdin_pipe_reader = nullptr;
 	}
 }
 
@@ -182,7 +182,7 @@ std::istream*	Coprocess::stdout_pipe ()
 		// Set the bInheritHandle flag so pipe handles are inherited.
 		sec_attr.nLength = sizeof(SECURITY_ATTRIBUTES);
 		sec_attr.bInheritHandle = TRUE;
-		sec_attr.lpSecurityDescriptor = NULL;
+		sec_attr.lpSecurityDescriptor = nullptr;
 
 		// Create a pipe for the child process's STDOUT.
 		if (!CreatePipe(&stdout_pipe_reader, &stdout_pipe_writer, &sec_attr, 0)) {
@@ -202,27 +202,27 @@ std::istream*	Coprocess::stdout_pipe ()
 void		Coprocess::close_stdout ()
 {
 	delete stdout_pipe_istream;
-	stdout_pipe_istream = NULL;
+	stdout_pipe_istream = nullptr;
 	if (stdout_pipe_writer) {
 		CloseHandle(stdout_pipe_writer);
-		stdout_pipe_writer = NULL;
+		stdout_pipe_writer = nullptr;
 	}
 	if (stdout_pipe_reader) {
 		CloseHandle(stdout_pipe_reader);
-		stdout_pipe_reader = NULL;
+		stdout_pipe_reader = nullptr;
 	}
 }
 
 void		Coprocess::spawn (const std::vector<std::string>& args)
 {
-	proc_handle = spawn_command(args, stdin_pipe_reader, stdout_pipe_writer, NULL);
+	proc_handle = spawn_command(args, stdin_pipe_reader, stdout_pipe_writer, nullptr);
 	if (stdin_pipe_reader) {
 		CloseHandle(stdin_pipe_reader);
-		stdin_pipe_reader = NULL;
+		stdin_pipe_reader = nullptr;
 	}
 	if (stdout_pipe_writer) {
 		CloseHandle(stdout_pipe_writer);
-		stdout_pipe_writer = NULL;
+		stdout_pipe_writer = nullptr;
 	}
 }
 
@@ -243,7 +243,7 @@ int		Coprocess::wait ()
 size_t		Coprocess::write_stdin (void* handle, const void* buf, size_t count)
 {
 	DWORD		bytes_written;
-	if (!WriteFile(static_cast<Coprocess*>(handle)->stdin_pipe_writer, buf, count, &bytes_written, NULL)) {
+	if (!WriteFile(static_cast<Coprocess*>(handle)->stdin_pipe_writer, buf, count, &bytes_written, nullptr)) {
 		throw System_error("WriteFile", "", GetLastError());
 	}
 	return bytes_written;
@@ -257,7 +257,7 @@ size_t		Coprocess::read_stdout (void* handle, void* buf, size_t count)
 	// fails with ERROR_BROKEN_PIPE.
 	DWORD bytes_read;
 	do {
-		if (!ReadFile(static_cast<Coprocess*>(handle)->stdout_pipe_reader, buf, count, &bytes_read, NULL)) {
+		if (!ReadFile(static_cast<Coprocess*>(handle)->stdout_pipe_reader, buf, count, &bytes_read, nullptr)) {
 			const DWORD	read_error = GetLastError();
 			if (read_error != ERROR_BROKEN_PIPE) {
 				throw System_error("ReadFile", "", read_error);

@@ -2,19 +2,19 @@
 
 To build git-crypt, you need:
 
-                           | Debian/Ubuntu package | RHEL/CentOS package
----------------------------|-----------------------|------------------------
-Make                       | make                  | make
-A C++ compiler (e.g. gcc)  | g++                   | gcc-c++
-OpenSSL development files  | libssl-dev            | openssl-devel
+| Software                        | Debian/Ubuntu package | RHEL/CentOS package|
+|---------------------------------|-----------------------|--------------------|
+|Make                             | make                  | make               |
+|A C++11 compiler (e.g. gcc 4.9+) | g++                   | gcc-c++            |
+|OpenSSL development files        | libssl-dev            | openssl-devel      |
 
 
 To use git-crypt, you need:
 
-                           | Debian/Ubuntu package | RHEL/CentOS package
----------------------------|-----------------------|------------------------
-Git 1.7.2 or newer         | git                   | git
-OpenSSL                    | openssl               | openssl
+| Software                        | Debian/Ubuntu package | RHEL/CentOS package|
+|---------------------------------|-----------------------|--------------------|
+|Git 1.7.2 or newer               | git                   | git                |
+|OpenSSL                          | openssl               | openssl            |
 
 Note: Git 1.8.5 or newer is recommended for best performance.
 

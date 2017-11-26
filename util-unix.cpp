@@ -125,40 +125,20 @@ void	mkdir_parent (const std::string& path)
 	}
 }
 
-static std::string readlink (const char* pathname)
-{
-	std::vector<char>	buffer(64);
-	ssize_t			len;
-
-	while ((len = ::readlink(pathname, &buffer[0], buffer.size())) == static_cast<ssize_t>(buffer.size())) {
-		// buffer may have been truncated - grow and try again
-		buffer.resize(buffer.size() * 2);
-	}
-	if (len == -1) {
-		throw System_error("readlink", pathname, errno);
-	}
-
-	return std::string(buffer.begin(), buffer.begin() + len);
-}
-
 std::string our_exe_path ()
 {
-	try {
-		return readlink("/proc/self/exe");
-	} catch (const System_error&) {
-		if (argv0[0] == '/') {
-			// argv[0] starts with / => it's an absolute path
-			return argv0;
-		} else if (std::strchr(argv0, '/')) {
-			// argv[0] contains / => it a relative path that should be resolved
-			char*		resolved_path_p = realpath(argv0, NULL);
-			std::string	resolved_path(resolved_path_p);
-			free(resolved_path_p);
-			return resolved_path;
-		} else {
-			// argv[0] is just a bare filename => not much we can do
-			return argv0;
-		}
+	if (argv0[0] == '/') {
+		// argv[0] starts with / => it's an absolute path
+		return argv0;
+	} else if (std::strchr(argv0, '/')) {
+		// argv[0] contains / => it a relative path that should be resolved
+		char*		resolved_path_p = realpath(argv0, nullptr);
+		std::string	resolved_path(resolved_path_p);
+		free(resolved_path_p);
+		return resolved_path;
+	} else {
+		// argv[0] is just a bare filename => not much we can do
+		return argv0;
 	}
 }
 
@@ -169,7 +149,7 @@ int	exit_status (int wait_status)
 
 void	touch_file (const std::string& filename)
 {
-	if (utimes(filename.c_str(), NULL) == -1 && errno != ENOENT) {
+	if (utimes(filename.c_str(), nullptr) == -1 && errno != ENOENT) {
 		throw System_error("utimes", filename, errno);
 	}
 }
@@ -199,19 +179,6 @@ int util_rename (const char* from, const char* to)
 	return rename(from, to);
 }
 
-static size_t sizeof_dirent_for (DIR* p)
-{
-	long name_max = fpathconf(dirfd(p), _PC_NAME_MAX);
-	if (name_max == -1) {
-		#ifdef NAME_MAX
-		name_max = NAME_MAX;
-		#else
-		name_max = 255;
-		#endif
-	}
-	return offsetof(struct dirent, d_name) + name_max + 1; // final +1 is for d_name's null terminator
-}
-
 std::vector<std::string> get_directory_contents (const char* path)
 {
 	std::vector<std::string>		contents;
@@ -221,19 +188,23 @@ std::vector<std::string> get_directory_contents (const char* path)
 		throw System_error("opendir", path, errno);
 	}
 	try {
-		std::vector<unsigned char>	buffer(sizeof_dirent_for(dir));
-		struct dirent*			dirent_buffer = reinterpret_cast<struct dirent*>(&buffer[0]);
-		struct dirent*			ent = NULL;
-		int				err = 0;
-		while ((err = readdir_r(dir, dirent_buffer, &ent)) == 0 && ent != NULL) {
-			if (std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0) {
-				continue;
+		errno = 0;
+		// Note: readdir is reentrant in new implementations. In old implementations,
+		// it might not be, but git-crypt isn't multi-threaded so that's OK.
+		// We don't use readdir_r because it's buggy and deprecated:
+		//  https://womble.decadent.org.uk/readdir_r-advisory.html
+		//  http://austingroupbugs.net/view.php?id=696
+		//  http://man7.org/linux/man-pages/man3/readdir_r.3.html
+		while (struct dirent* ent = readdir(dir)) {
+			if (!(std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0)) {
+				contents.push_back(ent->d_name);
 			}
-			contents.push_back(ent->d_name);
 		}
-		if (err != 0) {
-			throw System_error("readdir_r", path, errno);
+
+		if (errno) {
+			throw System_error("readdir", path, errno);
 		}
+
 	} catch (...) {
 		closedir(dir);
 		throw;
