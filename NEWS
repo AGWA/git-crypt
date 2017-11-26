@@ -1,3 +1,16 @@
+v0.6.0 (2017-11-26)
+  * Add support for OpenSSL 1.1 (still works with OpenSSL 1.0).
+  * Switch to C++11 (gcc 4.9 or higher now required to build).
+  * Allow GPG to fail on some keys (makes unlock work better if there are
+    multiple keys that can unlock the repo but only some are available).
+  * Allow the repo state directory to be configured with the
+    git-crypt.repoStateDir git config option.
+  * Respect the gpg.program git config option.
+  * Don't hard code path to git-crypt in .git/config on Linux (ensures
+    repo continues to work if git-crypt is moved).
+  * Ensure git-crypt's gpg files won't be treated as text by Git.
+  * Minor improvements to build system, documentation.
+
 v0.5.0 (2015-05-30)
   * Drastically speed up lock/unlock when used with Git 1.8.5 or newer.
   * Add git-crypt(1) man page (pass ENABLE_MAN=yes to make to build).
