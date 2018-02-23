@@ -10,6 +10,19 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
+SYS := $(shell gcc -dumpmachine)
+CYGWIN := $(findstring cygwin,$(SYS))
+MINGW32 := $(findstring mingw32,$(SYS))
+
+# https://stackoverflow.com/a/21749803/1432614
+ifdef CYGWIN
+	CXXFLAGS += -U__STRICT_ANSI__
+endif
+
+ifdef MINGW32
+	CXXFLAGS += -static
+endif
+
 ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
 
@@ -26,6 +39,10 @@ OBJFILES = \
 
 OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
 LDFLAGS += -lcrypto
+
+ifdef MINGW32
+	LDFLAGS += -lgdi32
+endif
 
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
