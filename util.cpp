@@ -150,7 +150,7 @@ void		init_std_streams ()
 	init_std_streams_platform();
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__CYGWIN__)
 #include "util-win32.cpp"
 #else
 #include "util-unix.cpp"
