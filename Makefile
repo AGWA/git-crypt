@@ -10,8 +10,17 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
+ifeq ($(OS),Windows_NT)
+# MSys2 install instead of ./INSTALL
+INSTALL = /usr/bin/install
+else
+INSTALL = install
+endif
+
 ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
+
+$(info OSTYPE=$(OSTYPE))
 
 OBJFILES = \
     git-crypt.o \
@@ -82,12 +91,12 @@ INSTALL_TARGETS := install-bin $(INSTALL_MAN_TARGETS-$(ENABLE_MAN))
 install: $(INSTALL_TARGETS)
 
 install-bin: build-bin
-	install -d $(DESTDIR)$(BINDIR)
-	install -m 755 git-crypt $(DESTDIR)$(BINDIR)/
+	$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m 755 git-crypt $(DESTDIR)$(BINDIR)/
 
 install-man: build-man
-	install -d $(DESTDIR)$(MANDIR)/man1
-	install -m 644 man/man1/git-crypt.1 $(DESTDIR)$(MANDIR)/man1/
+	$(INSTALL) -d $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL) -m 644 man/man1/git-crypt.1 $(DESTDIR)$(MANDIR)/man1/
 
 .PHONY: all \
 	build build-bin build-man \

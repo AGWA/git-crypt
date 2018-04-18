@@ -62,10 +62,26 @@ Using the brew package manager, simply run:
 
 ### Experimental Windows Support
 
-git-crypt should build on Windows with MinGW, although the build system
-is not yet finalized so you will need to pass your own CXX, CXXFLAGS, and
-LDFLAGS variables to make.  Additionally, Windows support is less tested
-and does not currently create key files with restrictive permissions,
-making it unsuitable for use on a multi-user system.  Windows support
-will mature in a future version of git-crypt.  Bug reports and patches
-are most welcome!
+git-crypt should  build on Windows with  MinGW.  Additionally, Windows
+support is  less tested and does  not currently create key  files with
+restrictive permissions, making it unsuitable  for use on a multi-user
+system.  Windows support will mature in a future version of git-crypt.
+Bug reports and patches are most welcome!
+
+1.  Install  a MinGW/MSys2 development environment,  for example using
+    https://github.com/orlp/dev-on-windows/wiki/Installing-GCC--&-MSYS2:
+	1.  Remove or rename `%USERPROFILE%\.bashrc` if you have one prior
+        to installation.
+	2.  Install  [MSys2](https://www.msys2.org/) & make sure  there is
+        no more update pending using `pacman -Syuu`.
+	3.  From  a MSYS2 MinGW  64-bit terminal, install  the development
+        environment:
+	
+			$ pacman -S --needed base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain \
+                    git subversion mercurial \
+                    mingw-w64-i686-cmake mingw-w64-x86_64-cmake
+
+2.  In a MSYS2 MinGW 64-bit terminal, run `make`
+3.  Manually  install the generated `git-crypt.exe`  somewhere in your
+    `%PATH%` or simply  run `make install` if you plan  to use it only
+    from MSys2
