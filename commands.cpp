@@ -187,16 +187,15 @@ static bool git_checkout (const std::vector<std::string>& paths)
 {
 	std::vector<std::string>	command;
 
-	command.push_back("git");
-	command.push_back("checkout");
-	command.push_back("--");
-
 	for (std::vector<std::string>::const_iterator path(paths.begin()); path != paths.end(); ++path) {
+		command.push_back("git");
+		command.push_back("checkout");
+		command.push_back("--");
 		command.push_back(*path);
-	}
-
-	if (!successful_exit(exec_command(command))) {
-		return false;
+		if (!successful_exit(exec_command(command))) {
+			return false;
+		}
+		command.clear();
 	}
 
 	return true;
