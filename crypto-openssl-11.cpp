@@ -46,7 +46,7 @@
 
 void init_crypto ()
 {
-	ERR_load_crypto_strings();
+	OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, nullptr);
 }
 
 struct Aes_ecb_encryptor::Aes_impl {
