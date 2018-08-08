@@ -31,6 +31,7 @@ Specify files to encrypt by creating a .gitattributes file:
 
     secretfile filter=git-crypt diff=git-crypt
     *.key filter=git-crypt diff=git-crypt
+    secretdir/** filter=git-crypt diff=git-crypt
 
 Like a .gitignore file, it can match wildcards and should be checked into
 the repository.  See below for more information about .gitattributes.
@@ -140,14 +141,9 @@ specifying merely a directory (e.g. `/dir/`) is *not* sufficient to
 encrypt all files beneath it.
 
 Also note that the pattern `dir/*` does not match files under
-sub-directories of dir/.  To encrypt an entire sub-tree dir/, place the
-following in dir/.gitattributes:
+sub-directories of dir/.  To encrypt an entire sub-tree dir/, use `dir/**`:
 
-    * filter=git-crypt diff=git-crypt
-    .gitattributes !filter !diff
-
-The second pattern is essential for ensuring that .gitattributes itself
-is not encrypted.
+    /dir/** filter=git-crypt diff=git-crypt
 
 Mailing Lists
 -------------
