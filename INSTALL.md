@@ -53,6 +53,9 @@ repository.  The package is built using git-buildpackage as follows:
     git checkout debian
     git-buildpackage -uc -us
 
+### Installing on CentOS
+
+Using [ansible](https://galaxy.ansible.com/030/ansible-git-crypt).
 
 ### Installing On Mac OS X
 
