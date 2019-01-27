@@ -1171,7 +1171,7 @@ int lock (int argc, const char** argv)
 	}
 	if (!git_checkout(encrypted_files)) {
 		std::clog << "Error: 'git checkout' failed" << std::endl;
-		std::clog << "git-crypt has been locked but up but existing decrypted files have not been encrypted" << std::endl;
+		std::clog << "git-crypt has been locked up but existing decrypted files have not been encrypted" << std::endl;
 		return 1;
 	}
 
