@@ -55,7 +55,7 @@ are added to your repository):
 
     git-crypt export-key /path/to/key
 
-After cloning a repository with encrypted files, unlock with with GPG:
+After cloning a repository with encrypted files, unlock with GPG:
 
     git-crypt unlock
 
