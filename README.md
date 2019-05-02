@@ -155,6 +155,12 @@ sub-directories of dir/.  To encrypt an entire sub-tree dir/, use `dir/**`:
 
     dir/** filter=git-crypt diff=git-crypt
 
+The .gitattributes file cannot be encrypted, so make sure wildcards don't
+match it accidentally.  If necessary, you can exclude .gitattributes from
+encryption like this:
+
+    .gitattributes !filter !diff
+
 Mailing Lists
 -------------
 
