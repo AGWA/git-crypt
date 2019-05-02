@@ -153,7 +153,7 @@ encrypt all files beneath it.
 Also note that the pattern `dir/*` does not match files under
 sub-directories of dir/.  To encrypt an entire sub-tree dir/, use `dir/**`:
 
-    /dir/** filter=git-crypt diff=git-crypt
+    dir/** filter=git-crypt diff=git-crypt
 
 Mailing Lists
 -------------
