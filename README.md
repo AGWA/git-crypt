@@ -110,6 +110,16 @@ git-crypt does not hide when a file does or doesn't change, the length
 of a file, or the fact that two files are identical (see "Security"
 section above).
 
+git-crypt does not support revoking access to an encrypted repository
+which was previously granted. This applies to both multi-user GPG
+mode (there's no del-gpg-user command to complement add-gpg-user)
+and also symmetric key mode (there's no support for rotating the key).
+This is because it is an inherently complex problem in the context
+of historical data. For example, even if a key was rotated at one
+point in history, a user having the previous key can still access
+previous repository history. This problem is discussed in more detail in
+<https://github.com/AGWA/git-crypt/issues/47>.
+
 Files encrypted with git-crypt are not compressible.  Even the smallest
 change to an encrypted file requires git to store the entire changed file,
 instead of just a delta.
