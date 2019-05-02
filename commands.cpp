@@ -160,11 +160,22 @@ static void configure_git_filters (const char* key_name)
 		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
 		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
 		           escaped_git_crypt_path + " diff --key-name=" + key_name);
+		git_config(std::string("merge.git-crypt-") + key_name + ".name",
+		           "A merge driver used to merge git-crypted files");
+		git_config(std::string("merge.git-crypt-") + key_name + ".driver",
+		           "bash ./.git-crypt/merge-tool.sh %O %A %B");
+		git_config(std::string("merge.git-crypt-") + key_name + ".recursive",
+		           "binary");
 	} else {
 		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
 		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
 		git_config("filter.git-crypt.required", "true");
 		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+		git_config("merge.git-crypt.name",
+		           "A merge driver used to merge git-crypted files");
+		git_config("merge.git-crypt.driver",
+		           "bash ./.git-crypt/merge-tool.sh %O %A %B");
+		git_config("merge.git-crypt.recursive", "binary");
 	}
 }
 
@@ -180,6 +191,12 @@ static void deconfigure_git_filters (const char* key_name)
 
 	if (git_has_config("diff." + attribute_name(key_name) + ".textconv")) {
 		git_deconfig("diff." + attribute_name(key_name));
+	}
+
+	if (git_has_config("merge." + attribute_name(key_name) + ".name") ||
+			git_has_config("merge." + attribute_name(key_name) + ".driver") ||
+			git_has_config("merge." + attribute_name(key_name) + ".recursive")) {
+		git_deconfig("merge." + attribute_name(key_name));
 	}
 }
 
@@ -1256,6 +1273,34 @@ int add_gpg_user (int argc, const char** argv)
 		new_files.push_back(state_gitattributes_path);
 	}
 
+	// Add the merge-tool script to the repo state directory to provide "git merge" command
+	const std::string		state_mergetool_path(state_path + "/merge-tool.sh");
+	if (access(state_mergetool_path.c_str(), F_OK) != 0) {
+		std::ofstream		state_mergetool_file(state_mergetool_path.c_str());
+		//                          |--------------------------------------------------------------------------------| 80 chars
+		state_mergetool_file << "#!/usr/bin/env bash\n";
+		state_mergetool_file << "ancestor_decrypted=$(mktemp)\n";
+		state_mergetool_file << "current_decrypted=$(mktemp)\n";
+		state_mergetool_file << "other_decrypted=$(mktemp)\n";
+		state_mergetool_file << "echo \"# Git crypt driver called #\"\n";
+		state_mergetool_file << "cat $1 | git-crypt smudge > \"${ancestor_decrypted}\"\n";
+		state_mergetool_file << "cat $2 | git-crypt smudge > \"${current_decrypted}\"\n";
+		state_mergetool_file << "cat $3 | git-crypt smudge > \"${other_decrypted}\"\n";
+		state_mergetool_file << "if [ \"$(git config --get merge.conflictstyle)\" == \"diff3\" ]; then diff=\"--diff3\"\n";
+		state_mergetool_file << "else diff=\"--no-diff3\"; fi\n";
+		state_mergetool_file << "git merge-file -L \"current branch\" -L \"ancestor branch\" -L \"other branch\" \"${current_decrypted}\" \"$diff\" \"${ancestor_decrypted}\" \"${other_decrypted}\"\n";
+		state_mergetool_file << "exit_code=$?\n";
+		state_mergetool_file << "cat \"${current_decrypted}\" | git-crypt clean > $2\n";
+		state_mergetool_file << "rm \"${other_decrypted}\" \"${ancestor_decrypted}\" \"${current_decrypted}\"\n";
+		state_mergetool_file << "exit $exit_code\n";
+		state_mergetool_file.close();
+		if (!state_mergetool_file) {
+			std::clog << "Error: unable to write " << state_mergetool_path << std::endl;
+			return 1;
+		}
+		new_files.push_back(state_mergetool_path);
+	}
+	
 	// add/commit the new files
 	if (!new_files.empty()) {
 		// git add NEW_FILE ...
