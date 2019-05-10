@@ -151,10 +151,14 @@ encrypt all files beneath it.
 
 Also note that the pattern `dir/*` does not match files under
 sub-directories of dir/.  To encrypt an entire sub-tree dir/, place the
-following in dir/.gitattributes:
+following in `dir/.gitattributes`:
 
     * filter=git-crypt diff=git-crypt
     .gitattributes !filter !diff
+
+or in your root `.gitattributes`:
+
+    dir/**/* filter=git-crypt diff=git-crypt
 
 The second pattern is essential for ensuring that .gitattributes itself
 is not encrypted.
