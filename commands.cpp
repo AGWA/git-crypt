@@ -774,19 +774,29 @@ int clean (int argc, const char** argv)
 	unsigned char		digest[Hmac_sha1_state::LEN];
 	hmac.get(digest);
 
-	// Write a header that...
-	std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
-	std::cout.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
-
 	// Now encrypt the file and write to stdout
 	Aes_ctr_encryptor	aes(key->aes_key, digest);
 
 	// First read from the in-memory copy
 	const unsigned char*	file_data = reinterpret_cast<const unsigned char*>(file_contents.data());
 	size_t			file_data_len = file_contents.size();
+
+	// Check if file is decrypted (or already encrypted)
+	const bool		is_decrypted = (file_data_len < 10) || std::memcmp(file_data, "\0GITCRYPT\0", 10) != 0;
+
+	if (is_decrypted) {
+		// Write a header that...
+		std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
+		std::cout.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
+	}
+
 	while (file_data_len > 0) {
 		const size_t	buffer_len = std::min(sizeof(buffer), file_data_len);
-		aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
+		if (is_decrypted) {
+			aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
+		} else {
+			std::memcpy(buffer, file_data, buffer_len);
+		}
 		std::cout.write(buffer, buffer_len);
 		file_data += buffer_len;
 		file_data_len -= buffer_len;
@@ -800,9 +810,11 @@ int clean (int argc, const char** argv)
 
 			const size_t	buffer_len = temp_file.gcount();
 
-			aes.process(reinterpret_cast<unsigned char*>(buffer),
-			            reinterpret_cast<unsigned char*>(buffer),
-			            buffer_len);
+			if (is_decrypted) {
+				aes.process(reinterpret_cast<unsigned char*>(buffer),
+					reinterpret_cast<unsigned char*>(buffer),
+					buffer_len);
+			}
 			std::cout.write(buffer, buffer_len);
 		}
 	}
