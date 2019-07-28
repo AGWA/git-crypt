@@ -160,11 +160,16 @@ static void configure_git_filters (const char* key_name)
 		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
 		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
 		           escaped_git_crypt_path + " diff --key-name=" + key_name);
+		git_config(std::string("merge.git-crypt-") + key_name + ".name", "git-crypt merge driver");
+		git_config(std::string("merge.git-crypt-") + key_name + ".driver",
+		           escaped_git_crypt_path + " merge --key-name=" + key_name + " %A %O %B %L");
 	} else {
 		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
 		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
 		git_config("filter.git-crypt.required", "true");
 		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+		git_config("merge.git-crypt.name", "git-crypt merge driver");
+		git_config("merge.git-crypt.driver", escaped_git_crypt_path + " merge %A %O %B %L");
 	}
 }
 
@@ -180,6 +185,12 @@ static void deconfigure_git_filters (const char* key_name)
 
 	if (git_has_config("diff." + attribute_name(key_name) + ".textconv")) {
 		git_deconfig("diff." + attribute_name(key_name));
+	}
+
+	if (git_has_config("merge." + attribute_name(key_name) + ".name") ||
+			git_has_config("merge." + attribute_name(key_name) + ".driver")) {
+
+		git_deconfig("merge." + attribute_name(key_name));
 	}
 }
 
@@ -690,8 +701,8 @@ static int parse_plumbing_options (const char** key_name, const char** key_file,
 	return parse_options(options, argc, argv);
 }
 
-// Encrypt contents of stdin and write to stdout
-int clean (int argc, const char** argv)
+// Encrypt contents of &in and write to &out
+int clean (int argc, const char** argv, std::istream& in, std::ostream& out)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -724,10 +735,10 @@ int clean (int argc, const char** argv)
 
 	char			buffer[1024];
 
-	while (std::cin && file_size < Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
-		std::cin.read(buffer, sizeof(buffer));
+	while (in && file_size < Aes_ctr_encryptor::MAX_CRYPT_BYTES) {
+		in.read(buffer, sizeof(buffer));
 
-		const size_t	bytes_read = std::cin.gcount();
+		const size_t	bytes_read = in.gcount();
 
 		hmac.add(reinterpret_cast<unsigned char*>(buffer), bytes_read);
 		file_size += bytes_read;
@@ -775,8 +786,8 @@ int clean (int argc, const char** argv)
 	hmac.get(digest);
 
 	// Write a header that...
-	std::cout.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
-	std::cout.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
+	out.write("\0GITCRYPT\0", 10); // ...identifies this as an encrypted file
+	out.write(reinterpret_cast<char*>(digest), Aes_ctr_encryptor::NONCE_LEN); // ...includes the nonce
 
 	// Now encrypt the file and write to stdout
 	Aes_ctr_encryptor	aes(key->aes_key, digest);
@@ -787,7 +798,7 @@ int clean (int argc, const char** argv)
 	while (file_data_len > 0) {
 		const size_t	buffer_len = std::min(sizeof(buffer), file_data_len);
 		aes.process(file_data, reinterpret_cast<unsigned char*>(buffer), buffer_len);
-		std::cout.write(buffer, buffer_len);
+		out.write(buffer, buffer_len);
 		file_data += buffer_len;
 		file_data_len -= buffer_len;
 	}
@@ -803,14 +814,14 @@ int clean (int argc, const char** argv)
 			aes.process(reinterpret_cast<unsigned char*>(buffer),
 			            reinterpret_cast<unsigned char*>(buffer),
 			            buffer_len);
-			std::cout.write(buffer, buffer_len);
+			out.write(buffer, buffer_len);
 		}
 	}
 
 	return 0;
 }
 
-static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char* header, std::istream& in)
+static int decrypt_file_to_stream (const Key_file& key_file, const unsigned char* header, std::istream& in, std::ostream& out = std::cout)
 {
 	const unsigned char*	nonce = header + 10;
 	uint32_t		key_version = 0; // TODO: get the version from the file header
@@ -828,7 +839,7 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 		in.read(reinterpret_cast<char*>(buffer), sizeof(buffer));
 		aes.process(buffer, buffer, in.gcount());
 		hmac.add(buffer, in.gcount());
-		std::cout.write(reinterpret_cast<char*>(buffer), in.gcount());
+		out.write(reinterpret_cast<char*>(buffer), in.gcount());
 	}
 
 	unsigned char		digest[Hmac_sha1_state::LEN];
@@ -844,8 +855,8 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 	return 0;
 }
 
-// Decrypt contents of stdin and write to stdout
-int smudge (int argc, const char** argv)
+// Decrypt contents of &in and write to &out
+int smudge (int argc, const char** argv, std::istream& in, std::ostream& out)
 {
 	const char*		key_name = 0;
 	const char*		key_path = 0;
@@ -864,8 +875,8 @@ int smudge (int argc, const char** argv)
 
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
-	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
+	in.read(reinterpret_cast<char*>(header), sizeof(header));
+	if (in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
 		std::clog << "git-crypt: Run 'git-crypt status' to make sure all files are properly encrypted." << std::endl;
@@ -873,12 +884,12 @@ int smudge (int argc, const char** argv)
 		std::clog << "git-crypt: this file may be unencrypted in the repository's history.  If this" << std::endl;
 		std::clog << "git-crypt: file contains sensitive information, you can use 'git filter-branch'" << std::endl;
 		std::clog << "git-crypt: to remove its old versions from the history." << std::endl;
-		std::cout.write(reinterpret_cast<char*>(header), std::cin.gcount()); // include the bytes which we already read
-		std::cout << std::cin.rdbuf();
+		out.write(reinterpret_cast<char*>(header), in.gcount()); // include the bytes which we already read
+		out << in.rdbuf();
 		return 0;
 	}
 
-	return decrypt_file_to_stdout(key_file, header, std::cin);
+	return decrypt_file_to_stream(key_file, header, in, out);
 }
 
 int diff (int argc, const char** argv)
@@ -920,7 +931,107 @@ int diff (int argc, const char** argv)
 	}
 
 	// Go ahead and decrypt it
-	return decrypt_file_to_stdout(key_file, header, in);
+	return decrypt_file_to_stream(key_file, header, in);
+}
+
+int merge (int argc, const char** argv)
+{
+	const char*		key_name = 0;     // unused but needed
+	const char*		key_path = 0;     // unused but needed
+	const char*		current_path = 0; // %A
+	const char*		base_path = 0;    // %O
+	const char*		other_path = 0;   // %B
+	const char*		marker_size = 0;  // %L
+
+	int			argi = parse_plumbing_options(&key_name, &key_path, argc, argv);
+	if (argc - argi == 4) {
+		current_path = argv[argi];
+		base_path = argv[argi + 1];
+		other_path = argv[argi + 2];
+		marker_size = argv[argi + 3];
+	} else {
+		std::clog << "Usage: git-crypt merge [--key-name=NAME] [--key-file=PATH] CURRENT BASE OTHER MARKER_SIZE" << std::endl;
+		return 2;
+	}
+
+	// Run smudge on input files
+	std::vector<std::string>	smudge_files;
+	smudge_files.push_back(current_path);
+	smudge_files.push_back(base_path);
+	smudge_files.push_back(other_path);
+
+	for (std::vector<std::string>::const_iterator file(smudge_files.begin()); file != smudge_files.end(); ++file) {
+		std::ifstream	in(*file, std::ifstream::binary);
+		if (!in) {
+			std::clog << "git-crypt: " << *file << ": unable to open for reading" << std::endl;
+			return 1;
+		}
+		in.exceptions(std::ifstream::badbit);
+
+		std::ofstream	out(*file + ".tmp", std::ofstream::binary | std::ofstream::trunc);
+		if (!out) {
+			std::clog << "git-crypt: " << *file << ".tmp: unable to open for writing" << std::endl;
+			return 1;
+		}
+		out.exceptions(std::ifstream::badbit);
+
+		if (smudge(argi, argv, in, out) != 0) {
+			std::clog << "Error: failed to smudge " << *file << ": unable to merge file" << std::endl;
+			return 1;
+		}
+		in.close();
+		out.close();
+	}
+
+	// git merge-file --marker-size <marker_size> <current_path> <base_path> <other_path>
+	std::vector<std::string> command;
+	command.push_back("git");
+	command.push_back("merge-file");
+	command.push_back("-L");
+	command.push_back("ours");
+	command.push_back("-L");
+	command.push_back("base");
+	command.push_back("-L");
+	command.push_back("theirs");
+	command.push_back("--marker-size");
+	command.push_back(marker_size);
+	command.push_back(std::string(current_path) + ".tmp");
+	command.push_back(std::string(base_path) + ".tmp");
+	command.push_back(std::string(other_path) + ".tmp");
+	int ret = exit_status(exec_command(command));
+
+	// Run clean on output file
+	// We have to clean (encrypt) the output file because git runs smudge filter on it
+	// afterwards which would complain about the file not being encrypted.
+	{
+		std::ifstream	in(std::string(current_path) + ".tmp", std::ifstream::binary);
+		if (!in) {
+			std::clog << "git-crypt: " << current_path << ".tmp: unable to open for reading" << std::endl;
+			return 1;
+		}
+		in.exceptions(std::ifstream::badbit);
+
+		std::ofstream	out(current_path, std::ofstream::binary | std::ofstream::trunc);
+		if (!out) {
+			std::clog << "git-crypt: " << current_path << ": unable to open for writing" << std::endl;
+			return 1;
+		}
+		out.exceptions(std::ifstream::badbit);
+
+		if (clean(argi, argv, in, out) != 0) {
+			std::clog << "Error: failed to clean " << current_path << ": unable to merge file" << std::endl;
+			return 1;
+		}
+		in.close();
+		out.close();
+	}
+
+	// Clean-up temporary files
+	for (std::vector<std::string>::const_iterator file(smudge_files.begin()); file != smudge_files.end(); ++file) {
+		remove_file(*file + ".tmp");
+	}
+
+	return ret;
 }
 
 void help_init (std::ostream& out)
