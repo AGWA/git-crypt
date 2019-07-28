@@ -45,6 +45,7 @@ struct Error {
 int clean (int argc, const char** argv, std::istream& in = std::cin, std::ostream& out = std::cout);
 int smudge (int argc, const char** argv, std::istream& in = std::cin, std::ostream& out = std::cout);
 int diff (int argc, const char** argv);
+int merge (int argc, const char** argv);
 // Public commands:
 int init (int argc, const char** argv);
 int unlock (int argc, const char** argv);

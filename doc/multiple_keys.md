@@ -11,7 +11,7 @@ option to `git-crypt init` as follows:
 To encrypt a file with an alternative key, use the `git-crypt-KEYNAME`
 filter in `.gitattributes` as follows:
 
-    secretfile filter=git-crypt-KEYNAME diff=git-crypt-KEYNAME
+    secretfile filter=git-crypt-KEYNAME diff=git-crypt-KEYNAME merge=git-crypt-KEYNAME
 
 To export an alternative key or share it with a GPG user, pass the `-k
 KEYNAME` option to `git-crypt export-key` or `git-crypt add-gpg-user`
