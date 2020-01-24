@@ -185,20 +185,16 @@ static void deconfigure_git_filters (const char* key_name)
 
 static bool git_checkout (const std::vector<std::string>& paths)
 {
-	std::vector<std::string>	command;
-
-	command.push_back("git");
-	command.push_back("checkout");
-	command.push_back("--");
-
 	for (std::vector<std::string>::const_iterator path(paths.begin()); path != paths.end(); ++path) {
+		std::vector<std::string>	command;
+		command.push_back("git");
+		command.push_back("checkout");
+		command.push_back("--");
 		command.push_back(*path);
+		if (!successful_exit(exec_command(command))) {
+			return false;
+		}
 	}
-
-	if (!successful_exit(exec_command(command))) {
-		return false;
-	}
-
 	return true;
 }
 
@@ -755,7 +751,7 @@ int clean (int argc, const char** argv)
 	// under deterministic CPA as long as the synthetic IV is derived from a
 	// secure PRF applied to the message.  Since HMAC-SHA1 is a secure PRF, this
 	// encryption scheme is semantically secure under deterministic CPA.
-	// 
+	//
 	// Informally, consider that if a file changes just a tiny bit, the IV will
 	// be completely different, resulting in a completely different ciphertext
 	// that leaks no information about the similarities of the plaintexts.  Also,
@@ -1682,4 +1678,3 @@ int status (int argc, const char** argv)
 
 	return exit_status;
 }
-
