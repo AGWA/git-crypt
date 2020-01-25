@@ -51,6 +51,12 @@
 #include <exception>
 #include <vector>
 
+enum {
+	// # of arguments per git checkout call; must be large enough to be efficient but small
+	// enough to avoid operating system limits on argument length
+	GIT_CHECKOUT_BATCH_SIZE = 100
+};
+
 static std::string attribute_name (const char* key_name)
 {
 	if (key_name) {
@@ -209,11 +215,11 @@ static bool git_checkout_batch (std::vector<std::string>::const_iterator paths_b
 static bool git_checkout (const std::vector<std::string>& paths)
 {
 	auto paths_begin(paths.begin());
-	while (paths.end() - paths_begin >= 100) {
-		if (!git_checkout_batch(paths_begin, paths_begin + 100)) {
+	while (paths.end() - paths_begin >= GIT_CHECKOUT_BATCH_SIZE) {
+		if (!git_checkout_batch(paths_begin, paths_begin + GIT_CHECKOUT_BATCH_SIZE)) {
 			return false;
 		}
-		paths_begin += 100;
+		paths_begin += GIT_CHECKOUT_BATCH_SIZE;
 	}
 	return git_checkout_batch(paths_begin, paths.end());
 }
