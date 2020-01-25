@@ -183,15 +183,19 @@ static void deconfigure_git_filters (const char* key_name)
 	}
 }
 
-static bool git_checkout (const std::vector<std::string>& paths)
+static bool git_checkout_batch (std::vector<std::string>::const_iterator paths_begin, std::vector<std::string>::const_iterator paths_end)
 {
+	if (paths_begin == paths_end) {
+		return true;
+	}
+
 	std::vector<std::string>	command;
 
 	command.push_back("git");
 	command.push_back("checkout");
 	command.push_back("--");
 
-	for (std::vector<std::string>::const_iterator path(paths.begin()); path != paths.end(); ++path) {
+	for (auto path(paths_begin); path != paths_end; ++path) {
 		command.push_back(*path);
 	}
 
@@ -200,6 +204,18 @@ static bool git_checkout (const std::vector<std::string>& paths)
 	}
 
 	return true;
+}
+
+static bool git_checkout (const std::vector<std::string>& paths)
+{
+	auto paths_begin(paths.begin());
+	while (paths.end() - paths_begin >= 100) {
+		if (!git_checkout_batch(paths_begin, paths_begin + 100)) {
+			return false;
+		}
+		paths_begin += 100;
+	}
+	return git_checkout_batch(paths_begin, paths.end());
 }
 
 static bool same_key_name (const char* a, const char* b)
