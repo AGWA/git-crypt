@@ -43,7 +43,7 @@ int parse_options (const Options_list& options, int argc, const char** argv)
 {
 	int	argi = 0;
 
-	while (argi < argc && argv[argi][0] == '-') {
+	while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
 		if (std::strcmp(argv[argi], "--") == 0) {
 			++argi;
 			break;
