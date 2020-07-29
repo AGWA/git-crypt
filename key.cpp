@@ -232,6 +232,11 @@ void		Key_file::load_header (std::istream& in)
 				key_name.clear();
 				throw Malformed();
 			}
+		} else if (field_id == HEADER_FIELD_SKIP_EMPTY) {
+			if (field_len != 0) {
+				throw Malformed();
+			}
+			skip_empty = true;
 		} else if (field_id & 1) { // unknown critical field
 			throw Incompatible();
 		} else {
@@ -255,6 +260,10 @@ void		Key_file::store (std::ostream& out) const
 		write_be32(out, HEADER_FIELD_KEY_NAME);
 		write_be32(out, key_name.size());
 		out.write(key_name.data(), key_name.size());
+	}
+	if (skip_empty) {
+		write_be32(out, HEADER_FIELD_SKIP_EMPTY);
+		write_be32(out, 0);
 	}
 	write_be32(out, HEADER_FIELD_END);
 	for (Map::const_iterator it(entries.begin()); it != entries.end(); ++it) {

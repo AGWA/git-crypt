@@ -770,6 +770,10 @@ int clean (int argc, const char** argv)
 		return 1;
 	}
 
+	if (file_size == 0 && key_file.get_skip_empty()) {
+		return 0;
+	}
+
 	// We use an HMAC of the file as the encryption nonce (IV) for CTR mode.
 	// By using a hash of the file we ensure that the encryption is
 	// deterministic so git doesn't think the file has changed when it really
@@ -887,6 +891,11 @@ int smudge (int argc, const char** argv)
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
+
+	if (std::cin.gcount() == 0 && key_file.get_skip_empty()) {
+		return 0;
+	}
+
 	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
@@ -991,6 +1000,7 @@ int init (int argc, const char** argv)
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
 	key_file.set_key_name(key_name);
+	key_file.set_skip_empty(true);
 	key_file.generate();
 
 	mkdir_parent(internal_key_path);
@@ -1425,6 +1435,7 @@ int keygen (int argc, const char** argv)
 
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
+	key_file.set_skip_empty(true);
 	key_file.generate();
 
 	if (std::strcmp(key_file_name, "-") == 0) {
