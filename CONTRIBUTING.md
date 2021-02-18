@@ -4,8 +4,7 @@ documentation, bug reports, or anything else that improves git-crypt.
 
 When contributing code, please consider the following guidelines:
 
- * You are encouraged to open an issue on GitHub or send mail to
-   git-crypt-discuss@lists.cloudmutt.com to discuss any non-trivial
+ * You are encouraged to open an issue on GitHub to discuss any non-trivial
    changes before you start coding.
 
  * Please mimic the existing code style as much as possible.  In
@@ -15,8 +14,7 @@ When contributing code, please consider the following guidelines:
  * To minimize merge commits, please rebase your changes before opening
    a pull request.
 
- * To submit your patch, open a pull request on GitHub or send a
-   properly-formatted patch to git-crypt-discuss@lists.cloudmutt.com.
+ * To submit your patch, open a pull request on GitHub.
 
 Finally, be aware that since git-crypt is security-sensitive software,
 the bar for contributions is higher than average.  Please don't be
