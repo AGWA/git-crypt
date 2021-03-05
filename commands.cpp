@@ -365,6 +365,52 @@ static std::string get_path_to_top ()
 	return path_to_top;
 }
 
+static std::string git_crypt_config (const std::string& key, const std::string& type, const std::string& default_value)
+{
+	std::vector<std::string> command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--file");
+	command.push_back(get_repo_state_path() + "/config");
+	command.push_back("--type");
+	command.push_back(type);
+	command.push_back("--default");
+	command.push_back(default_value);
+	command.push_back("--get");
+	command.push_back(key);
+
+	std::stringstream output;
+	if (!successful_exit(exec_command(command, output))) {
+		throw Error("'git config' failed - is Git installed?");
+	}
+
+	std::string word;
+	output >> word;
+  return word;
+}
+
+static void git_crypt_set_config (const std::string& name, const std::string& value)
+{
+	std::vector<std::string> command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--file");
+	command.push_back(get_repo_state_path() + "/config");
+	command.push_back("--replace-all");
+	command.push_back(name);
+	command.push_back(value);
+
+	if (!successful_exit(exec_command(command))) {
+		throw Error("'git config' failed - is Git installed?");
+	}
+}
+
+static bool git_config_encrypt_empty_files ()
+{
+	return git_crypt_config("git-crypt.encrypt-empty-files", "bool", "false") == "true";
+}
+
+
 static void get_git_status (std::ostream& output)
 {
 	// git status -uno --porcelain
@@ -770,6 +816,10 @@ int clean (int argc, const char** argv)
 		return 1;
 	}
 
+	if (file_size == 0 && !git_config_encrypt_empty_files()) {
+		return 0;
+	}
+
 	// We use an HMAC of the file as the encryption nonce (IV) for CTR mode.
 	// By using a hash of the file we ensure that the encryption is
 	// deterministic so git doesn't think the file has changed when it really
@@ -887,6 +937,11 @@ int smudge (int argc, const char** argv)
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
 	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
+
+	if (std::cin.gcount() == 0 && !git_config_encrypt_empty_files()) {
+		return 0;
+	}
+
 	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
 		// File not encrypted - just copy it out to stdout
 		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
@@ -1001,6 +1056,9 @@ int init (int argc, const char** argv)
 
 	// 2. Configure git for git-crypt
 	configure_git_filters(key_name);
+
+	// 3. Set default options
+	git_crypt_set_config("git-crypt.encrypt-empty-files", "false");
 
 	return 0;
 }
