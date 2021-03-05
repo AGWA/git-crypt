@@ -68,6 +68,13 @@ That's all you need to do - after git-crypt is set up (either with
 `git-crypt init` or `git-crypt unlock`), you can use git normally -
 encryption and decryption happen transparently.
 
+To check if a file will be encrypted before committing it:
+
+    git add path/new/file
+    git diff --cached
+    
+The diff output will show `Binary files ... ... differ` instead of the contents of the file.
+
 Current Status
 --------------
 
