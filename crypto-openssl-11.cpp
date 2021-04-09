@@ -35,7 +35,6 @@
 #include "crypto.hpp"
 #include "key.hpp"
 #include "util.hpp"
-#include <openssl/aes.h>
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
@@ -50,14 +49,16 @@ void init_crypto ()
 }
 
 struct Aes_ecb_encryptor::Aes_impl {
-	AES_KEY key;
+	EVP_CIPHER_CTX *ctx;
 };
 
 Aes_ecb_encryptor::Aes_ecb_encryptor (const unsigned char* raw_key)
 : impl(new Aes_impl)
 {
-	if (AES_set_encrypt_key(raw_key, KEY_LEN * 8, &(impl->key)) != 0) {
-		throw Crypto_error("Aes_ctr_encryptor::Aes_ctr_encryptor", "AES_set_encrypt_key failed");
+	impl->ctx = EVP_CIPHER_CTX_new();
+	if (!EVP_EncryptInit_ex(impl->ctx, EVP_aes_256_ecb(), NULL,
+					 raw_key, NULL)) {
+		throw Crypto_error("Aes_ctr_encryptor::Aes_ctr_encryptor", "EVP_EncryptInit_ex failed");
 	}
 }
 
@@ -66,12 +67,15 @@ Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 	// Note: Explicit destructor necessary because class contains an unique_ptr
 	// which contains an incomplete type when the unique_ptr is declared.
 
-	explicit_memset(&impl->key, '\0', sizeof(impl->key));
+	EVP_CIPHER_CTX_free(impl->ctx);
 }
 
 void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* cipher)
 {
-	AES_encrypt(plain, cipher, &(impl->key));
+	int ciphertext_len;
+	if (1!=EVP_EncryptUpdate(impl->ctx, cipher, &ciphertext_len, plain, BLOCK_LEN)) {
+		throw Crypto_error("Aes_ctr_encryptor::encrypt", "EVP_EncryptUpdate failed");
+	}
 }
 
 struct Hmac_sha1_state::Hmac_impl {
