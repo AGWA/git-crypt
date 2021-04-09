@@ -51,14 +51,14 @@ void Aes_ctr_encryptor::process (const unsigned char* in, unsigned char* out, si
 	for (size_t i = 0; i < len; ++i) {
 		if (byte_counter % BLOCK_LEN == 0) {
 			// Set last 4 bytes of CTR to the (big-endian) block number (sequentially increasing with each block)
-			store_be32(ctr_value + NONCE_LEN, byte_counter / BLOCK_LEN);
+			store_be32(ctr_value + NONCE_LEN, byte_counter >> 4);
 
 			// Generate a new pad
 			ecb.encrypt(ctr_value, pad);
 		}
 
 		// encrypt one byte
-		out[i] = in[i] ^ pad[byte_counter++ % BLOCK_LEN];
+		out[i] = in[i] ^ pad[byte_counter++ & (BLOCK_LEN -1)];
 
 		if (byte_counter == 0) {
 			throw Crypto_error("Aes_ctr_encryptor::process", "Too much data to encrypt securely");
