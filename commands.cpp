@@ -243,17 +243,17 @@ static std::string get_internal_state_path ()
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("rev-parse");
-	command.push_back("--git-dir");
+	command.push_back("--git-path");
+	command.push_back("common/git-crypt");
 
 	std::stringstream		output;
 
 	if (!successful_exit(exec_command(command, output))) {
-		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
+		throw Error("'git rev-parse --git-path common/git-crypt' failed - is this a Git repository?");
 	}
 
 	std::string			path;
 	std::getline(output, path);
-	path += "/git-crypt";
 
 	return path;
 }
