@@ -16,9 +16,10 @@ jobs:
 
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
-        install: git msys2-devel base-devel libssl-dev
         with:
           msystem: MINGW64
+          install: git msys2-devel base-devel libssl-dev
+          update: true
 
       - name: Build git-crypt
         run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
