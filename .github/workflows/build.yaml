@@ -1,0 +1,109 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  create_release:
+    name: Create release
+    runs-on: macos-latest
+    outputs:
+      id: ${{ steps.create_release.outputs.id }}
+      html_url: ${{ steps.create_release.outputs.html_url }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        if: contains(github.ref, 'release')
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+  build:
+    name: Build release
+    needs: create_release
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup msys2
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            git
+            zip
+            msys2-devel
+            zlib-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-i686-toolchain
+            mingw-w64-x86_64-openssl
+            mingw-w64-i686-openssl
+            openssl-devel
+
+      - name: Install requirements
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt install libssl-dev
+
+      - name: Build git-crypt
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
+
+      - name: Build git-crypt
+        if: matrix.os == 'ubuntu-latest'
+        run: make LDFLAGS="-lcrypto"
+
+      - name: zip artifacts
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          zip --junk-paths -r git-crypt-windows.zip git-crypt.exe
+
+      - name: zip artifacts
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          zip --junk-paths -r git-crypt-linux.zip git-crypt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifacts
+          path: git-crypt*.zip
+
+      - name: Upload Release Asset
+        if: contains(github.ref, 'release') && matrix.os == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./git-crypt-windows.zip
+          asset_name: git-crypt-windows.zip
+          asset_content_type: application/zip
+
+      - name: Upload Release Asset
+        if: contains(github.ref, 'release') && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./git-crypt-linux.zip
+          asset_name: git-crypt-linux.zip
+          asset_content_type: application/zip
