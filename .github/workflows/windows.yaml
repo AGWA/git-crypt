@@ -18,11 +18,20 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          install: git msys2-devel base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain openssl-devel
           update: true
+          install: >-
+            base-devel
+            git
+            msys2-devel
+            zlib-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-i686-toolchain
+            mingw-w64-x86_64-openssl
+            mingw-w64-i686-openssl
+            openssl-devel
 
       - name: Build git-crypt
-        run: make
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
 
       - name: Create Release
         if: contains(github.ref, 'release')
