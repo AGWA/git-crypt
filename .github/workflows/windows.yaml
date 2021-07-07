@@ -19,15 +19,11 @@ jobs:
         with:
           msystem: MINGW64
 
-      - name: Install required packages
-        shell: msys2 {0}
-        run: |
-          pacman -S --needed base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain git subversion mercurial mingw-w64-i686-cmake mingw-w64-x86_64-cmake
-
       - name: Build git-crypt
-        run: make
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
 
       - name: Create Release
+        if: contains(github.ref, 'release')
         id: create_release
         uses: actions/create-release@v1
         env:
