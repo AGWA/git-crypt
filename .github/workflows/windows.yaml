@@ -47,13 +47,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          release_name: Windows ${{ github.ref }}
           draft: true
           prerelease: false
 
       - name: zip artifacts
         run: |
           zip --junk-paths -r git-crypt-windows.zip git-crypt.exe
+
+    - name: Upload build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifacts
+          path: git-crypt-windows.zip
 
       - name: Upload Release Asset
         if: contains(github.ref, 'release')
