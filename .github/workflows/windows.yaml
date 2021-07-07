@@ -18,7 +18,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          install: git msys2-devel base-devel libssl-dev
+          install: git msys2-devel base-devel openssl-devel
           update: true
 
       - name: Build git-crypt
