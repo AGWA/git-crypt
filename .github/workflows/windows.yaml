@@ -1,0 +1,56 @@
+name: Windows build
+
+on:
+  push:
+    branches:
+      - development
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+
+      - name: Install required packages
+        shell: msys2 {0}
+        run: |
+          pacman -S --needed base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain git subversion mercurial mingw-w64-i686-cmake mingw-w64-x86_64-cmake
+
+      - name: Build git-crypt
+        run: make
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+
+      - name: zip artifacts
+        run: |
+          zip --junk-paths -r git-crypt-windows.zip git-crypt.exe
+
+      - name: Upload Release Asset
+        if: contains(github.ref, 'release')
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./git-crypt-windows.zip
+          asset_name: git-crypt-windows.zip
+          asset_content_type: application/zip
