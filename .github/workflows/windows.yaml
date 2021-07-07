@@ -27,6 +27,7 @@ jobs:
           install: >-
             base-devel
             git
+            zip
             msys2-devel
             zlib-devel
             mingw-w64-x86_64-toolchain
