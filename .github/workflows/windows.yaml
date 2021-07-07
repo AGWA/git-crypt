@@ -19,6 +19,11 @@ jobs:
         with:
           msystem: MINGW64
 
+      - name: Install required packages
+        shell: msys2 {0}
+        run: |
+          pacman -S zlib-devel
+
       - name: Build git-crypt
         run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
 
