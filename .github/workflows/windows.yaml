@@ -56,10 +56,10 @@ jobs:
           zip --junk-paths -r git-crypt-windows.zip git-crypt.exe
 
       - name: Upload build artifacts
-          uses: actions/upload-artifact@v2
-          with:
-            name: build-artifacts
-            path: git-crypt-windows.zip
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifacts
+          path: git-crypt-windows.zip
 
       - name: Upload Release Asset
         if: contains(github.ref, 'release')
