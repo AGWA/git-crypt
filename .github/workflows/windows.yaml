@@ -2,8 +2,6 @@ name: Windows build
 
 on:
   push:
-    branches:
-      - development
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
