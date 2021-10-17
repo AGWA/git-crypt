@@ -15,7 +15,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Create Release
-        if: contains(github.ref, 'release')
+        if: contains(github.ref, 'refs/tags/')
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -87,7 +87,7 @@ jobs:
           path: git-crypt*.zip
 
       - name: Upload Release Asset
-        if: contains(github.ref, 'release') && matrix.os == 'windows-latest'
+        if: contains(github.ref, 'refs/tags/') && matrix.os == 'windows-latest'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,7 +98,7 @@ jobs:
           asset_content_type: application/zip
 
       - name: Upload Release Asset
-        if: contains(github.ref, 'release') && matrix.os == 'ubuntu-latest'
+        if: contains(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
