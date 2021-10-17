@@ -4,6 +4,7 @@ on:
   push:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
 
 jobs:
   create_release:
