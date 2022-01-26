@@ -5,7 +5,7 @@
 #
 
 CXXFLAGS ?= -Wall -pedantic -Wno-long-long -O2
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=gnu++11
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
@@ -25,6 +25,12 @@ OBJFILES = \
     fhstream.o
 
 OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
+
+ifeq ($(OS),Windows_NT)
+	CXXFLAGS += -static -static-libgcc
+	LDFLAGS += -static-libstdc++ -static -lcrypto.dll
+endif
+
 LDFLAGS += -lcrypto
 
 XSLTPROC ?= xsltproc
