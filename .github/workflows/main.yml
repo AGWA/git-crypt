@@ -1,0 +1,31 @@
+name: build win64
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: git mingw-w64-x86_64-cc
+
+      - name: building win64
+        run: |
+          pacman -Sy --noconfirm make mingw-w64-x86_64-gcc mingw-w64-x86_64-openssl
+          make -j$(nproc)
+          strip git-crypt.exe
+
+      - name: archive win64 build
+        uses: actions/upload-artifact@v2
+        with:
+          name: git-crypt-win64
+          path: |
+            git-crypt.exe
+          retention-days: 60
