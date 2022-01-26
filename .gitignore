@@ -1,2 +1,5 @@
+.idea/
+
 *.o
+*.exe
 git-crypt
