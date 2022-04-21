@@ -1,3 +1,8 @@
+v0.7.0 (2022-04-21)
+  * Avoid "argument list too long" errors on macOS.
+  * Fix handling of "-" arguments.
+  * Minor documentation improvements.
+
 v0.6.0 (2017-11-26)
   * Add support for OpenSSL 1.1 (still works with OpenSSL 1.0).
   * Switch to C++11 (gcc 4.9 or higher now required to build).
