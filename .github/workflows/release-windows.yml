@@ -1,0 +1,56 @@
+on:
+  release:
+    types: [published]
+name: Build Release Binary (Windows)
+jobs:
+  build:
+    name: Build Release Binary
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            msys2-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+            openssl-devel
+      - name: Build binary
+        shell: msys2 {0}
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: git-crypt-artifacts
+          path: git-crypt.exe
+  upload:
+    name: Upload Release Binary
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: git-crypt-artifacts
+      - name: Upload release asset
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require("fs").promises;
+            const { repo: { owner, repo }, sha } = context;
+            await github.repos.uploadReleaseAsset({
+              owner, repo,
+              release_id: ${{ github.event.release.id }},
+              name: 'git-crypt-${{ github.event.release.name }}-x86_64.exe',
+              data: await fs.readFile('git-crypt.exe'),
+            });
