@@ -1297,7 +1297,8 @@ int add_gpg_user (int argc, const char** argv)
 			std::ostringstream	commit_message_builder;
 			commit_message_builder << "Add " << collab_keys.size() << " git-crypt collaborator" << (collab_keys.size() != 1 ? "s" : "") << "\n\nNew collaborators:\n\n";
 			for (std::vector<std::pair<std::string, bool> >::const_iterator collab(collab_keys.begin()); collab != collab_keys.end(); ++collab) {
-				commit_message_builder << '\t' << gpg_shorten_fingerprint(collab->first) << ' ' << gpg_get_uid(collab->first) << '\n';
+				commit_message_builder << "    " << collab->first << '\n';
+				commit_message_builder << "        " << gpg_get_uid(collab->first) << '\n';
 			}
 
 			// git commit -m MESSAGE NEW_FILE ...

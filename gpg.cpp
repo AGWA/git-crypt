@@ -61,12 +61,6 @@ static std::string gpg_nth_column (const std::string& line, unsigned int col)
 	       line.substr(pos);
 }
 
-// given a key fingerprint, return the last 8 nibbles
-std::string gpg_shorten_fingerprint (const std::string& fingerprint)
-{
-	return fingerprint.size() == 40 ? fingerprint.substr(32) : fingerprint;
-}
-
 // given a key fingerprint, return the key's UID (e.g. "John Smith <jsmith@example.com>")
 std::string gpg_get_uid (const std::string& fingerprint)
 {
