@@ -69,3 +69,19 @@ and does not currently create key files with restrictive permissions,
 making it unsuitable for use on a multi-user system.  Windows support
 will mature in a future version of git-crypt.  Bug reports and patches
 are most welcome!
+
+### Building git-crypt as a container
+
+To build and bundle git-crypt as a container, simply run:
+
+    make build-image
+
+To build, bundle and deploy to your specific container registry, simply run:
+
+    IMAGE_REPO=my-fancy-repo make build-image
+    IMAGE_REPO=my-fancy-repo make push-image
+
+or
+
+    make build-image IMAGE_REPO=my-fancy-repo
+    make push-image IMAGE_REPO=my-fancy-repo
