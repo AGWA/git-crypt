@@ -170,6 +170,7 @@ static void	init_std_streams_platform ()
 {
 	_setmode(_fileno(stdin), _O_BINARY);
 	_setmode(_fileno(stdout), _O_BINARY);
+	std::cout.setf(std::ios::unitbuf);
 }
 
 void create_protected_file (const char* path) // TODO
