@@ -689,7 +689,12 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		const std::string&	fingerprint(collab->first);
 		const bool		key_is_trusted(collab->second);
 		std::ostringstream	path_builder;
-		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << fingerprint << ".gpg";
+		
+		if (fingerprint.rfind("!") == fingerprint.size() - 1) {
+			path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << fingerprint.substr(0, fingerprint.size() - 1) << ".gpg";
+		} else {
+			path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << fingerprint << ".gpg";
+		}
 		std::string		path(path_builder.str());
 
 		if (access(path.c_str(), F_OK) == 0) {
