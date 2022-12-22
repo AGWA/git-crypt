@@ -33,7 +33,7 @@ Specify files to encrypt by creating a .gitattributes file:
     *.key eol=lf filter=git-crypt diff=git-crypt
     secretdir/** eol=lf filter=git-crypt diff=git-crypt
 
-***eol=lf settings is necessary if autocrlf is true. 
+***eol=lf settings is necessary if autocrlf is true.***
 
 Like a .gitignore file, it can match wildcards and should be checked into
 the repository.  See below for more information about .gitattributes.
@@ -43,7 +43,7 @@ Make sure you don't accidentally encrypt the .gitattributes file itself
 those files won't be encrypted!
 
 ***IF `core.autocrlf` is true (which is recommended in Windows), it will throw an error like `git-crypt: error: encrypted file has been tampered with!`
-To avoid this, use `eol=lf` in .gitattributes for the secrets.
+To avoid this, use `eol=lf` in .gitattributes for the secrets.***
 
 Share the repository with others (or with yourself) using GPG:
 
