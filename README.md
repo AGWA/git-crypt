@@ -42,7 +42,7 @@ Make sure you don't accidentally encrypt the .gitattributes file itself
 .gitattributes rules are in place *before* you add sensitive files, or
 those files won't be encrypted!
 
-***IF `core.autocrlf` is true (which is recommended in Windows), it will throw error like `git-crypt: error: encrypted file has been tampered with!`
+***IF `core.autocrlf` is true (which is recommended in Windows), it will throw an error like `git-crypt: error: encrypted file has been tampered with!`
 To avoid this, use `eol=lf` in .gitattributes for the secrets.
 
 Share the repository with others (or with yourself) using GPG:
