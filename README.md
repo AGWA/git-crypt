@@ -25,15 +25,15 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
 
 ## Installing git-crypt
 
-1. For ***nix** based systems
+1. For ***nix** based systems.
 
         apt-get install git-crypt
 
-2. For **MacOS** (using homebrew)
+2. For **MacOS** (using homebrew).
 
         brew install git-crypt
 
-3. To build and install from source
+3. To build and install from source.
 
     > Following the instructions in the [INSTALL.md](INSTALL.md) file.
 
@@ -41,12 +41,12 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
 
 ## Setting up git-crypt
 
-1. Start by configuring your repository to use git-crypt:
+1. Start by configuring your repository to use git-crypt.
 
         cd your-repo/
         git-crypt init
 
-    This will generate a key for your repository
+    This will generate a key for your repository.
 
 
 2. Specify the files you want to encrypt by creating a `.gitattributes` file.
@@ -65,7 +65,7 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
     *.key filter=git-crypt diff=git-crypt
     ```
 
-    You can use [globbing patterns](http://linux.die.net/man/7/glob) to match against your file names, just like in your .gitignore file. (See below [See below](#gitattributes-file) for more information about .gitattributes.)
+    You can use [globbing patterns](http://linux.die.net/man/7/glob) to match against your file names, just like in your .gitignore file. ([See below](#gitattributes-file) for more information about .gitattributes.)
 
     > || **WARNING** ||
     >
@@ -80,21 +80,21 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
 
 You can either choose to encrypt your files automatically using git-crypt, or you can choose to encrypt and decrypt manually at any time.
 
-1. **Automatic** Encryption/Decryption
+1. **Automatic** Encryption/Decryption.
 
     * When you *commit* your repo, your files will be automatically **encrypted**.
 
     * When you *checkout* your repository, your files will be automatically **decrypted**.
 
-2. Alternatively, you can **manually** encrypt and decrypt your files
+2. Alternatively, you can **manually** encrypt and decrypt your files.
 
-    * Lock selected files in your repository
+    * Lock selected files in your repository.
 
         ```
         git-crypt lock
         ```
 
-    * Unlock selected files in your reposity
+    * Unlock selected files in your reposity.
 
         ```
         git-crypt unlock
@@ -106,28 +106,28 @@ You can either choose to encrypt your files automatically using git-crypt, or yo
 
 In order for others to en/decrypt your files, they will need a public key. You can generate your key either by using [GPG](https://gnupg.org/download/), or by using **git-crypt**.
 
-1. Create and Commit a GPG User using [GPG](https://gnupg.org/download/):
+1. Create and commit a GPG user using [GPG](https://gnupg.org/download/).
 
     ```
     git-crypt add-gpg-user USER_ID
     ```
 
 
-    > `USER_ID` can be: a key ID a full fingerprint, an email address, or anything else that uniquely identifies a public key to GPG
+    > `USER_ID` can be: a key ID a full fingerprint, an email address, or anything else that uniquely identifies a public key to GPG.
     >
     > (see ["HOW TO SPECIFY A USER ID"](https://www.gnupg.org/documentation/manuals/gnupg/Specify-a-User-ID.html))
 
     This will create a `.git-crypt/` directory in the root folder of your repository and add (and commit) a GPG-encrypted key file for each user you create.
 
-2. Create/Send a sharable key using git-crypt
+2. Create/Send a sharable key using git-crypt.
 
-    You can also export a symmetric secret key, which you must
+    You can also export a symmetric secret key, which you will need to
 securely convey to collaborators (GPG is not required, and no files
-are added to your repository):
+are added to your repository).
 
         git-crypt export-key /path/to/key
 
-    You can then send this key to your collaborators, who can unlock your secret files using:
+    You can then send this key to your collaborators, who can unlock your encrypted files using:
 
         git-crypt unlock /path/to/key
 
@@ -135,8 +135,8 @@ are added to your repository):
 
 ## Using git-crypt
 
-Once **git-crypt** is set up ( either with
-`git-crypt init` or `git-crypt unlock` ), you can continue to use git normally. Encryption and decryption will happen automatically and transparently.
+Once **git-crypt** is set up (either with
+`git-crypt init` or `git-crypt unlock`), you can continue to use git normally. Encryption and decryption will happen automatically and transparently.
 
 <br />
 
