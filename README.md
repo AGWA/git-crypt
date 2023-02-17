@@ -1,6 +1,11 @@
 git-crypt - a transparent file encryption in git
 ==============================================
-![git-crypt-logo](./media/git-crypt-logo.svg)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./media/git-crypt-logo-dark.svg">
+  <img alt="git-crypt logo header" src="./media/git-crypt-logo.svg">
+</picture>
+
 
 **git-crypt** enables transparent encryption and decryption of files in your git repository.
 
@@ -19,11 +24,11 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
 ## Installing git-crypt
 ------------------
 
-1. For *nix based systems
+1. For ***nix** based systems
 
         apt-get install git-crypt
 
-2. For MacOS (using homebrew)
+2. For **MacOS** (using homebrew)
 
         brew install git-crypt
 
@@ -43,13 +48,13 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
         git-crypt init
 
 
-    * This will generate a key for your repository
+    This will generate a key for your repository
 
 <br />
 
 2. Specify the files you want to encrypt by creating a `.gitattributes` file.
 
-    For example, let's say you have a file called `secretfile` and maybe a directory called `secretdir/`. You could add them like this:
+    For example, let's say you have a file called `secretfile` and maybe a directory called `secretdir/`. You can add them like this:
 
     ```
     # My secret file
@@ -63,7 +68,7 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
     *.key filter=git-crypt diff=git-crypt
     ```
 
-    Just like in your .gitignore file, you can use [globbing patterns](http://linux.die.net/man/7/glob) to match against your file names. (See below for more information about .gitattributes.)
+    You can use [globbing patterns](http://linux.die.net/man/7/glob) to match against your file names, just like in your .gitignore file. (See below for more information about .gitattributes.)
 
     > || **WARNING** ||
     >
@@ -77,13 +82,13 @@ For more information, see <https://www.agwa.name/projects/git-crypt>.
 ## Encrypting your files
 ---
 
-You can either choose to encrypt your files automatically using git-crypt, or you can manually encrypt and decrypt at any time.
+You can either choose to encrypt your files automatically using git-crypt, or you can choose to encrypt and decrypt manually at any time.
 
 1. **Automatic** Encryption/Decryption
-    * When committing your repo
-        * Your files will be automatically **encrypted**.
-    * When you checkout your repository
-        * Your files will be **decrypted**.
+
+    * When you *commit* your repo, your files will be automatically **encrypted**.
+
+    * When you *checkout* your repository, your files will be automatically **decrypted**.
 
 <br />
 
@@ -101,11 +106,11 @@ You can either choose to encrypt your files automatically using git-crypt, or yo
         git-crypt unlock
         ```
 
-## Sharing with Others
+## Collaborating with Others
 --------------------------------------
-In order for others to en(de)crypt your files, they will need a key. You can generate your key either by using [GPG](https://gnupg.org/download/), or using **git-crypt**.
+In order for others to en/decrypt your files, they will need a public key. You can generate your key either by using [GPG](https://gnupg.org/download/), or by using **git-crypt**.
 
-1. Create/Commit a GPG User using [GPG](https://gnupg.org/download/):
+1. Create and Commit a GPG User using [GPG](https://gnupg.org/download/):
 
     ```
     git-crypt add-gpg-user USER_ID
@@ -133,11 +138,10 @@ are added to your repository):
         git-crypt unlock /path/to/key
 
 
-## 5. That's All
+## 5. All Finished
 
 Once **git-crypt** is set up ( either with
-`git-crypt init` or `git-crypt unlock` ), you can continue to use git normally---
-encryption and decryption will happen automatically/transparently.
+`git-crypt init` or `git-crypt unlock` ), you can continue to use git normally. Encryption and decryption will happen automatically and transparently.
 
 <br />
 
