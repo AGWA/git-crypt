@@ -1,5 +1,3 @@
-<link rel="shortcut icon" type="image/x-icon" href="media/favicon.svg">
-
 # git-crypt - a transparent file encryption in git
 
 <!--- Logo picture element for user's light/dark modes --->
