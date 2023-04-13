@@ -10,7 +10,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -42,13 +42,13 @@ jobs:
         with:
           name: git-crypt-artifacts
       - name: Upload release asset
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require("fs").promises;
             const { repo: { owner, repo }, sha } = context;
-            await github.repos.uploadReleaseAsset({
+            await github.rest.repos.uploadReleaseAsset({
               owner, repo,
               release_id: ${{ github.event.release.id }},
               name: 'git-crypt-${{ github.event.release.name }}-x86_64.exe',
