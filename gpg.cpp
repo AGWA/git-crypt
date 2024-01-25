@@ -69,7 +69,9 @@ std::string gpg_get_uid (const std::string& fingerprint)
 	command.push_back(gpg_get_executable());
 	command.push_back("--batch");
 	command.push_back("--with-colons");
-	command.push_back("--fixed-list-mode");
+	if (gpg_get_executable() != "gpgsm") {
+		command.push_back("--fixed-list-mode");
+	}
 	command.push_back("--list-keys");
 	command.push_back("0x" + fingerprint);
 	std::stringstream		command_output;
@@ -111,6 +113,8 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 			std::string		line;
 			std::getline(command_output, line);
 			if (line.substr(0, 4) == "pub:") {
+				is_pubkey = true;
+			} else if (line.substr(0, 4) == "crt:") {
 				is_pubkey = true;
 			} else if (line.substr(0, 4) == "sub:") {
 				is_pubkey = false;
