@@ -46,75 +46,85 @@
 
 void init_crypto ()
 {
-	ERR_load_crypto_strings();
+        ERR_load_crypto_strings();
 }
 
 struct Aes_ecb_encryptor::Aes_impl {
-	AES_KEY key;
+        EVP_CIPHER_CTX *ctx;
 };
 
 Aes_ecb_encryptor::Aes_ecb_encryptor (const unsigned char* raw_key)
 : impl(new Aes_impl)
 {
-	if (AES_set_encrypt_key(raw_key, KEY_LEN * 8, &(impl->key)) != 0) {
-		throw Crypto_error("Aes_ctr_encryptor::Aes_ctr_encryptor", "AES_set_encrypt_key failed");
-	}
+        impl->ctx = EVP_CIPHER_CTX_new();
+        if (!EVP_EncryptInit_ex(impl->ctx, EVP_aes_256_ecb(), nullptr, raw_key, nullptr)) {
+                throw Crypto_error("Aes_ecb_encryptor::Aes_ecb_encryptor", "EVP_EncryptInit_ex failed");
+        }
 }
 
 Aes_ecb_encryptor::~Aes_ecb_encryptor ()
 {
-	// Note: Explicit destructor necessary because class contains an unique_ptr
-	// which contains an incomplete type when the unique_ptr is declared.
+        // Note: Explicit destructor necessary because class contains a unique_ptr
+        // which contains an incomplete type when the unique_ptr is declared.
 
-	explicit_memset(&impl->key, '\0', sizeof(impl->key));
+        EVP_CIPHER_CTX_free(impl->ctx);
 }
 
 void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* cipher)
 {
-	AES_encrypt(plain, cipher, &(impl->key));
+        int outlen;
+        if (!EVP_EncryptUpdate(impl->ctx, cipher, &outlen, plain, AES_BLOCK_SIZE) || outlen != AES_BLOCK_SIZE) {
+                throw Crypto_error("Aes_ecb_encryptor::encrypt", "EVP_EncryptUpdate failed");
+        }
 }
 
 struct Hmac_sha1_state::Hmac_impl {
-	HMAC_CTX ctx;
+        EVP_MD_CTX *ctx;
+        const EVP_MD *md;
 };
 
 Hmac_sha1_state::Hmac_sha1_state (const unsigned char* key, size_t key_len)
 : impl(new Hmac_impl)
 {
-	HMAC_Init(&(impl->ctx), key, key_len, EVP_sha1());
+        impl->ctx = EVP_MD_CTX_new();
+        impl->md = EVP_sha1();
+        if (!EVP_DigestInit_ex(impl->ctx, impl->md, nullptr) ||
+            !EVP_DigestSignInit(impl->ctx, nullptr, impl->md, nullptr, nullptr) ||
+            !EVP_DigestSignUpdate(impl->ctx, key, key_len)) {
+                throw Crypto_error("Hmac_sha1_state::Hmac_sha1_state", "EVP_DigestSignInit or EVP_DigestSignUpdate failed");
+        }
 }
 
 Hmac_sha1_state::~Hmac_sha1_state ()
 {
-	// Note: Explicit destructor necessary because class contains an unique_ptr
-	// which contains an incomplete type when the unique_ptr is declared.
+        // Note: Explicit destructor necessary because class contains a unique_ptr
+        // which contains an incomplete type when the unique_ptr is declared.
 
-	HMAC_cleanup(&(impl->ctx));
+        EVP_MD_CTX_free(impl->ctx);
 }
 
 void Hmac_sha1_state::add (const unsigned char* buffer, size_t buffer_len)
 {
-	HMAC_Update(&(impl->ctx), buffer, buffer_len);
+        EVP_DigestSignUpdate(impl->ctx, buffer, buffer_len);
 }
 
 void Hmac_sha1_state::get (unsigned char* digest)
 {
-	unsigned int len;
-	HMAC_Final(&(impl->ctx), digest, &len);
+        size_t len;
+        EVP_DigestSignFinal(impl->ctx, digest, &len);
 }
-
 
 void random_bytes (unsigned char* buffer, size_t len)
 {
-	if (RAND_bytes(buffer, len) != 1) {
-		std::ostringstream	message;
-		while (unsigned long code = ERR_get_error()) {
-			char		error_string[120];
-			ERR_error_string_n(code, error_string, sizeof(error_string));
-			message << "OpenSSL Error: " << error_string << "; ";
-		}
-		throw Crypto_error("random_bytes", message.str());
-	}
+        if (RAND_bytes(buffer, len) != 1) {
+                std::ostringstream      message;
+                while (unsigned long code = ERR_get_error()) {
+                        char            error_string[120];
+                        ERR_error_string_n(code, error_string, sizeof(error_string));
+                        message << "OpenSSL Error: " << error_string << "; ";
+                }
+                throw Crypto_error("random_bytes", message.str());
+        }
 }
 
 #endif
