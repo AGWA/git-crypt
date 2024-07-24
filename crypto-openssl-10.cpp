@@ -80,18 +80,17 @@ void Aes_ecb_encryptor::encrypt(const unsigned char* plain, unsigned char* ciphe
 
 struct Hmac_sha1_state::Hmac_impl {
         EVP_MD_CTX *ctx;
-        const EVP_MD *md;
+        EVP_PKEY *pkey;
 };
 
 Hmac_sha1_state::Hmac_sha1_state (const unsigned char* key, size_t key_len)
 : impl(new Hmac_impl)
 {
         impl->ctx = EVP_MD_CTX_new();
-        impl->md = EVP_sha1();
-        if (!EVP_DigestInit_ex(impl->ctx, impl->md, nullptr) ||
-            !EVP_DigestSignInit(impl->ctx, nullptr, impl->md, nullptr, nullptr) ||
-            !EVP_DigestSignUpdate(impl->ctx, key, key_len)) {
-                throw Crypto_error("Hmac_sha1_state::Hmac_sha1_state", "EVP_DigestSignInit or EVP_DigestSignUpdate failed");
+        impl->pkey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, nullptr, key, key_len);
+        if (!impl->ctx || !impl->pkey ||
+            !EVP_DigestSignInit(impl->ctx, nullptr, EVP_sha1(), nullptr, impl->pkey)) {
+                throw Crypto_error("Hmac_sha1_state::Hmac_sha1_state", "EVP_DigestSignInit failed");
         }
 }
 
@@ -101,6 +100,7 @@ Hmac_sha1_state::~Hmac_sha1_state ()
         // which contains an incomplete type when the unique_ptr is declared.
 
         EVP_MD_CTX_free(impl->ctx);
+        EVP_PKEY_free(impl->pkey);
 }
 
 void Hmac_sha1_state::add (const unsigned char* buffer, size_t buffer_len)
