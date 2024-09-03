@@ -32,6 +32,8 @@
 #include "util.hpp"
 #include "commands.hpp"
 #include <sstream>
+#include <iostream>
+#include <string>
 
 static std::string gpg_get_executable()
 {
@@ -105,6 +107,12 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 	command.push_back("--list-keys");
 	command.push_back(query);
 	std::stringstream		command_output;
+	bool forceSubkey = false;
+	std::string subkey;
+	if (query.rfind("!") == query.size() - 1) {
+		forceSubkey = true;
+		subkey = query.substr(0, query.size() - 1);
+	}
 	if (successful_exit(exec_command(command, command_output))) {
 		bool			is_pubkey = false;
 		while (command_output.peek() != -1) {
@@ -113,10 +121,19 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 			if (line.substr(0, 4) == "pub:") {
 				is_pubkey = true;
 			} else if (line.substr(0, 4) == "sub:") {
-				is_pubkey = false;
+				if (!forceSubkey) {
+					is_pubkey = false;
+				}
 			} else if (is_pubkey && line.substr(0, 4) == "fpr:") {
 				// fpr:::::::::7A399B2DB06D039020CD1CE1D0F3702D61489532:
 				// want the 9th column (counting from 0)
+				if (forceSubkey) {
+					if (gpg_nth_column(line, 9) == subkey) {
+						fingerprints.push_back(query);
+						break;
+					}
+					continue;
+				}
 				fingerprints.push_back(gpg_nth_column(line, 9));
 			}
 		}
