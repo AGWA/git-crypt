@@ -16,7 +16,7 @@ jobs:
       - name: Build binary
         run: make
       - name: Upload release artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: git-crypt-artifacts
           path: git-crypt
@@ -28,7 +28,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: git-crypt-artifacts
       - name: Upload release asset
