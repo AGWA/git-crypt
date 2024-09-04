@@ -28,16 +28,15 @@
  * as that of the covered work.
  */
 
-#include <openssl/opensslconf.h>
+#include <openssl/hmac.h>
 
-#if defined(OPENSSL_API_COMPAT)
+#if !defined(HMAC_cleanup)
 
 #include "crypto.hpp"
 #include "key.hpp"
 #include "util.hpp"
 #include <openssl/aes.h>
 #include <openssl/sha.h>
-#include <openssl/hmac.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
