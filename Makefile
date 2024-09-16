@@ -9,6 +9,10 @@ CXXFLAGS += -std=c++11
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
+GIT_COMMIT=$(shell git rev-parse HEAD)
+GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
+VERSION=$(shell grep VERSION git-crypt.hpp | awk '{print$$NF}' | tr -d '"')
+IMAGE_REPO ?= johnt337
 
 ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
@@ -89,7 +93,14 @@ install-man: build-man
 	install -d $(DESTDIR)$(MANDIR)/man1
 	install -m 644 man/man1/git-crypt.1 $(DESTDIR)$(MANDIR)/man1/
 
+build-image: 
+	docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg GIT_DIRTY=$(GIT_DIRTY) --build-arg VERSION=$(VERSION) -t $(IMAGE_REPO)/git-crypt:$(VERSION) .
+
+push-image:
+	docker push $(IMAGE_REPO)/git-crypt:$(VERSION)
+
 .PHONY: all \
 	build build-bin build-man \
 	clean clean-bin clean-man \
-	install install-bin install-man
+	install install-bin install-man \
+	build-image push-image
