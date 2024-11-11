@@ -25,9 +25,13 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-openssl
             openssl-devel
+  
       - name: Build binary
         shell: msys2 {0}
-        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
+        run: |
+          make clean
+          make ENABLE_MAN=no
+
       - name: artifacts name
         id: artifacts-name
         env:

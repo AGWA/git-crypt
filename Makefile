@@ -4,15 +4,22 @@
 # See COPYING file for license information.
 #
 
+# Compiler Flags
 CXXFLAGS ?= -Wall -pedantic -Wno-long-long -O2
 CXXFLAGS += -std=c++11
+# Added -Wno-deprecated-declarations to suppress deprecated OpenSSL warnings
+CXXFLAGS += -Wno-deprecated-declarations
+
+# Installation Directories
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
+# Documentation
 ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
 
+# Object Files
 OBJFILES = \
     git-crypt.o \
     commands.o \
@@ -25,14 +32,31 @@ OBJFILES = \
     fhstream.o
 
 OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
+
+# Linker Flags
+# Initially includes -lcrypto; additional flags will be appended based on OS
 LDFLAGS += -lcrypto
 
+# Detect Operating System
+# $(OS) is typically 'Windows_NT' on Windows and empty or 'Linux' on Linux
+ifeq ($(OS),Windows_NT)
+    # Windows-specific linker flags
+    LDFLAGS += -lws2_32 -lcrypt32
+else
+    # Unix/Linux-specific linker flags
+    # You can add Unix-specific flags here if needed
+    # For example, linking against pthread:
+    # LDFLAGS += -lpthread
+endif
+
+# Documentation Tools
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
 		 --stringparam man.output.base.dir man/ \
 		 --param man.output.subdirs.enabled 1 \
 		 --param man.authors.section.enabled 1
 
+# Targets
 all: build
 
 #
@@ -46,12 +70,15 @@ build: $(BUILD_TARGETS)
 
 build-bin: git-crypt
 
+# Linking the binary
 git-crypt: $(OBJFILES)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
 
+# Object File Dependencies
 util.o: util.cpp util-unix.cpp util-win32.cpp
 coprocess.o: coprocess.cpp coprocess-unix.cpp coprocess-win32.cpp
 
+# Building Manual Pages
 build-man: man/man1/git-crypt.1
 
 man/man1/git-crypt.1: man/git-crypt.xml
