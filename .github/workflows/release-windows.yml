@@ -67,7 +67,7 @@ jobs:
           script: |
             const fs = require("fs").promises;
             const { repo: { owner, repo }, sha } = context;
-            await github.repos.uploadReleaseAsset({
+            await github.rest.repos.uploadReleaseAsset({
               owner, repo,
               release_id: ${{ github.event.release.id }},
               name: 'git-crypt-${{ github.event.release.name }}-x86_64.exe',
