@@ -71,6 +71,6 @@ void help_refresh (std::ostream&);
 void help_status (std::ostream&);
 
 // other
-std::string get_git_config (const std::string& name);
+std::string get_git_config (const std::string& name, bool from_worktree=true);
 
 #endif
