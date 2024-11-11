@@ -1,6 +1,9 @@
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - master
 name: Build Release Binary (Windows)
 jobs:
   build:
@@ -25,14 +28,26 @@ jobs:
       - name: Build binary
         shell: msys2 {0}
         run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
+      - name: artifacts name
+        id: artifacts-name
+        env:
+          IS_RELEASE: ${{ github.event_name == 'release' }}
+        run: |
+          $artifactsName = if ($env:IS_RELEASE -eq "true") {
+            "git-crypt-artifacts"
+          } else {
+            "git-crypt-artifacts-dev"
+          }
+          "artifacts-name=$artifactsName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append     
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: git-crypt-artifacts
+          name: ${{ env.artifacts-name }}
           path: git-crypt.exe
   upload:
     name: Upload Release Binary
     runs-on: ubuntu-latest
+    if: github.event_name == 'release'
     needs: build
     permissions:
       contents: write
@@ -54,3 +69,4 @@ jobs:
               name: 'git-crypt-${{ github.event.release.name }}-x86_64.exe',
               data: await fs.readFile('git-crypt.exe'),
             });
+            

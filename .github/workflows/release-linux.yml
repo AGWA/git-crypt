@@ -1,6 +1,9 @@
 on:
   release:
     types: [published]
+  push:
+    branches:
+      - master
 name: Build Release Binary (Linux)
 jobs:
   build:
@@ -15,20 +18,31 @@ jobs:
         run: sudo apt install libssl-dev
       - name: Build binary
         run: make
+      - name: artifacts name
+        id: artifacts-name
+        env:
+          IS_RELEASE: ${{ github.event_name == 'release' }}
+        run: |
+          if [ "$IS_RELEASE" = true ]; then
+            echo "artifacts-name=git-crypt-artifacts" >> $GITHUB_ENV
+          else
+            echo "artifacts-name=git-crypt-artifacts-dev" >> $GITHUB_ENV
+          fi
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: git-crypt-artifacts
+          name: ${{ env.artifacts-name }}
           path: git-crypt
   upload:
     name: Upload Release Binary
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     needs: build
     permissions:
       contents: write
     steps:
       - name: Download release artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v2
         with:
           name: git-crypt-artifacts
       - name: Upload release asset
@@ -44,3 +58,4 @@ jobs:
               name: 'git-crypt-${{ github.event.release.name }}-linux-x86_64',
               data: await fs.readFile('git-crypt'),
             });
+            
