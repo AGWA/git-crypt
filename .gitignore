@@ -1,2 +1,4 @@
 *.o
 git-crypt
+
+.vscode/*
