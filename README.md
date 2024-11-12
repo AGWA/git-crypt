@@ -1,3 +1,14 @@
+# Forked from [AGWA/git-crypt](https://github.com/AGWA/git-crypt)
+
+## Updates
+
+- Fix build issue
+- Add support for worktree https://github.com/AGWA/git-crypt/pull/222, https://github.com/AGWA/git-crypt/issues/105
+- Add support for merge https://github.com/AGWA/git-crypt/pull/180
+- Add intergration tests for basic functionality including worktree
+
+## Original README
+
 git-crypt - transparent file encryption in git
 ==============================================
 
