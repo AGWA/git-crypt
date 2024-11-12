@@ -38,24 +38,24 @@
 #include <string>
 
 enum {
-	HMAC_KEY_LEN = 64,
-	AES_KEY_LEN = 32
+    HMAC_KEY_LEN = 64,
+    AES_KEY_LEN = 32
 };
 
 struct Key_file {
 public:
-	struct Entry {
+    struct Entry {
 		uint32_t		version;
 		unsigned char		aes_key[AES_KEY_LEN];
 		unsigned char		hmac_key[HMAC_KEY_LEN];
 
-		Entry ();
+        Entry ();
 
 		void			load (std::istream&);
 		void			load_legacy (uint32_t version, std::istream&);
 		void			store (std::ostream&) const;
 		void			generate (uint32_t version);
-	};
+    };
 
 	struct Malformed { }; // exception class
 	struct Incompatible { }; // exception class
@@ -67,48 +67,46 @@ public:
 
 	void				load_legacy (std::istream&);
 	void				load (std::istream&);
-	void				store (std::ostream&) const;
+    // Updated method signatures to support Base64 encoding
+    void				store (std::ostream& out, bool use_base64 = true) const;
+    bool				store_to_file (const char* filename, bool use_base64 = true) const;
+    std::string			store_to_string (bool use_base64 = true) const;
 
-	bool				load_from_file (const char* filename);
-	bool				store_to_file (const char* filename) const;
+    void				generate ();
 
-	std::string			store_to_string () const;
+    bool				is_empty () const { return entries.empty(); }
+    bool				is_filled () const { return !is_empty(); }
 
-	void				generate ();
-
-	bool				is_empty () const { return entries.empty(); }
-	bool				is_filled () const { return !is_empty(); }
-
-	uint32_t			latest () const;
+    uint32_t			latest () const;
 
 	void				set_key_name (const char* k) { key_name = k ? k : ""; }
 	const char*			get_key_name () const { return key_name.empty() ? 0 : key_name.c_str(); }
 private:
-	typedef std::map<uint32_t, Entry, std::greater<uint32_t> > Map;
-	enum { FORMAT_VERSION = 2 };
+    typedef std::map<uint32_t, Entry, std::greater<uint32_t> > Map;
+    enum { FORMAT_VERSION = 2 };
 
 	Map				entries;
 	std::string			key_name;
 
 	void				load_header (std::istream&);
 
-	enum {
+    enum {
 		HEADER_FIELD_END	= 0,
 		HEADER_FIELD_KEY_NAME	= 1
-	};
-	enum {
+    };
+    enum {
 		KEY_FIELD_END		= 0,
 		KEY_FIELD_VERSION	= 1,
 		KEY_FIELD_AES_KEY	= 3,
 		KEY_FIELD_HMAC_KEY	= 5
-	};
-	enum {
+    };
+    enum {
 		MAX_FIELD_LEN		= 1<<20
-	};
+    };
 };
 
 enum {
-	KEY_NAME_MAX_LEN = 128
+    KEY_NAME_MAX_LEN = 128
 };
 
 bool validate_key_name (const char* key_name, std::string* reason =0);

@@ -1478,44 +1478,47 @@ int ls_gpg_users (int argc, const char** argv) // TODO
 
 void help_export_key (std::ostream& out)
 {
-	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt export-key [OPTIONS] FILENAME" << std::endl;
-	out << std::endl;
-	out << "    -k, --key-name KEYNAME      Export the given key, instead of the default" << std::endl;
-	out << std::endl;
-	out << "When FILENAME is -, export to standard out." << std::endl;
+    //     |--------------------------------------------------------------------------------| 80 chars
+    out << "Usage: git-crypt export-key [OPTIONS] FILENAME" << std::endl;
+    out << std::endl;
+    out << "    -k, --key-name KEYNAME      Export the given key, instead of the default" << std::endl;
+    out << "    --base64                 Export key in base64 format" << std::endl;
+    out << std::endl;
+    out << "When FILENAME is -, export to standard out." << std::endl;
 }
 int export_key (int argc, const char** argv)
 {
-	// TODO: provide options to export only certain key versions
-	const char*		key_name = 0;
-	Options_list		options;
-	options.push_back(Option_def("-k", &key_name));
-	options.push_back(Option_def("--key-name", &key_name));
+    // Provide options to export only certain key versions
+    const char*		key_name = 0;
+    bool            use_base64 = false; // Default to Base64 encoding
+    Options_list		options;
+    options.push_back(Option_def("-k", &key_name));
+    options.push_back(Option_def("--key-name", &key_name));
+    options.push_back(Option_def("--base64", &use_base64, true)); // Option to disable Base64
 
 	int			argi = parse_options(options, argc, argv);
 
-	if (argc - argi != 1) {
-		std::clog << "Error: no filename specified" << std::endl;
-		help_export_key(std::clog);
-		return 2;
-	}
+    if (argc - argi != 1) {
+        std::clog << "Error: no filename specified" << std::endl;
+        help_export_key(std::clog);
+        return 2;
+    }
 
 	Key_file		key_file;
-	load_key(key_file, key_name);
+    load_key(key_file, key_name);
 
 	const char*		out_file_name = argv[argi];
 
-	if (std::strcmp(out_file_name, "-") == 0) {
-		key_file.store(std::cout);
-	} else {
-		if (!key_file.store_to_file(out_file_name)) {
-			std::clog << "Error: " << out_file_name << ": unable to write key file" << std::endl;
-			return 1;
-		}
-	}
+    if (std::strcmp(out_file_name, "-") == 0) {
+        key_file.store(std::cout, use_base64);
+    } else {
+        if (!key_file.store_to_file(out_file_name, use_base64)) {
+            std::clog << "Error: " << out_file_name << ": unable to write key file" << std::endl;
+            return 1;
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 void help_keygen (std::ostream& out)
