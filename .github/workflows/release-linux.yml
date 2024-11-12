@@ -4,21 +4,29 @@ on:
   pull_request:
     branches:
       - master
-name: Build Release Binary (Linux)
+name: Build and Test Release Binary (Linux)
 jobs:
   build:
-    name: Build Release Binary
+    name: Build and Test Release Binary
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Install dependencies
-        run: sudo apt install libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev vim-common
+
       - name: Build binary
         run: make
-      - name: artifacts name
+
+      - name: Run integration tests
+        run: |
+          chmod +x ./tests/linux/basic-test.sh
+          ./tests/linux/basic-test.sh
+
+      - name: Determine artifacts name
         id: artifacts-name
         env:
           IS_RELEASE: ${{ github.event_name == 'release' }}
@@ -28,11 +36,13 @@ jobs:
           else
             echo "artifacts-name=git-crypt-artifacts-dev" >> $GITHUB_ENV
           fi
+
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.artifacts-name }}
           path: git-crypt
+
   upload:
     name: Upload Release Binary
     if: github.event_name == 'release'
@@ -45,17 +55,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: git-crypt-artifacts
+
       - name: Upload release asset
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require("fs").promises;
-            const { repo: { owner, repo }, sha } = context;
+            const { owner, repo } = context.repo;
             await github.rest.repos.uploadReleaseAsset({
-              owner, repo,
-              release_id: ${{ github.event.release.id }},
-              name: 'git-crypt-${{ github.event.release.name }}-linux-x86_64',
+              owner,
+              repo,
+              release_id: context.payload.release.id,
+              name: `git-crypt-${context.payload.release.tag_name}-linux-x86_64`,
               data: await fs.readFile('git-crypt'),
             });
-            
+            core.notice(`✅ Uploaded release asset: git-crypt-${context.payload.release.tag_name}-linux-x86_64`);
