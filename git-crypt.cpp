@@ -73,6 +73,7 @@ static void print_usage (std::ostream& out)
 	out << "   clean [LEGACY-KEYFILE]" << std::endl;
 	out << "   smudge [LEGACY-KEYFILE]" << std::endl;
 	out << "   diff [LEGACY-KEYFILE] FILE" << std::endl;
+	out << "   merge" << std::endl;
 	*/
 	out << std::endl;
 	out << "See 'git-crypt help COMMAND' for more information on a specific command." << std::endl;
@@ -230,6 +231,9 @@ try {
 		}
 		if (std::strcmp(command, "diff") == 0) {
 			return diff(argc, argv);
+		}
+		if (std::strcmp(command, "merge") == 0) {
+			return merge(argc, argv);
 		}
 	} catch (const Option_error& e) {
 		std::clog << "git-crypt: Error: " << e.option_name << ": " << e.message << std::endl;

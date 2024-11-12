@@ -29,9 +29,8 @@ Configure a repository to use git-crypt:
 
 Specify files to encrypt by creating a .gitattributes file:
 
-    secretfile filter=git-crypt diff=git-crypt
-    *.key filter=git-crypt diff=git-crypt
-    secretdir/** filter=git-crypt diff=git-crypt
+    secretfile filter=git-crypt diff=git-crypt merge=git-crypt
+	*.key filter=git-crypt diff=git-crypt merge=git-crypt
 
 Like a .gitignore file, it can match wildcards and should be checked into
 the repository.  See below for more information about .gitattributes.
@@ -153,10 +152,10 @@ encrypt all files beneath it.
 Also note that the pattern `dir/*` does not match files under
 sub-directories of dir/.  To encrypt an entire sub-tree dir/, use `dir/**`:
 
-    dir/** filter=git-crypt diff=git-crypt
+    dir/** filter=git-crypt diff=git-crypt merge=git-crypt
 
 The .gitattributes file must not be encrypted, so make sure wildcards don't
 match it accidentally.  If necessary, you can exclude .gitattributes from
 encryption like this:
 
-    .gitattributes !filter !diff
+    .gitattributes !filter !diff !merge

@@ -7,8 +7,8 @@
 	-->
 	<refentryinfo>
 		<title>git-crypt</title>
-		<date>2022-04-21</date>
-		<productname>git-crypt 0.7.0</productname>
+		<date>2024-11-11</date>
+		<productname>git-crypt 0.8.0</productname>
 
 		<author>
 			<othername>Andrew Ayer</othername>
@@ -310,11 +310,11 @@
 		<para>
 			Then, you specify the files to encrypt by creating a
 			<citerefentry><refentrytitle>gitattributes</refentrytitle><manvolnum>5</manvolnum></citerefentry> file.
-			Each file which you want to encrypt should be assigned the "<literal>filter=git-crypt diff=git-crypt</literal>"
+			Each file which you want to encrypt should be assigned the "<literal>filter=git-crypt diff=git-crypt merge=git-crypt</literal>"
 			attributes.  For example:
 		</para>
 
-		<screen>secretfile filter=git-crypt diff=git-crypt&#10;*.key filter=git-crypt diff=git-crypt</screen>
+		<screen>secretfile filter=git-crypt diff=git-crypt merge=git-crypt&#10;*.key filter=git-crypt diff=git-crypt merge=git-crypt</screen>
 
 		<para>
 			Like a <filename>.gitignore</filename> file, <filename>.gitattributes</filename> files can match wildcards and
@@ -383,7 +383,7 @@
 			following in <filename>dir/.gitattributes</filename>:
 		</para>
 
-		<screen>* filter=git-crypt diff=git-crypt&#10;.gitattributes !filter !diff</screen>
+		<screen>* filter=git-crypt diff=git-crypt merge=git-crypt&#10;.gitattributes !filter !diff !merge</screen>
 
 		<para>
 			The second pattern is essential for ensuring that <filename>.gitattributes</filename> itself
@@ -414,7 +414,7 @@
 			filter in <filename>.gitattributes</filename> as follows:
 		</para>
 
-		<screen><replaceable>secretfile</replaceable> filter=git-crypt-<replaceable>KEYNAME</replaceable> diff=git-crypt-<replaceable>KEYNAME</replaceable></screen>
+		<screen><replaceable>secretfile</replaceable> filter=git-crypt-<replaceable>KEYNAME</replaceable> diff=git-crypt-<replaceable>KEYNAME</replaceable> merge=git-crypt-<replaceable>KEYNAME</replaceable></screen>
 
 		<para>
 			To export an alternative key or share it with a GPG user, pass the
