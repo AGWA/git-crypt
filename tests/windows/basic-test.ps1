@@ -127,7 +127,6 @@ try {
 
     Write-Host "::notice:: ✅ Passed worktree test"
 
-    # Test compatibility with git-crypt 0.7.0
     Write-Host "Testing compatibility with git-crypt 0.7.0..."
     
     Push-Location "$REPO_HOME"
