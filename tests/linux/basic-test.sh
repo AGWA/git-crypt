@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+REPO_HOME="$PWD"
 # Export the built git-crypt binary to PATH
 export PATH="$PWD:$PATH"
 
@@ -124,3 +124,23 @@ else
 fi
 
 echo "::notice:: ✅ Passed worktree test"
+
+echo "test compatibility with git-crypt 0.7.0..."
+
+# move to original repo
+cd "$REPO_HOME"
+
+# clean git changes
+git reset --hard
+
+git crypt unlock "./tests/key.gitcrypt"
+# check if tests/fake.test.secrets is decrypted
+
+if xxd "./tests/fake.test.secrets" | grep -q 'GITCRYPT'; then
+    echo "fake.test.secrets is encrypted"
+    exit 1
+else
+    echo "fake.test.secrets is decrypted"
+    echo "::notice:: ✅ Passed  0.7.0 compatibility test"
+fi
+

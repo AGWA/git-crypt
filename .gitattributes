@@ -1,1 +1,3 @@
 .git* export-ignore
+
+*.test.secrets eol=lf filter=git-crypt  diff=git-crypt
