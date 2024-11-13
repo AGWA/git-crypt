@@ -41,11 +41,9 @@ LDFLAGS += -lcrypto
 # $(OS) is typically 'Windows_NT' on Windows and empty or 'Linux' on Linux
 ifeq ($(OS),Windows_NT)
     # Windows-specific linker flags
-    LDFLAGS += -lws2_32 -lcrypt32
+    LDFLAGS += -static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32
 else
     # Unix/Linux-specific linker flags
-    # You can add Unix-specific flags here if needed
-    # For example, linking against pthread:
     # LDFLAGS += -lpthread
 endif
 
