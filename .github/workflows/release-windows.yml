@@ -24,7 +24,7 @@ jobs:
             openssl-devel
       - name: Build binary
         shell: msys2 {0}
-        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32"
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
