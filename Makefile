@@ -17,7 +17,7 @@ MANDIR ?= $(PREFIX)/share/man
 
 # Documentation
 ENABLE_MAN ?= no
-DOCBOOK_XSL ?= http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl
+DOCBOOK_XSL ?= http://cdn.docbook.org/release/xsl-nons/current/manpages/docbook.xsl
 
 # Object Files
 OBJFILES = \
