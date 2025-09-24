@@ -28,8 +28,6 @@
  * as that of the covered work.
  */
 
-#include <openssl/opensslconf.h>
-
 #include "crypto.hpp"
 #include "key.hpp"
 #include "util.hpp"
