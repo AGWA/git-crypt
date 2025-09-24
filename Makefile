@@ -31,7 +31,7 @@ OBJFILES = \
     coprocess.o \
     fhstream.o
 
-OBJFILES += crypto-openssl-10.o crypto-openssl-11.o
+OBJFILES += crypto-openssl-11.o
 
 # Linker Flags
 # Initially includes -lcrypto; additional flags will be appended based on OS

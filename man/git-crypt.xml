@@ -7,9 +7,9 @@
 	-->
 	<refentryinfo>
 		<title>git-crypt</title>
-		<date>2024-11-11</date>
-		<productname>git-crypt 0.8.1</productname>
-
+		<date>2025-09-24</date>
+		<productname>git-crypt 0.8.2</productname>
+		
 		<author>
 			<othername>Andrew Ayer</othername>
 			<contrib></contrib>
