@@ -896,7 +896,8 @@ int smudge (int argc, const char** argv)
 		std::clog << "git-crypt: file contains sensitive information, you can use 'git filter-branch'" << std::endl;
 		std::clog << "git-crypt: to remove its old versions from the history." << std::endl;
 		std::cout.write(reinterpret_cast<char*>(header), std::cin.gcount()); // include the bytes which we already read
-		std::cout << std::cin.rdbuf();
+		if (!std::cin.fail())
+			std::cout << std::cin.rdbuf();
 		return 0;
 	}
 
