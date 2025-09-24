@@ -33,6 +33,8 @@ OBJFILES = \
 
 OBJFILES += crypto-openssl-11.o
 
+OS ?= $(shell uname)
+
 # Linker Flags
 # Initially includes -lcrypto; additional flags will be appended based on OS
 LDFLAGS += -lcrypto
@@ -42,6 +44,10 @@ LDFLAGS += -lcrypto
 ifeq ($(OS),Windows_NT)
     # Windows-specific linker flags
     LDFLAGS += -static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32
+endif
+ifeq ($(OS),Darwin)
+	LDFLAGS += "-L/opt/homebrew/opt/openssl@3/lib"
+    CPPFLAGS += "-I/opt/homebrew/opt/openssl@3/include"
 else
     # Unix/Linux-specific linker flags
     # LDFLAGS += -lpthread
@@ -70,6 +76,7 @@ build-bin: git-crypt
 
 # Linking the binary
 git-crypt: $(OBJFILES)
+	@echo OS=$(OS) LDFLAGS=$(LDFLAGS)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
 
 # Object File Dependencies

@@ -1,0 +1,65 @@
+on:
+  release:
+    types: [published]
+  pull_request:
+    branches:
+      - master
+name: Build and Test Release Binary (macOS)
+jobs:
+  build:
+    name: Build and Test Release Binary
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # https://github.com/actions/runner-images#available-images
+        os: [ macos-13, macos-13-xlarge ] # amd64, arm64
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build ${{ env.RUNNER_OS }} ${{ env.RUNNER_ARCH }} binary
+        run: |
+          make
+          echo BUILD_FILE=git-crypt-${{ github.ref_name }}-darwin-${{ env.RUNNER_ARCH }} >> $GITHUB_ENV 
+
+      - name: Run integration tests for ${{ env.BUILD_FILE }}
+        run: |
+          chmod +x ./tests/linux/basic-test.sh
+          ./tests/linux/basic-test.sh
+
+      - name: Determine artifacts name
+        id: artifacts-name
+        env:
+          IS_RELEASE: ${{ github.event_name == 'release' }}
+        run: |
+          if [ "$IS_RELEASE" = true ]; then
+            echo "artifacts-name=${{ env.BUILD_FILE }}" >> $GITHUB_ENV
+          else
+            echo "artifacts-name=${{ env.BUILD_FILE }}-dev" >> $GITHUB_ENV
+          fi
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifacts-name }}
+          path: git-crypt
+
+  upload:
+    name: Upload Release Binary
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Upload release assets
+        uses: AButler/upload-release-assets@v3
+        if: github.ref_type == 'tag'
+        with:
+          files: git-crypt-*-darwin-*
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
