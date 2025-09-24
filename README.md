@@ -1,75 +1,146 @@
-git-crypt - transparent file encryption in git
-==============================================
+# git-crypt - a transparent file encryption in git
 
-git-crypt enables transparent encryption and decryption of files in a
-git repository.  Files which you choose to protect are encrypted when
-committed, and decrypted when checked out.  git-crypt lets you freely
-share a repository containing a mix of public and private content.
-git-crypt gracefully degrades, so developers without the secret key can
-still clone and commit to a repository with encrypted files.  This lets
-you store your secret material (such as keys or passwords) in the same
-repository as your code, without requiring you to lock down your entire
-repository.
+<!--- Logo picture element for user's light/dark modes --->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./media/git-crypt-logo-dark.svg">
+  <img alt="git-crypt logo header" src="./media/git-crypt-logo.svg">
+</picture>
 
-git-crypt was written by [Andrew Ayer](https://www.agwa.name) (agwa@andrewayer.name).
+**git-crypt** enables transparent encryption and decryption of files in your git repository.
+
+Simply select all the files that you want to protect. From that point forward, all your selected files will be encrypted when they are committed and decrypted when they are checked out.
+
+With **git-crypt** you can freely share your repository with the public while keeping your private or sensitive content secure.
+
+**git-crypt** also gracefully degrades, so contributors and developers can still clone and commit changes to your repository while the encrypted files remain secure. Your secret material (such as keys or passwords) can be kept in the same repository as your code, without requiring you to lock down your entire repository.
+
+**git-crypt** was written by [Andrew Ayer](https://www.agwa.name) (agwa@andrewayer.name).
+
 For more information, see <https://www.agwa.name/projects/git-crypt>.
 
-Building git-crypt
-------------------
-See the [INSTALL.md](INSTALL.md) file.
+<!--- Line break elements have been added to improve readability -->
+<br />
+
+## Installing git-crypt
+
+1. For ***nix** based systems.
+
+        apt-get install git-crypt
+
+2. For **MacOS** (using homebrew).
+
+        brew install git-crypt
+
+3. To build and install from source.
+
+    > Following the instructions in the [INSTALL.md](INSTALL.md) file.
+
+<br />
+
+## Setting up git-crypt
+
+1. Start by configuring your repository to use git-crypt.
+
+        cd your-repo/
+        git-crypt init
+
+    This will generate a key for your repository.
 
 
-Using git-crypt
----------------
+2. Specify the files you want to encrypt by creating a `.gitattributes` file.
 
-Configure a repository to use git-crypt:
+    For example, let's say you have a file called `secretfile` and maybe a directory called `secretdir/`. You can add them like this:
 
-    cd repo
-    git-crypt init
-
-Specify files to encrypt by creating a .gitattributes file:
-
+    ```
+    # My secret file
     secretfile filter=git-crypt diff=git-crypt
-    *.key filter=git-crypt diff=git-crypt
+
+    # My secret directory
     secretdir/** filter=git-crypt diff=git-crypt
 
-Like a .gitignore file, it can match wildcards and should be checked into
-the repository.  See below for more information about .gitattributes.
-Make sure you don't accidentally encrypt the .gitattributes file itself
-(or other git files like .gitignore or .gitmodules).  Make sure your
-.gitattributes rules are in place *before* you add sensitive files, or
-those files won't be encrypted!
+    # You can even add a key
+    # My secret key
+    *.key filter=git-crypt diff=git-crypt
+    ```
 
-Share the repository with others (or with yourself) using GPG:
+    You can use [globbing patterns](http://linux.die.net/man/7/glob) to match against your file names, just like in your .gitignore file. ([See below](#gitattributes-file) for more information about .gitattributes.)
 
+    > || **WARNING** ||
+    >
+    > * Make sure your .gitattributes rules are in place **BEFORE** you commit sensitive files, or those files won't be encrypted!
+    >
+    > * Be care not to (accidently) encrypt the .gitattributes file itself
+    > (or other git files like .gitignore or .gitmodules).
+
+<br />
+
+## Encrypting your files
+
+You can either choose to encrypt your files automatically using git-crypt, or you can choose to encrypt and decrypt manually at any time.
+
+1. **Automatic** Encryption/Decryption.
+
+    * When you *commit* your repo, your files will be automatically **encrypted**.
+
+    * When you *checkout* your repository, your files will be automatically **decrypted**.
+
+2. Alternatively, you can **manually** encrypt and decrypt your files.
+
+    * Lock selected files in your repository.
+
+        ```
+        git-crypt lock
+        ```
+
+    * Unlock selected files in your reposity.
+
+        ```
+        git-crypt unlock
+        ```
+
+<br />
+
+## Collaborating with Others
+
+In order for others to en/decrypt your files, they will need a public key. You can generate your key either by using [GPG](https://gnupg.org/download/), or by using **git-crypt**.
+
+1. Create and commit a GPG user using [GPG](https://gnupg.org/download/).
+
+    ```
     git-crypt add-gpg-user USER_ID
+    ```
 
-`USER_ID` can be a key ID, a full fingerprint, an email address, or
-anything else that uniquely identifies a public key to GPG (see "HOW TO
-SPECIFY A USER ID" in the gpg man page).  Note: `git-crypt add-gpg-user`
-will add and commit a GPG-encrypted key file in the .git-crypt directory
-of the root of your repository.
 
-Alternatively, you can export a symmetric secret key, which you must
+    > `USER_ID` can be: a key ID a full fingerprint, an email address, or anything else that uniquely identifies a public key to GPG.
+    >
+    > (see ["HOW TO SPECIFY A USER ID"](https://www.gnupg.org/documentation/manuals/gnupg/Specify-a-User-ID.html))
+
+    This will create a `.git-crypt/` directory in the root folder of your repository and add (and commit) a GPG-encrypted key file for each user you create.
+
+2. Create/Send a sharable key using git-crypt.
+
+    You can also export a symmetric secret key, which you will need to
 securely convey to collaborators (GPG is not required, and no files
-are added to your repository):
+are added to your repository).
 
-    git-crypt export-key /path/to/key
+        git-crypt export-key /path/to/key
 
-After cloning a repository with encrypted files, unlock with GPG:
+    You can then send this key to your collaborators, who can unlock your encrypted files using:
 
-    git-crypt unlock
+        git-crypt unlock /path/to/key
 
-Or with a symmetric key:
+<br />
 
-    git-crypt unlock /path/to/key
+## Using git-crypt
 
-That's all you need to do - after git-crypt is set up (either with
-`git-crypt init` or `git-crypt unlock`), you can use git normally -
-encryption and decryption happen transparently.
+Once **git-crypt** is set up (either with
+`git-crypt init` or `git-crypt unlock`), you can continue to use git normally. Encryption and decryption will happen automatically and transparently.
 
-Current Status
---------------
+<br />
+
+## More About Development
+
+### Current Status
 
 The latest version of git-crypt is [0.8.0](NEWS.md), released on
 2025-09-23.  git-crypt aims to be bug-free and reliable, meaning it
@@ -79,8 +150,7 @@ documented, featureful, or easy-to-use as it should be.  Additionally,
 there may be backwards-incompatible changes introduced before version
 1.0.
 
-Security
---------
+### Security
 
 git-crypt is more secure than other transparent git encryption systems.
 git-crypt encrypts files using AES-256 in CTR mode with a synthetic IV
@@ -92,8 +162,7 @@ it leaks no information beyond whether two files are identical or not.
 Other proposals for transparent git encryption use ECB or CBC with a
 fixed IV.  These systems are not semantically secure and leak information.
 
-Limitations
------------
+### Limitations
 
 git-crypt relies on git filters, which were not designed with encryption
 in mind.  As such, git-crypt is not the best tool for encrypting most or
@@ -141,8 +210,8 @@ git-crypt does not work reliably with some third-party git GUIs, such
 as [Atlassian SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511)
 and GitHub for Mac.  Files might be left in an unencrypted state.
 
-Gitattributes File
-------------------
+
+### Gitattributes File
 
 The .gitattributes file is documented in the gitattributes(5) man page.
 The file pattern format is the same as the one used by .gitignore,
