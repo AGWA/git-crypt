@@ -44,6 +44,10 @@ Share the repository with others (or with yourself) using GPG:
 
     git-crypt add-gpg-user USER_ID
 
+If its a collaborator key you might need to trust the key:
+
+    git-crypt add-gpg-user --trusted USER_ID
+
 `USER_ID` can be a key ID, a full fingerprint, an email address, or
 anything else that uniquely identifies a public key to GPG (see "HOW TO
 SPECIFY A USER ID" in the gpg man page).  Note: `git-crypt add-gpg-user`
