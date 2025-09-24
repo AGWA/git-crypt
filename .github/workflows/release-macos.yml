@@ -4,47 +4,53 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+
 name: Build and Test Release Binary (macOS)
+
 jobs:
   build:
     name: Build and Test Release Binary
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # https://github.com/actions/runner-images#available-images
-        os: [ macos-13, macos-13-xlarge ] # amd64, arm64
+        # macos-13 is x64 (Intel), macos-13-xlarge is arm64 (Apple Silicon)
+        os: [ macos-13, macos-13-xlarge ]
     permissions:
       contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build ${{ env.RUNNER_OS }} ${{ env.RUNNER_ARCH }} binary
+      - name: Build and Test ${{ matrix.os }} ${{ runner.arch }} binary
         run: |
           make
-          echo BUILD_FILE=git-crypt-${{ github.ref_name }}-darwin-${{ env.RUNNER_ARCH }} >> $GITHUB_ENV 
-
-      - name: Run integration tests for ${{ env.BUILD_FILE }}
-        run: |
           chmod +x ./tests/linux/basic-test.sh
           ./tests/linux/basic-test.sh
 
-      - name: Determine artifacts name
-        id: artifacts-name
-        env:
-          IS_RELEASE: ${{ github.event_name == 'release' }}
+      - name: Prepare Artifact
+        id: prep_artifact
         run: |
-          if [ "$IS_RELEASE" = true ]; then
-            echo "artifacts-name=${{ env.BUILD_FILE }}" >> $GITHUB_ENV
-          else
-            echo "artifacts-name=${{ env.BUILD_FILE }}-dev" >> $GITHUB_ENV
+          # Use runner.arch which resolves to 'x64' or 'arm64'
+          FINAL_NAME="git-crypt-${{ github.ref_name }}-darwin-${{ runner.arch }}"
+          
+          # Append '-dev' suffix for non-release builds (e.g., PRs)
+          if [[ "${{ github.event_name }}" != 'release' ]]; then
+            FINAL_NAME="${FINAL_NAME}-dev"
           fi
+          
+          echo "Renaming binary to ${FINAL_NAME}"
+          mv git-crypt "${FINAL_NAME}"
+          
+          # Set the final name as an output for the next step
+          echo "artifact_name=${FINAL_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload release artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.artifacts-name }}
-          path: git-crypt
+          # Use the output from the previous step for both the artifact and path
+          name: ${{ steps.prep_artifact.outputs.artifact_name }}
+          path: ${{ steps.prep_artifact.outputs.artifact_name }}
 
   upload:
     name: Upload Release Binary
@@ -52,14 +58,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
+      # 'contents: write' is required to upload assets to the release
       contents: write
     steps:
-      - name: Download release artifacts
+      - name: Download all release artifacts
         uses: actions/download-artifact@v4
 
-      - name: Upload release assets
-        uses: AButler/upload-release-assets@v3
-        if: github.ref_type == 'tag'
+      - name: Upload assets to GitHub release
+        uses: AButler/upload-release-assets@v3.0
         with:
-          files: git-crypt-*-darwin-*
+          # The download action creates subdirectories for each artifact.
+          # The '**/...' glob pattern searches recursively to find the binaries.
+          files: '**/git-crypt-*-darwin-*'
           repo-token: ${{ secrets.GITHUB_TOKEN }}

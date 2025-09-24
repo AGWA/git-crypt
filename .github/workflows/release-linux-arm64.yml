@@ -1,6 +1,8 @@
 on:
   release:
     types: [published]
+  workflow_dispatch:
+
 name: Build Release Binary (Linux ARM64)
 jobs:
   build:
