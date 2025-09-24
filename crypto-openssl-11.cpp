@@ -30,8 +30,6 @@
 
 #include <openssl/opensslconf.h>
 
-#if defined(OPENSSL_API_COMPAT)
-
 #include "crypto.hpp"
 #include "key.hpp"
 #include "util.hpp"
@@ -115,5 +113,3 @@ void random_bytes (unsigned char* buffer, size_t len)
 		throw Crypto_error("random_bytes", message.str());
 	}
 }
-
-#endif
