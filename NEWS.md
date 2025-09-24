@@ -1,6 +1,10 @@
 News
 ====
 
+######v0.8.0 (2025-09-23)
+* Remove OpenSSL 1.0 support, fix compilation with OpenSSL 3.
+* Avoid use of problematic short GPG key IDs.
+
 ######v0.7.0 (2022-04-21)
 * Avoid "argument list too long" errors on macOS.
 * Fix handling of "-" arguments.
