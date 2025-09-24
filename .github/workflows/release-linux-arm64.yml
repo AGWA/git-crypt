@@ -5,7 +5,7 @@ name: Build Release Binary (Linux ARM64)
 jobs:
   build:
     name: Build Release Binary
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-22.04-arm
     permissions:
       contents: read
     steps:
