@@ -10,6 +10,19 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man
 
+SYS := $(shell $(CXX) -dumpmachine)
+CYGWIN := $(findstring cygwin,$(SYS))
+MINGW32 := $(findstring mingw32,$(SYS))
+
+# https://stackoverflow.com/a/21749803/1432614
+ifdef CYGWIN
+	CXXFLAGS += -U__STRICT_ANSI__
+endif
+
+ifdef MINGW32
+	CXXFLAGS += -static
+endif
+
 ENABLE_MAN ?= no
 DOCBOOK_XSL ?= http://cdn.docbook.org/release/xsl-nons/current/manpages/docbook.xsl
 
@@ -26,6 +39,10 @@ OBJFILES = \
 
 OBJFILES += crypto-openssl-11.o
 LDFLAGS += -lcrypto
+
+ifdef MINGW32
+	LDFLAGS += -lgdi32
+endif
 
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
@@ -67,7 +84,7 @@ CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(ENABLE_MAN))
 clean: $(CLEAN_TARGETS)
 
 clean-bin:
-	rm -f $(OBJFILES) git-crypt
+	rm -f $(OBJFILES) git-crypt git-crypt.exe
 
 clean-man:
 	rm -f man/man1/git-crypt.1
