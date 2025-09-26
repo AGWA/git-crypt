@@ -83,18 +83,23 @@ public:
 
 	void				set_key_name (const char* k) { key_name = k ? k : ""; }
 	const char*			get_key_name () const { return key_name.empty() ? 0 : key_name.c_str(); }
+
+	void				set_skip_empty (bool v) { skip_empty = v; }
+	bool				get_skip_empty () const { return skip_empty; }
 private:
 	typedef std::map<uint32_t, Entry, std::greater<uint32_t> > Map;
 	enum { FORMAT_VERSION = 2 };
 
 	Map				entries;
 	std::string			key_name;
+	bool				skip_empty = false;
 
 	void				load_header (std::istream&);
 
 	enum {
 		HEADER_FIELD_END	= 0,
-		HEADER_FIELD_KEY_NAME	= 1
+		HEADER_FIELD_KEY_NAME	= 1,
+		HEADER_FIELD_SKIP_EMPTY	= 3	// If this field is present, empty files are left unencrypted (see issue #53)
 	};
 	enum {
 		KEY_FIELD_END		= 0,
