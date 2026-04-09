@@ -239,16 +239,16 @@ static void validate_key_name_or_throw (const char* key_name)
 
 static std::string get_internal_state_path ()
 {
-	// git rev-parse --git-dir
+	// git rev-parse --git-common-dir
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("rev-parse");
-	command.push_back("--git-dir");
+	command.push_back("--git-common-dir");
 
 	std::stringstream		output;
 
 	if (!successful_exit(exec_command(command, output))) {
-		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
+		throw Error("'git rev-parse --git-common-dir' failed - is this a Git repository?");
 	}
 
 	std::string			path;
@@ -1705,4 +1705,3 @@ int status (int argc, const char** argv)
 
 	return exit_status;
 }
-
