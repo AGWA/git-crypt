@@ -46,6 +46,9 @@ build: $(BUILD_TARGETS)
 
 build-bin: git-crypt
 
+test: build-bin
+	tests/worktree.sh ./git-crypt
+
 git-crypt: $(OBJFILES)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
 
@@ -90,6 +93,6 @@ install-man: build-man
 	install -m 644 man/man1/git-crypt.1 $(DESTDIR)$(MANDIR)/man1/
 
 .PHONY: all \
-	build build-bin build-man \
+	build build-bin build-man test \
 	clean clean-bin clean-man \
 	install install-bin install-man
