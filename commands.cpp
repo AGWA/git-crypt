@@ -239,16 +239,23 @@ static void validate_key_name_or_throw (const char* key_name)
 
 static std::string get_internal_state_path ()
 {
-	// git rev-parse --git-dir
+	// The git-crypt state directory (which holds the symmetric keys) lives in
+	// the shared git directory so that it is reachable from every linked
+	// worktree.  We therefore resolve it via --git-common-dir rather than
+	// --git-dir: in the main worktree the two are identical, but in a linked
+	// worktree --git-dir points at the per-worktree directory
+	// (.git/worktrees/<name>), which never contains the keys.  Using
+	// --git-dir there caused `git worktree add` to fail in the smudge filter
+	// with "Unable to open key file".
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("rev-parse");
-	command.push_back("--git-dir");
+	command.push_back("--git-common-dir");
 
 	std::stringstream		output;
 
 	if (!successful_exit(exec_command(command, output))) {
-		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
+		throw Error("'git rev-parse --git-common-dir' failed - is this a Git repository?");
 	}
 
 	std::string			path;
