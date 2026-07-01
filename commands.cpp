@@ -237,25 +237,50 @@ static void validate_key_name_or_throw (const char* key_name)
 	}
 }
 
-static std::string get_internal_state_path ()
+static std::string git_rev_parse (const char* flag)
 {
-	// git rev-parse --git-dir
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("rev-parse");
-	command.push_back("--git-dir");
+	command.push_back(flag);
 
 	std::stringstream		output;
 
 	if (!successful_exit(exec_command(command, output))) {
-		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
+		throw Error(std::string("'git rev-parse ") + flag + "' failed - is this a Git repository?");
 	}
 
 	std::string			path;
 	std::getline(output, path);
-	path += "/git-crypt";
-
 	return path;
+}
+
+static std::string get_internal_state_path ()
+{
+	// The git-crypt state directory (which holds the symmetric keys) lives in
+	// the shared git directory.  In a linked worktree, --git-dir points at the
+	// per-worktree directory (.git/worktrees/<name>), which does not contain
+	// the keys.  Prefer the per-worktree directory when it has already been
+	// provisioned (preserving the ability to keep per-worktree state), and
+	// otherwise fall back to the common git directory shared by every
+	// worktree.  This lets `git worktree add` decrypt transparently instead of
+	// failing in the smudge filter with "Unable to open key file".
+	const std::string		per_worktree(git_rev_parse("--git-dir") + "/git-crypt");
+	if (access(per_worktree.c_str(), F_OK) == 0) {
+		return per_worktree;
+	}
+
+	const std::string		common(git_rev_parse("--git-common-dir") + "/git-crypt");
+	if (access(common.c_str(), F_OK) == 0) {
+		return common;
+	}
+
+	// Neither exists yet (e.g. during `git-crypt init`, or the first unlock in
+	// a linked worktree); create under the common git directory shared by every
+	// worktree so that the key is reachable from all of them.  In the main
+	// worktree --git-dir and --git-common-dir are identical, so this matches
+	// historical behaviour there.
+	return common;
 }
 
 static std::string get_internal_keys_path (const std::string& internal_state_path)
