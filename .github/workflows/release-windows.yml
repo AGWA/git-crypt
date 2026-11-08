@@ -10,9 +10,9 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3.7.0
       - name: Setup msys2
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@v2.33.0
         with:
           msystem: MINGW64
           update: true
@@ -26,7 +26,7 @@ jobs:
         shell: msys2 {0}
         run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: git-crypt-artifacts
           path: git-crypt.exe
@@ -38,11 +38,11 @@ jobs:
       contents: write
     steps:
       - name: Download release artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: git-crypt-artifacts
       - name: Upload release asset
-        uses: actions/github-script@v6
+        uses: actions/github-script@v6.4.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
