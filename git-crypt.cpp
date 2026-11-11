@@ -56,7 +56,7 @@ static void print_usage (std::ostream& out)
 	out << "GPG commands:" << std::endl;
 	out << "  add-gpg-user USERID  add the user with the given GPG user ID as a collaborator" << std::endl;
 	//out << "  rm-gpg-user USERID   revoke collaborator status from the given GPG user ID" << std::endl;
-	//out << "  ls-gpg-users         list the GPG key IDs of collaborators" << std::endl;
+	out << "  ls-gpg-users         list the GPG key fingerprints of collaborators" << std::endl;
 	out << "  unlock               decrypt this repo using the in-repo GPG-encrypted key" << std::endl;
 	out << std::endl;
 	out << "Symmetric key commands:" << std::endl;

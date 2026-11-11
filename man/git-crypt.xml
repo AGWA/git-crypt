@@ -52,6 +52,9 @@
 			<command>git-crypt add-gpg-user <arg choice="plain"><replaceable>GPG_USER_ID</replaceable></arg></command>
 		</cmdsynopsis>
 		<cmdsynopsis>
+			<command>git-crypt ls-gpg-users</command>
+		</cmdsynopsis>
+		<cmdsynopsis>
 			<command>git-crypt unlock</command>
 		</cmdsynopsis>
 	</refsynopsisdiv>
@@ -266,6 +269,38 @@
 									<citerefentry><refentrytitle>gpg</refentrytitle><manvolnum>1</manvolnum></citerefentry>),
 									or use the <option>--trusted</option> option to <command>add-gpg-user</command>
 									on a case-by-case basis.
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>ls-gpg-users <arg choice="opt"><replaceable>OPTIONS</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						List the GPG collaborators who can unlock the repository: the
+						fingerprints of the GPG keys that each key has been encrypted to
+						by <command>add-gpg-user</command>, grouped by key name and key
+						version.  Where the fingerprint is in your GPG keyring, its user ID is
+						shown.  This reads the <filename>.git-crypt</filename> directory (or the
+						directory set by <varname>git-crypt.repoStateDir</varname>), so it works
+						whether or not the repository is unlocked.  For example:
+					</para>
+					<screen>Key 'default', version 0:&#10;    7A399B2DB06D039020CD1CE1D0F3702D61489532 John Smith &lt;jsmith@example.com&gt;&#10;    0123456789ABCDEF0123456789ABCDEF01234567 (not in your GPG keyring)</screen>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-k</option> <replaceable>KEY_NAME</replaceable></term>
+							<term><option>--key-name</option> <replaceable>KEY_NAME</replaceable></term>
+
+							<listitem>
+								<para>
+									List the collaborators of the given key only.
 								</para>
 							</listitem>
 						</varlistentry>

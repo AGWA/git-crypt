@@ -125,6 +125,54 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 	return fingerprints;
 }
 
+// Returns the UID (e.g. "John Smith <jsmith@example.com>") of every public key in the
+// keyring, keyed by the primary key's fingerprint.  Listing the whole keyring at once
+// (rather than looking up each fingerprint) means unknown fingerprints produce no gpg
+// error output.  Returns an empty map if gpg fails.
+std::map<std::string, std::string> gpg_list_public_key_uids ()
+{
+	// gpg --batch --with-colons --fixed-list-mode --fingerprint --list-keys
+	std::vector<std::string>	command;
+	command.push_back(gpg_get_executable());
+	command.push_back("--batch");
+	command.push_back("--with-colons");
+	command.push_back("--fixed-list-mode");
+	command.push_back("--fingerprint");
+	command.push_back("--list-keys");
+	std::stringstream		command_output;
+
+	std::map<std::string, std::string>	uids;
+	if (!successful_exit(exec_command(command, command_output))) {
+		return uids;
+	}
+
+	// pub:...            <- start of a key
+	// fpr:::::::::7A399B2DB06D039020CD1CE1D0F3702D61489532:   <- its fingerprint
+	// uid:u::::1395975462::AB97D6E3E5D8789988CA55E5F77D9E7397D05229::John Smith <jsmith@example.com>:
+	// sub:...            <- a subkey, followed by its own fpr line
+	std::string			fingerprint;	// of the current primary key, until its first uid is seen
+	bool				in_pubkey = false;
+	while (command_output.peek() != -1) {
+		std::string		line;
+		std::getline(command_output, line);
+		if (line.substr(0, 4) == "pub:") {
+			in_pubkey = true;
+			fingerprint.clear();
+		} else if (line.substr(0, 4) == "sub:") {
+			in_pubkey = false;
+		} else if (in_pubkey && fingerprint.empty() && line.substr(0, 4) == "fpr:") {
+			// want the 9th column (counting from 0)
+			fingerprint = gpg_nth_column(line, 9);
+			uids[fingerprint]; // known key, even if it has no UID
+		} else if (!fingerprint.empty() && line.substr(0, 4) == "uid:") {
+			if (uids[fingerprint].empty()) {
+				uids[fingerprint] = gpg_nth_column(line, 9);
+			}
+		}
+	}
+	return uids;
+}
+
 std::vector<std::string> gpg_list_secret_keys ()
 {
 	// gpg --batch --with-colons --list-secret-keys --fingerprint

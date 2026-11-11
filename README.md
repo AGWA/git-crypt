@@ -53,6 +53,10 @@ SPECIFY A USER ID" in the gpg man page).  Note: `git-crypt add-gpg-user`
 will add and commit a GPG-encrypted key file in the .git-crypt directory
 of the root of your repository.
 
+To see which GPG keys can unlock the repository:
+
+    git-crypt ls-gpg-users
+
 Alternatively, you can export a symmetric secret key, which you must
 securely convey to collaborators (GPG is not required, and no files
 are added to your repository):
