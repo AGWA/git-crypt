@@ -239,11 +239,14 @@ static void validate_key_name_or_throw (const char* key_name)
 
 static std::string get_internal_state_path ()
 {
-	// git rev-parse --git-dir
+	// git rev-parse --git-dir --git-common-dir
+	// The internal state lives in the common Git directory so that it's shared
+	// by all of the repository's worktrees.
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("rev-parse");
 	command.push_back("--git-dir");
+	command.push_back("--git-common-dir");
 
 	std::stringstream		output;
 
@@ -251,8 +254,14 @@ static std::string get_internal_state_path ()
 		throw Error("'git rev-parse --git-dir' failed - is this a Git repository?");
 	}
 
-	std::string			path;
-	std::getline(output, path);
+	std::string			git_dir;
+	std::string			git_common_dir;
+	std::getline(output, git_dir);
+	std::getline(output, git_common_dir);
+
+	// Git older than 2.5 doesn't know --git-common-dir and echoes it back verbatim.
+	// Those versions don't support worktrees, so the Git directory is the common one.
+	std::string			path(git_common_dir.empty() || git_common_dir == "--git-common-dir" ? git_dir : git_common_dir);
 	path += "/git-crypt";
 
 	return path;
@@ -376,6 +385,108 @@ static void get_git_status (std::ostream& output)
 
 	if (!successful_exit(exec_command(command, output))) {
 		throw Error("'git status' failed - is this a Git repository?");
+	}
+}
+
+static std::string get_current_directory ()
+{
+	std::vector<char>	buffer(256);
+	while (getcwd(&buffer[0], buffer.size()) == nullptr) {
+		if (errno != ERANGE) {
+			throw System_error("getcwd", "", errno);
+		}
+		buffer.resize(buffer.size() * 2);
+	}
+	return &buffer[0];
+}
+
+static void change_directory (const std::string& path)
+{
+	if (chdir(path.c_str()) == -1) {
+		throw System_error("chdir", path, errno);
+	}
+}
+
+// Returns the root directory of every worktree of the repository that's present on disk.
+// The unlocked keys and the filter configuration are shared by all worktrees, so lock and
+// unlock must act on all of them.  With Git versions too old to have 'git worktree list',
+// the current directory is the only worktree.
+static std::vector<std::string> get_worktree_paths ()
+{
+	// git worktree list --porcelain
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("worktree");
+	command.push_back("list");
+	command.push_back("--porcelain");
+
+	std::stringstream		output;
+	std::vector<std::string>	paths;
+
+	if (!successful_exit(exec_command(command, output))) {
+		paths.push_back(get_current_directory());
+		return paths;
+	}
+
+	// Example output (records are separated by blank lines):
+	// worktree /path/to/bare-repo
+	// bare
+	//
+	// worktree /path/to/linked-worktree
+	// HEAD abcd1234...
+	// branch refs/heads/master
+	std::string			path;
+	bool				bare = false;
+	std::string			line;
+	bool				more = true;
+	while (more) {
+		more = static_cast<bool>(std::getline(output, line));
+		if (!more || line.empty()) {
+			// End of record. Skip bare repositories (no working tree) and
+			// worktrees whose directory is gone (nothing to check out there).
+			if (!path.empty() && !bare && access(path.c_str(), F_OK) == 0) {
+				paths.push_back(path);
+			}
+			path.clear();
+			bare = false;
+		} else if (line.compare(0, 9, "worktree ") == 0) {
+			path = line.substr(9);
+		} else if (line == "bare") {
+			bare = true;
+		}
+	}
+
+	return paths;
+}
+
+// Returns the worktrees that have uncommitted changes (ignoring untracked files).
+// Running 'git status' also serves as a check that the Git repo is accessible.
+static std::vector<std::string> get_unclean_worktrees (const std::vector<std::string>& worktrees)
+{
+	const std::string		original_directory(get_current_directory());
+	std::vector<std::string>	unclean_worktrees;
+
+	for (std::vector<std::string>::const_iterator worktree(worktrees.begin()); worktree != worktrees.end(); ++worktree) {
+		change_directory(*worktree);
+		std::stringstream	status_output;
+		get_git_status(status_output);
+		if (status_output.peek() != -1) {
+			unclean_worktrees.push_back(*worktree);
+		}
+	}
+
+	change_directory(original_directory);
+	return unclean_worktrees;
+}
+
+static void print_unclean_worktrees (const std::vector<std::string>& worktrees, const std::vector<std::string>& unclean_worktrees)
+{
+	std::clog << "Error: Working directory not clean." << std::endl;
+	if (worktrees.size() > 1) {
+		std::clog << "The following worktrees have uncommitted changes:" << std::endl;
+		for (std::vector<std::string>::const_iterator worktree(unclean_worktrees.begin()); worktree != unclean_worktrees.end(); ++worktree) {
+			std::clog << "    " << *worktree << std::endl;
+		}
 	}
 }
 
@@ -584,6 +695,35 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 			throw Error("'git check-attr' failed - is this a Git repository?");
 		}
 	}
+}
+
+// Checks out, in every worktree, the files encrypted with the given keys, so that the
+// working tree copies get decrypted or encrypted according to the current filter configuration.
+static bool checkout_encrypted_files (const std::vector<std::string>& worktrees, const std::vector<const char*>& key_names)
+{
+	const std::string	original_directory(get_current_directory());
+
+	for (std::vector<std::string>::const_iterator worktree(worktrees.begin()); worktree != worktrees.end(); ++worktree) {
+		change_directory(*worktree);
+
+		std::vector<std::string>	encrypted_files;
+		for (std::vector<const char*>::const_iterator key_name(key_names.begin()); key_name != key_names.end(); ++key_name) {
+			get_encrypted_files(encrypted_files, *key_name);
+		}
+
+		// Git won't check out a file if its mtime hasn't changed, so touch every file first.
+		for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
+			touch_file(*file);
+		}
+		if (!git_checkout(encrypted_files)) {
+			std::clog << "Error: 'git checkout' failed in " << *worktree << std::endl;
+			change_directory(original_directory);
+			return false;
+		}
+	}
+
+	change_directory(original_directory);
+	return true;
 }
 
 static void load_key (Key_file& key_file, const char* key_name, const char* key_path =0, const char* legacy_path =0)
@@ -1013,17 +1153,15 @@ void help_unlock (std::ostream& out)
 }
 int unlock (int argc, const char** argv)
 {
-	// 1. Make sure working directory is clean (ignoring untracked files)
+	// 1. Make sure every worktree is clean (ignoring untracked files)
 	// We do this because we check out files later, and we don't want the
 	// user to lose any changes.  (TODO: only care if encrypted files are
 	// modified, since we only check out encrypted files)
 
-	// Running 'git status' also serves as a check that the Git repo is accessible.
-
-	std::stringstream	status_output;
-	get_git_status(status_output);
-	if (status_output.peek() != -1) {
-		std::clog << "Error: Working directory not clean." << std::endl;
+	const std::vector<std::string>	worktrees(get_worktree_paths());
+	const std::vector<std::string>	unclean_worktrees(get_unclean_worktrees(worktrees));
+	if (!unclean_worktrees.empty()) {
+		print_unclean_worktrees(worktrees, unclean_worktrees);
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt unlock'." << std::endl;
 		return 1;
 	}
@@ -1077,7 +1215,7 @@ int unlock (int argc, const char** argv)
 
 
 	// 3. Install the key(s) and configure the git filters
-	std::vector<std::string>	encrypted_files;
+	std::vector<const char*>	key_names;
 	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
 		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
 		// TODO: croak if internal_key_path already exists???
@@ -1088,16 +1226,11 @@ int unlock (int argc, const char** argv)
 		}
 
 		configure_git_filters(key_file->get_key_name());
-		get_encrypted_files(encrypted_files, key_file->get_key_name());
+		key_names.push_back(key_file->get_key_name());
 	}
 
-	// 4. Check out the files that are currently encrypted.
-	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
-	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
-		touch_file(*file);
-	}
-	if (!git_checkout(encrypted_files)) {
-		std::clog << "Error: 'git checkout' failed" << std::endl;
+	// 4. Check out the files that are currently encrypted, in every worktree.
+	if (!checkout_encrypted_files(worktrees, key_names)) {
 		std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
 		return 1;
 	}
@@ -1141,33 +1274,32 @@ int lock (int argc, const char** argv)
 		return 2;
 	}
 
-	// 1. Make sure working directory is clean (ignoring untracked files)
+	// 1. Make sure every worktree is clean (ignoring untracked files)
 	// We do this because we check out files later, and we don't want the
 	// user to lose any changes.  (TODO: only care if encrypted files are
 	// modified, since we only check out encrypted files)
 
-	// Running 'git status' also serves as a check that the Git repo is accessible.
-
-	std::stringstream	status_output;
-	get_git_status(status_output);
-	if (!force && status_output.peek() != -1) {
-		std::clog << "Error: Working directory not clean." << std::endl;
+	const std::vector<std::string>	worktrees(get_worktree_paths());
+	const std::vector<std::string>	unclean_worktrees(get_unclean_worktrees(worktrees));
+	if (!force && !unclean_worktrees.empty()) {
+		print_unclean_worktrees(worktrees, unclean_worktrees);
 		std::clog << "Please commit your changes or 'git stash' them before running 'git-crypt lock'." << std::endl;
 		std::clog << "Or, use 'git-crypt lock --force' and possibly lose uncommitted changes." << std::endl;
 		return 1;
 	}
 
 	// 2. deconfigure the git filters and remove decrypted keys
-	std::vector<std::string>	encrypted_files;
+	std::vector<std::string>	dirents; // owns the strings pointed to by key_names
+	std::vector<const char*>	key_names;
 	if (all_keys) {
 		// deconfigure for all keys
-		std::vector<std::string> dirents = get_directory_contents(get_internal_keys_path().c_str());
+		dirents = get_directory_contents(get_internal_keys_path().c_str());
 
 		for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
 			const char* this_key_name = (*dirent == "default" ? 0 : dirent->c_str());
 			remove_file(get_internal_key_path(this_key_name));
 			deconfigure_git_filters(this_key_name);
-			get_encrypted_files(encrypted_files, this_key_name);
+			key_names.push_back(this_key_name);
 		}
 	} else {
 		// just handle the given key
@@ -1183,16 +1315,11 @@ int lock (int argc, const char** argv)
 
 		remove_file(internal_key_path);
 		deconfigure_git_filters(key_name);
-		get_encrypted_files(encrypted_files, key_name);
+		key_names.push_back(key_name);
 	}
 
-	// 3. Check out the files that are currently decrypted but should be encrypted.
-	// Git won't check out a file if its mtime hasn't changed, so touch every file first.
-	for (std::vector<std::string>::const_iterator file(encrypted_files.begin()); file != encrypted_files.end(); ++file) {
-		touch_file(*file);
-	}
-	if (!git_checkout(encrypted_files)) {
-		std::clog << "Error: 'git checkout' failed" << std::endl;
+	// 3. Check out the files that are currently decrypted but should be encrypted, in every worktree.
+	if (!checkout_encrypted_files(worktrees, key_names)) {
 		std::clog << "git-crypt has been locked up but existing decrypted files have not been encrypted" << std::endl;
 		return 1;
 	}

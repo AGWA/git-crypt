@@ -246,6 +246,12 @@
 					</para>
 
 					<para>
+						The decrypted keys are shared by all of the repository's worktrees, so
+						unlocking (and locking) applies to every worktree at once.  Every worktree
+						must be clean.
+					</para>
+
+					<para>
 						This command takes no options.
 					</para>
 				</listitem>

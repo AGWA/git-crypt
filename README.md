@@ -68,6 +68,10 @@ That's all you need to do - after git-crypt is set up (either with
 `git-crypt init` or `git-crypt unlock`), you can use git normally -
 encryption and decryption happen transparently.
 
+If the repository has multiple worktrees (`git worktree add`), they all
+share the same keys: `git-crypt unlock` and `git-crypt lock` decrypt or
+encrypt the files in every worktree at once.
+
 Current Status
 --------------
 
