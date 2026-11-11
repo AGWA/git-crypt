@@ -47,13 +47,20 @@ jobs:
             mingw-w64-x86_64-openssl
       - name: Build binary
         shell: msys2 {0}
+        # Link statically, as the release workflow does.  Git for Windows runs
+        # filters with its own DLLs first on PATH, which a dynamically linked
+        # git-crypt.exe would load instead of MSYS2's.
+        env:
+          LDFLAGS: -static-libstdc++ -static
         run: make
       - name: Smoke test
         shell: msys2 {0}
         run: ./git-crypt.exe version
-      - name: Integration scenarios (informational)
-        # The scenarios have not been validated on Windows yet, so failures
-        # here don't fail the build.
-        continue-on-error: true
+      - name: Integration scenarios
         shell: msys2 {0}
-        run: ./tests/run.sh
+        # Use Git for Windows, as git-crypt.exe users do.  MSYS2's git prints
+        # POSIX paths (e.g. /tmp/...), which a native program can't open.
+        run: |
+          export PATH="/c/Program Files/Git/cmd:$PATH"
+          git --version
+          ./tests/run.sh

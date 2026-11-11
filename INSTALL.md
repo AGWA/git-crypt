@@ -92,9 +92,16 @@ link statically, as the release workflow does:
 
     LDFLAGS="-static-libstdc++ -static" make
 
-*Not yet tested on a Windows machine.  These are the commands the Test and
-Release workflows run on windows-2022, and the link line was verified by
-cross-compiling with MinGW-w64 on Linux (the executable was not run).*
+Use `git-crypt.exe` with [Git for Windows](https://gitforwindows.org/), not
+with MSYS2's `git` package: MSYS2's `git` prints POSIX paths (such as
+`/tmp/...`) that `git-crypt.exe`, a native Windows program, can't open, so
+`lock` and `unlock` don't find your working tree.  Link statically when using
+Git for Windows, too: it runs git-crypt's filters with its own DLLs first on
+`PATH`, and a dynamically linked `git-crypt.exe` fails to start.
+
+*Not yet tested on a Windows machine.  The Test workflow builds with these
+commands on windows-2022 and runs the integration scenarios with Git for
+Windows; the Release workflow builds the same way.*
 
 Cygwin is not tested or supported; use MSYS2.
 

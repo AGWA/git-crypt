@@ -49,6 +49,10 @@ run_scenario ()
 		export SCENARIO_TMP=$tmp
 		export HOME=$tmp/home
 		export GNUPGHOME=$gnupghome
+		# On Windows (MSYS2), don't convert GNUPGHOME to a Windows path when
+		# starting git-crypt.exe: the gpg it runs is MSYS2's, which treats a
+		# Windows path as relative.  No effect on other platforms.
+		export MSYS2_ENV_CONV_EXCL="GNUPGHOME${MSYS2_ENV_CONV_EXCL:+;$MSYS2_ENV_CONV_EXCL}"
 		export GIT_CONFIG_GLOBAL=/dev/null
 		export GIT_CONFIG_NOSYSTEM=1
 		export GIT_AUTHOR_NAME='git-crypt test'

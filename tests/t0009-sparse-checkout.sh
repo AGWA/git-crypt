@@ -24,7 +24,9 @@ sparse_clone ()
 	if [ "$1" = cone ]; then
 		git sparse-checkout set --cone foo
 	else
-		git sparse-checkout set --no-cone '/*' '!/*/' '/foo/'
+		# Patterns on stdin, not as arguments: on Windows, MSYS2 would turn
+		# arguments like /foo/ into Windows paths.
+		printf '%s\n' '/*' '!/*/' '/foo/' | git sparse-checkout set --no-cone --stdin
 	fi
 	git checkout -q main 2>/dev/null
 	[ -f foo/foo.txt ] || fail "sparse checkout setup: foo/foo.txt missing"
