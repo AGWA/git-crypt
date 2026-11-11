@@ -296,6 +296,70 @@
 			</varlistentry>
 
 			<varlistentry>
+				<term><option>lock <arg choice="opt"><replaceable>OPTIONS</replaceable></arg></option></term>
+				<listitem>
+					<para>
+						Remove the decrypted key from the repository, de-configure the git-crypt
+						filters, and re-encrypt the encrypted files in every worktree.  Every
+						worktree must be clean, unless <option>--force</option> is given.
+						Locking an already-locked key is an error, unless
+						<option>--if-unlocked</option> is given.
+					</para>
+
+					<para>
+						The following options are understood:
+					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-k</option> <replaceable>KEY_NAME</replaceable></term>
+							<term><option>--key-name</option> <replaceable>KEY_NAME</replaceable></term>
+
+							<listitem>
+								<para>
+									Lock the given key, rather than the default key.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-a</option></term>
+							<term><option>--all</option></term>
+
+							<listitem>
+								<para>
+									Lock all keys, rather than just the default key.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-f</option></term>
+							<term><option>--force</option></term>
+
+							<listitem>
+								<para>
+									Lock even if a worktree has uncommitted changes.
+									Uncommitted changes to encrypted files may be lost.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>--if-unlocked</option></term>
+
+							<listitem>
+								<para>
+									If the key is already locked (with <option>--all</option>:
+									if no key is unlocked), do nothing and exit with status 0,
+									without checking whether the worktrees are clean.
+									Otherwise, lock as usual.  This makes
+									<command>git-crypt lock --if-unlocked</command> safe to run
+									from cleanup scripts and CI trap handlers.
+								</para>
+							</listitem>
+						</varlistentry>
+					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
 				<term><option>export-key <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="plain"><replaceable>FILENAME</replaceable></arg></option></term>
 				<listitem>
 					<para>

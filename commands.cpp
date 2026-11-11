@@ -1395,6 +1395,7 @@ void help_lock (std::ostream& out)
 	out << "    -a, --all                Lock all keys, instead of just the default" << std::endl;
 	out << "    -k, --key-name KEYNAME   Lock the given key, instead of the default" << std::endl;
 	out << "    -f, --force              Lock even if unclean (you may lose uncommited work)" << std::endl;
+	out << "    --if-unlocked            Do nothing (and succeed) if already locked" << std::endl;
 	out << std::endl;
 }
 int lock (int argc, const char** argv)
@@ -1402,6 +1403,7 @@ int lock (int argc, const char** argv)
 	const char*	key_name = 0;
 	bool		all_keys = false;
 	bool		force = false;
+	bool		if_unlocked = false;
 	Options_list	options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
@@ -1409,6 +1411,7 @@ int lock (int argc, const char** argv)
 	options.push_back(Option_def("--all", &all_keys));
 	options.push_back(Option_def("-f", &force));
 	options.push_back(Option_def("--force", &force));
+	options.push_back(Option_def("--if-unlocked", &if_unlocked));
 
 	int			argi = parse_options(options, argc, argv);
 	key_name = normalize_key_name(key_name);
@@ -1422,6 +1425,24 @@ int lock (int argc, const char** argv)
 	if (all_keys && key_name) {
 		std::clog << "Error: -k and --all options are mutually exclusive" << std::endl;
 		return 2;
+	}
+
+	// 0. With --if-unlocked, do nothing if already locked: no decrypted key is installed
+	// for the given key (or, with --all, for any key).  This is the condition under
+	// which a plain 'lock' fails with "already locked".  It's checked before the
+	// working tree, since uncommitted changes don't matter if nothing is checked out.
+	if (if_unlocked) {
+		bool		already_locked;
+		if (all_keys) {
+			const std::string	internal_keys_path(get_internal_keys_path());
+			already_locked = access(internal_keys_path.c_str(), F_OK) != 0 ||
+			                 get_directory_contents(internal_keys_path.c_str()).empty();
+		} else {
+			already_locked = access(get_internal_key_path(key_name).c_str(), F_OK) != 0;
+		}
+		if (already_locked) {
+			return 0;
+		}
 	}
 
 	// 1. Make sure every worktree is clean (ignoring untracked files)
