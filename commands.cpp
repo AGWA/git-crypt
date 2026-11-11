@@ -143,6 +143,27 @@ static bool git_has_config (const std::string& name)
 	}
 }
 
+// Returns the boolean value of the given Git config option, or default_value if it is
+// unset or not a valid boolean.
+static bool get_git_config_bool (const std::string& name, bool default_value)
+{
+	// git config --bool --get NAME
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--bool");
+	command.push_back("--get");
+	command.push_back(name);
+
+	std::stringstream		output;
+	if (!successful_exit(exec_command(command, output))) {
+		return default_value;
+	}
+	std::string			value;
+	std::getline(output, value);
+	return value == "true" ? true : value == "false" ? false : default_value;
+}
+
 static void git_deconfig (const std::string& name)
 {
 	std::vector<std::string>	command;
@@ -1304,13 +1325,12 @@ int smudge (int argc, const char** argv)
 	// Read the header to get the nonce and make sure it's actually encrypted
 	unsigned char		header[ENCRYPTED_FILE_HEADER_LEN];
 	if (!read_header_or_pass_through(std::cin, header)) {
-		// File not encrypted - it has been copied out to stdout as-is
-		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
-		std::clog << "git-crypt: Run 'git-crypt status' to make sure all files are properly encrypted." << std::endl;
-		std::clog << "git-crypt: If 'git-crypt status' reports no problems, then an older version of" << std::endl;
-		std::clog << "git-crypt: this file may be unencrypted in the repository's history.  If this" << std::endl;
-		std::clog << "git-crypt: file contains sensitive information, you can use 'git filter-branch'" << std::endl;
-		std::clog << "git-crypt: to remove its old versions from the history." << std::endl;
+		// File not encrypted - it has been copied out to stdout as-is.  Commands that walk
+		// history (git log -p, blame, rebase) can hit many such blobs, so keep the warning to
+		// one line, and let it be turned off with git-crypt.warnUnencrypted=false.
+		if (get_git_config_bool("git-crypt.warnUnencrypted", true)) {
+			std::clog << "git-crypt: warning: file not encrypted (run 'git-crypt status' for details)" << std::endl;
+		}
 		return 0;
 	}
 

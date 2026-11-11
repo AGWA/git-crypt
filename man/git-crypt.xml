@@ -660,6 +660,38 @@
 			normally.  git-crypt will automatically determine which key is being used.
 		</para>
 	</refsect1>
+	<refsect1>
+		<title>Configuration</title>
+
+		<para>
+			git-crypt reads the following options from the Git configuration (see
+			<citerefentry><refentrytitle>git-config</refentrytitle><manvolnum>1</manvolnum></citerefentry>):
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><varname>git-crypt.warnUnencrypted</varname></term>
+				<listitem>
+					<para>
+						When Git checks out a file that should be encrypted but whose blob is
+						not (for example an old version committed before the file was added to
+						<filename>.gitattributes</filename>), git-crypt passes it through unchanged
+						and prints a one-line warning:
+					</para>
+					<screen>git-crypt: warning: file not encrypted (run 'git-crypt status' for details)</screen>
+					<para>
+						Commands that walk history, such as <command>git log -p</command> or
+						<command>git blame</command>, may print it many times.  Set this boolean
+						option to <literal>false</literal> to suppress the warning, e.g.
+						<command>git config git-crypt.warnUnencrypted false</command>.
+						Defaults to <literal>true</literal>.  Use <command>git-crypt status</command>
+						to check that the current files are properly encrypted.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+	</refsect1>
+
 	<!--
 	<refsect1>
 		<title>Global options</title>
