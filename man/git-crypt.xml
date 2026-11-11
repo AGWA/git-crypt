@@ -187,6 +187,18 @@
 							</listitem>
 						</varlistentry>
 						<varlistentry>
+							<term><option>--no-untracked</option></term>
+
+							<listitem>
+								<para>
+									Don't list untracked files.  This is the default if Git's
+									<varname>status.showUntrackedFiles</varname> option is set
+									to <literal>no</literal>, which is useful in repositories with
+									many untracked files (such as build output).
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
 							<term><option>-r</option></term>
 
 							<listitem>

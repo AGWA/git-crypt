@@ -582,6 +582,57 @@ static std::pair<std::string, std::string> get_file_attributes (const std::strin
 	return std::make_pair(filter_attr, diff_attr);
 }
 
+// Looks up the filter and diff attributes of any number of files.  With Git 1.8.5
+// (released 27 Nov 2013) and higher, a single `git check-attr --stdin -z` process answers
+// for all files.  Older versions don't support -z and --stdin, so a separate `git check-attr`
+// process is run for each file.  In a repository with thousands of files, the single
+// process is almost 100x faster.
+class Attribute_lookup {
+	Coprocess		check_attr;
+	std::ostream*		check_attr_stdin;
+	std::istream*		check_attr_stdout;
+public:
+	Attribute_lookup ()
+	: check_attr_stdin(nullptr), check_attr_stdout(nullptr)
+	{
+		if (git_version() >= make_version(1, 8, 5)) {
+			std::vector<std::string>	command;
+			command.push_back("git");
+			command.push_back("check-attr");
+			command.push_back("--stdin");
+			command.push_back("-z");
+			command.push_back("filter");
+			command.push_back("diff");
+
+			check_attr_stdin = check_attr.stdin_pipe();
+			check_attr_stdout = check_attr.stdout_pipe();
+			check_attr.spawn(command);
+		}
+	}
+
+	// returns filter and diff attributes as a pair
+	std::pair<std::string, std::string> get (const std::string& filename)
+	{
+		if (check_attr_stdin) {
+			return get_file_attributes(filename, *check_attr_stdin, *check_attr_stdout);
+		} else {
+			return get_file_attributes(filename);
+		}
+	}
+
+	// Must be called after the last get()
+	void finish ()
+	{
+		if (check_attr_stdin) {
+			check_attr.close_stdin();
+			check_attr_stdin = nullptr;
+			if (!successful_exit(check_attr.wait())) {
+				throw Error("'git check-attr' failed - is this a Git repository?");
+			}
+		}
+	}
+};
+
 static bool check_if_blob_is_encrypted (const std::string& object_id)
 {
 	// git cat-file blob object_id
@@ -659,26 +710,7 @@ static void get_tracked_files_with_filter (std::vector<std::pair<std::string, st
 	std::istream*			ls_files_stdout = ls_files.stdout_pipe();
 	ls_files.spawn(ls_files_command);
 
-	Coprocess			check_attr;
-	std::ostream*			check_attr_stdin = nullptr;
-	std::istream*			check_attr_stdout = nullptr;
-	if (git_version() >= make_version(1, 8, 5)) {
-		// In Git 1.8.5 (released 27 Nov 2013) and higher, we use a single `git check-attr` process
-		// to get the attributes of all files at once.  In prior versions, we have to fork and exec
-		// a separate `git check-attr` process for each file, since -z and --stdin aren't supported.
-		// In a repository with thousands of files, this results in an almost 100x speedup.
-		std::vector<std::string>	check_attr_command;
-		check_attr_command.push_back("git");
-		check_attr_command.push_back("check-attr");
-		check_attr_command.push_back("--stdin");
-		check_attr_command.push_back("-z");
-		check_attr_command.push_back("filter");
-		check_attr_command.push_back("diff");
-
-		check_attr_stdin = check_attr.stdin_pipe();
-		check_attr_stdout = check_attr.stdout_pipe();
-		check_attr.spawn(check_attr_command);
-	}
+	Attribute_lookup		attributes;
 
 	while (ls_files_stdout->peek() != -1) {
 		std::string		tag;
@@ -697,15 +729,7 @@ static void get_tracked_files_with_filter (std::vector<std::pair<std::string, st
 		}
 
 		if (is_git_file_mode(mode)) {
-			std::string	filter_attribute;
-
-			if (check_attr_stdin) {
-				filter_attribute = get_file_attributes(filename, *check_attr_stdin, *check_attr_stdout).first;
-			} else {
-				filter_attribute = get_file_attributes(filename).first;
-			}
-
-			files.push_back(std::make_pair(filename, filter_attribute));
+			files.push_back(std::make_pair(filename, attributes.get(filename).first));
 		}
 	}
 
@@ -713,12 +737,7 @@ static void get_tracked_files_with_filter (std::vector<std::pair<std::string, st
 		throw Error("'git ls-files' failed - is this a Git repository?");
 	}
 
-	if (check_attr_stdin) {
-		check_attr.close_stdin();
-		if (!successful_exit(check_attr.wait())) {
-			throw Error("'git check-attr' failed - is this a Git repository?");
-		}
-	}
+	attributes.finish();
 }
 
 // Lists the checked-out files that are encrypted with the given key.
@@ -2142,6 +2161,8 @@ void help_status (std::ostream& out)
 	out << "    -f, --fix      Fix problems with the repository" << std::endl;
 	out << "    -q, --quiet    Don't write to standard output (the exit status still" << std::endl;
 	out << "                   reports the result)" << std::endl;
+	out << "    --no-untracked Don't show untracked files (the default if Git's" << std::endl;
+	out << "                   status.showUntrackedFiles option is 'no')" << std::endl;
 	//out << "    -z             Machine-parseable output" << std::endl;
 	out << std::endl;
 }
@@ -2158,6 +2179,7 @@ int status (int argc, const char** argv)
 	bool		fix_problems = false;		// -f fix problems
 	bool		machine_output = false;		// -z machine-parseable output
 	bool		quiet = false;			// -q don't write to stdout
+	bool		no_untracked = false;		// --no-untracked don't show untracked files
 
 	Options_list	options;
 	options.push_back(Option_def("-r", &repo_status_only));
@@ -2168,6 +2190,7 @@ int status (int argc, const char** argv)
 	options.push_back(Option_def("-z", &machine_output));
 	options.push_back(Option_def("-q", &quiet));
 	options.push_back(Option_def("--quiet", &quiet));
+	options.push_back(Option_def("--no-untracked", &no_untracked));
 
 	int		argi = parse_options(options, argc, argv);
 
@@ -2221,11 +2244,18 @@ int status (int argc, const char** argv)
 		return any_locked ? 1 : 0;
 	}
 
-	// git ls-files -cotsz --exclude-standard ...
+	// Like 'git status', honor status.showUntrackedFiles=no
+	if (!no_untracked && git_has_config("status.showUntrackedFiles")) {
+		std::string	show_untracked(get_git_config("status.showUntrackedFiles"));
+		std::transform(show_untracked.begin(), show_untracked.end(), show_untracked.begin(), ::tolower);
+		no_untracked = show_untracked == "no" || show_untracked == "false" || show_untracked == "off" || show_untracked == "0";
+	}
+
+	// git ls-files -cotsz --exclude-standard ...  (without -o if untracked files aren't wanted)
 	std::vector<std::string>	command;
 	command.push_back("git");
 	command.push_back("ls-files");
-	command.push_back("-cotsz");
+	command.push_back(no_untracked ? "-ctsz" : "-cotsz");
 	command.push_back("--exclude-standard");
 	command.push_back("--");
 	if (argc - argi == 0) {
@@ -2253,6 +2283,7 @@ int status (int argc, const char** argv)
 	bool				unencrypted_blob_errors = false;
 	unsigned int			nbr_of_fixed_blobs = 0;
 	unsigned int			nbr_of_fix_errors = 0;
+	Attribute_lookup		attributes;
 	std::map<std::string, bool>	key_is_unlocked;	// by filter attribute; filled lazily
 	std::set<std::string>		locked_keys_of_unencrypted_blobs; // key names ("default" for the default key)
 
@@ -2272,8 +2303,7 @@ int status (int argc, const char** argv)
 		output >> std::ws;
 		std::getline(output, filename, '\0');
 
-		// TODO: get file attributes en masse for efficiency... unfortunately this requires machine-parseable output from git check-attr to be workable, and this is only supported in Git 1.8.5 and above (released 27 Nov 2013)
-		const std::pair<std::string, std::string> file_attrs(get_file_attributes(filename));
+		const std::pair<std::string, std::string> file_attrs(attributes.get(filename));
 
 		if (file_attrs.first == "git-crypt" || std::strncmp(file_attrs.first.c_str(), "git-crypt-", 10) == 0) {
 			// File is encrypted
@@ -2342,6 +2372,8 @@ int status (int argc, const char** argv)
 			}
 		}
 	}
+
+	attributes.finish();
 
 	int				exit_status = 0;
 
