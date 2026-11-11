@@ -689,6 +689,26 @@
 					</para>
 				</listitem>
 			</varlistentry>
+			<varlistentry>
+				<term><varname>git-crypt.repoStateDir</varname></term>
+				<listitem>
+					<para>
+						Directory, relative to the top of the work tree, that holds the committed
+						git-crypt state (the GPG-encrypted keys in <filename>keys/</filename>).
+						Defaults to <filename>.git-crypt</filename>.  This is local Git configuration
+						and is not committed, so it must be set in every clone.  It does not move the
+						unlocked key, which always lives in the Git directory (see
+						<emphasis>Files</emphasis>).  Absolute paths are not supported: the value is
+						appended to the path of the top of the work tree.
+					</para>
+					<para>
+						For example, to use a project that has its own <filename>.git-crypt</filename>
+						directory and was added with
+						<command>git subtree add --prefix=sub <replaceable>REPOSITORY</replaceable> <replaceable>BRANCH</replaceable></command>:
+					</para>
+					<screen>git config git-crypt.repoStateDir sub/.git-crypt&#10;git-crypt unlock</screen>
+				</listitem>
+			</varlistentry>
 		</variablelist>
 	</refsect1>
 
@@ -707,17 +727,43 @@
 	</refsect1>
 	-->
 
-	<!--
 	<refsect1>
 		<title>Files</title>
 		<variablelist>
 			<varlistentry>
-				<term><filename>/path/to/file</filename></term>
-				<listitem><para>Description.</para></listitem>
+				<term><filename>$(git rev-parse --git-common-dir)/git-crypt/keys/<replaceable>NAME</replaceable></filename></term>
+				<listitem>
+					<para>
+						The unlocked symmetric key.  <replaceable>NAME</replaceable> is
+						<literal>default</literal> for the default key.  Never committed.  Shared by
+						all linked worktrees.  Created by <command>git-crypt init</command> and
+						<command>git-crypt unlock</command>; removed by <command>git-crypt lock</command>.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>.git-crypt/keys/<replaceable>NAME</replaceable>/<replaceable>VERSION</replaceable>/<replaceable>FPR</replaceable>.gpg</filename></term>
+				<listitem>
+					<para>
+						Committed copy of the key encrypted to one collaborator's GPG key, named by
+						the key's full fingerprint.  Created by <command>git-crypt add-gpg-user</command>
+						and listed by <command>git-crypt ls-gpg-users</command>.  The leading
+						<filename>.git-crypt</filename> directory can be changed with
+						<varname>git-crypt.repoStateDir</varname>.
+					</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term>Files written by <command>git-crypt export-key</command></term>
+				<listitem>
+					<para>
+						The raw symmetric key.  Anyone who has it can decrypt the repository, so protect
+						it like a password.
+					</para>
+				</listitem>
 			</varlistentry>
 		</variablelist>
 	</refsect1>
-	-->
 
 	<!--
 	<refsect1>

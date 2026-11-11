@@ -94,6 +94,63 @@ If the repository has multiple worktrees (`git worktree add`), they all
 share the same keys: `git-crypt unlock` and `git-crypt lock` decrypt or
 encrypt the files in every worktree at once.
 
+Where keys are stored
+---------------------
+
+**Unlocked key.**  `git-crypt init` and `git-crypt unlock` keep the
+symmetric key in the Git directory, never in the work tree:
+
+    $(git rev-parse --git-common-dir)/git-crypt/keys/<name>
+
+where `<name>` is `default` for the default key, or the name given with
+`-k`.  This file is never committed.  Because it lives in the common Git
+directory, all linked worktrees (`git worktree add`) share it.
+`git-crypt lock` removes it.
+
+**Committed GPG copies.**  `git-crypt add-gpg-user` commits a copy of the
+key, encrypted to the collaborator's GPG key, in the work tree:
+
+    .git-crypt/keys/<name>/<version>/<FPR>.gpg
+
+There is one file per collaborator, named by the full fingerprint of
+their GPG key.  `git-crypt ls-gpg-users` lists them.  `git-crypt unlock`
+(with no argument) decrypts one of these using your GPG secret key and
+stores the result as the unlocked key above.
+
+**Exported keys.**  `git-crypt export-key` writes the raw, unencrypted
+symmetric key to the file you name.  Anyone with that file can decrypt
+the repository, so protect it like a password.
+
+Moving the committed keys: git-crypt.repoStateDir
+-------------------------------------------------
+
+By default, git-crypt looks for the committed keys in `.git-crypt` at
+the top of the work tree.  If they live somewhere else, set the
+`git-crypt.repoStateDir` option to that directory, relative to the top
+of the work tree:
+
+    git config git-crypt.repoStateDir path/to/.git-crypt
+
+This is local Git configuration and is not committed, so every clone
+must set it.  It only changes where the committed GPG copies are read
+and written; it does not move the unlocked key, which always stays in
+the Git directory.  Absolute paths are not supported: the value is
+always appended to the top of the work tree, so an absolute path will
+not be found and `git-crypt unlock` will fail.
+
+A typical use is a project that has its own `.git-crypt` directory and
+is added to another repository with `git subtree`:
+
+    git subtree add --prefix=sub /path/to/sub-repo main
+    git config git-crypt.repoStateDir sub/.git-crypt
+    git-crypt unlock
+
+Without the `git config` line, git-crypt looks for `.git-crypt` at the
+top of the outer repository, finds no keys, and `git-crypt unlock` fails
+with "no GPG secret key available to unlock this repository".  With it,
+unlock finds `sub/.git-crypt/keys/default/0/<FPR>.gpg` and the files
+under `sub/` are decrypted.
+
 Current Status
 --------------
 
