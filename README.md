@@ -57,6 +57,9 @@ To see which GPG keys can unlock the repository:
 
     git-crypt ls-gpg-users
 
+Collaborator walkthrough (import and verify a public key, add the user,
+unlock) and fixes for common GPG errors: see [doc/gpg.md](doc/gpg.md).
+
 Alternatively, you can export a symmetric secret key, which you must
 securely convey to collaborators (GPG is not required, and no files
 are added to your repository):
