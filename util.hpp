@@ -76,6 +76,9 @@ void*		explicit_memset (void* s, int c, size_t n);	// memset that won't be optim
 bool		leakless_equals (const void* a, const void* b, size_t len); // compare bytes w/o leaking timing
 void		init_std_streams ();
 void		create_protected_file (const char* path); // create empty file accessible only by current user
+#ifdef _WIN32
+bool		write_protected_file (const char* path, const std::string& contents);
+#endif
 int		util_rename (const char*, const char*);
 std::vector<std::string> get_directory_contents (const char* path);
 
