@@ -18,6 +18,9 @@ Building git-crypt
 ------------------
 See the [INSTALL.md](INSTALL.md) file.
 
+To run the integration tests, run `make test` (see
+[tests/README.md](tests/README.md)).
+
 
 Using git-crypt
 ---------------

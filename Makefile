@@ -58,6 +58,12 @@ man/man1/git-crypt.1: man/git-crypt.xml
 	$(XSLTPROC) $(DOCBOOK_FLAGS) $(DOCBOOK_XSL) man/git-crypt.xml
 
 #
+# Test
+#
+test: build-bin
+	./tests/run.sh
+
+#
 # Clean
 #
 CLEAN_MAN_TARGETS-yes = clean-man
@@ -91,5 +97,6 @@ install-man: build-man
 
 .PHONY: all \
 	build build-bin build-man \
+	test \
 	clean clean-bin clean-man \
 	install install-bin install-man

@@ -11,6 +11,9 @@ When contributing code, please consider the following guidelines:
    particular, please indent code using tab characters with a width
    of 8.
 
+ * Please add or update an integration scenario under `tests/` for your
+   change, and make sure `make test` passes (see tests/README.md).
+
  * To minimize merge commits, please rebase your changes before opening
    a pull request.
 

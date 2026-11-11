@@ -1,0 +1,59 @@
+on:
+  push:
+  pull_request:
+name: Test
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev gnupg
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install openssl@3 gnupg
+      - name: Build and test (Linux)
+        if: runner.os == 'Linux'
+        run: make test
+      - name: Build and test (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          prefix=$(brew --prefix openssl@3)
+          CXXFLAGS="-I$prefix/include" LDFLAGS="-L$prefix/lib" make test
+  windows:
+    name: Build (windows)
+    runs-on: windows-2022
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+      - name: Build binary
+        shell: msys2 {0}
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
+      - name: Smoke test
+        shell: msys2 {0}
+        run: ./git-crypt.exe version
+      - name: Integration scenarios (informational)
+        # The scenarios have not been validated on Windows yet, so failures
+        # here don't fail the build.
+        continue-on-error: true
+        shell: msys2 {0}
+        run: ./tests/run.sh
