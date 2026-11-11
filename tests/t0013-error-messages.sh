@@ -187,3 +187,13 @@ scenario_errors_never_print_key_material ()
 	assert_status 1
 	assert_not_contains "$(printf '%s%s' "$stdout" "$stderr" | od -An -tx1 | tr -d ' \n')" "${key_hex:60:32}"
 }
+
+scenario_unlock_from_stdin_with_encrypted_file ()
+{
+	new_repo_with_secret
+	git cat-file blob HEAD:secret.txt > "$SCENARIO_TMP/blob"
+	git-crypt lock
+	run sh -c "git-crypt unlock - < '$SCENARIO_TMP/blob'"
+	assert_status 1
+	assert_contains "$stderr" "- is a git-crypt encrypted file, not a key file"
+}

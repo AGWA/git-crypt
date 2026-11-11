@@ -132,3 +132,35 @@ scenario_readding_a_user_reports_it_and_force_reencrypts ()
 	[ "$head_before" != "$(git rev-parse HEAD)" ] || fail "no commit after --force"
 	assert_eq "" "$(git status --porcelain)" "uncommitted changes after --force"
 }
+
+scenario_failed_force_reencrypt_keeps_existing_file ()
+{
+	new_key_with_subkeys
+	new_repo_with_secret
+	git-crypt add-gpg-user --trusted "$enc1!" >/dev/null 2>&1
+	local file=".git-crypt/keys/default/0/$primary.gpg"
+	local before
+	before=$(file_to_hex_or_sum "$file")
+
+	# Re-adding with --force to a non-encryption subkey fails before gpg runs; make gpg
+	# itself fail instead by pointing gpg.program at a wrapper that refuses to encrypt.
+	cat > "$SCENARIO_TMP/failing-gpg" <<'GPG'
+#!/bin/sh
+for arg in "$@"; do [ "$arg" = "-e" ] && { echo "gpg: encryption failed (test)" >&2; exit 2; }; done
+exec gpg "$@"
+GPG
+	chmod +x "$SCENARIO_TMP/failing-gpg"
+	git config gpg.program "$SCENARIO_TMP/failing-gpg"
+
+	run git-crypt add-gpg-user --force --trusted "$enc1!"
+	assert_status 1
+	[ -f "$file" ] || fail "existing collaborator file deleted by failed --force"
+	assert_eq "$before" "$(file_to_hex_or_sum "$file")" "collaborator file changed"
+	[ ! -e "$file.tmp" ] || fail "temporary file left behind"
+	assert_eq "" "$(git status --porcelain)" "working tree changed"
+}
+
+file_to_hex_or_sum ()
+{
+	cksum < "$1"
+}

@@ -780,8 +780,26 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 // half-configured state left by an interrupted lock or unlock) counts as locked.
 static bool is_key_unlocked (const char* key_name)
 {
+	if (key_name && !validate_key_name(key_name)) {
+		return false; // e.g. a bogus "filter=git-crypt-..." attribute; no such key can exist
+	}
 	return access(get_internal_key_path(key_name).c_str(), F_OK) == 0 &&
 	       git_has_config("filter." + attribute_name(key_name) + ".smudge");
+}
+
+// Converts the value of a git-crypt "filter" attribute (or filter name) to a key name
+// ("default" for the default key).  Returns false if it is not a git-crypt filter.
+static bool filter_to_key_name (const std::string& filter, std::string& key_name)
+{
+	if (filter == "git-crypt") {
+		key_name = "default";
+		return true;
+	}
+	if (filter.compare(0, 10, "git-crypt-") == 0 && validate_key_name(filter.c_str() + 10)) {
+		key_name = filter.substr(10);
+		return true;
+	}
+	return false;
 }
 
 // Converts a directory entry under a keys directory to a key name ("default" for
@@ -833,10 +851,9 @@ static void add_key_names_from_filter_config (std::set<std::string>& key_names)
 			continue;
 		}
 		const std::string	filter(name.substr(7, name.size() - 7 - 7)); // strip "filter." and ".smudge"
-		if (filter == "git-crypt") {
-			key_names.insert("default");
-		} else if (filter.compare(0, 10, "git-crypt-") == 0 && validate_key_name(filter.c_str() + 10)) {
-			key_names.insert(filter.substr(10));
+		std::string		key_name;
+		if (filter_to_key_name(filter, key_name)) {
+			key_names.insert(key_name);
 		}
 	}
 }
@@ -856,11 +873,9 @@ static std::vector<std::string> get_repo_key_names ()
 	std::vector<std::pair<std::string, std::string> >	tracked_files;
 	get_tracked_files_with_filter(tracked_files, ALL_TRACKED_FILES);
 	for (std::vector<std::pair<std::string, std::string> >::const_iterator file(tracked_files.begin()); file != tracked_files.end(); ++file) {
-		const std::string&	filter(file->second);
-		if (filter == "git-crypt") {
-			key_names.insert("default");
-		} else if (filter.compare(0, 10, "git-crypt-") == 0 && validate_key_name(filter.c_str() + 10)) {
-			key_names.insert(filter.substr(10));
+		std::string		key_name;
+		if (filter_to_key_name(file->second, key_name)) {
+			key_names.insert(key_name);
 		}
 	}
 
@@ -872,11 +887,18 @@ static std::vector<std::string> get_repo_key_names ()
 	return sorted_key_names;
 }
 
+// What checkout_encrypted_files() reports on stdout
+enum Checkout_report {
+	NO_REPORT,
+	REPORT_DECRYPTED_FILES,	// after unlock -v
+	REPORT_ENCRYPTED_FILES	// after lock -v
+};
+
 // Checks out, in every worktree, the files encrypted with the given keys, so that the
 // working tree copies get decrypted or encrypted according to the current filter configuration.
-// If verbose_action is non-null (e.g. "Decrypted"), then after a successful checkout, lists
-// the checked out files on stdout, grouped by key (and by worktree, if there are several).
-static bool checkout_encrypted_files (const std::vector<std::string>& worktrees, const std::vector<const char*>& key_names, const char* verbose_action)
+// Unless report is NO_REPORT, after a successful checkout, lists the checked out files on
+// stdout, grouped by key (and by worktree, if there are several).
+static bool checkout_encrypted_files (const std::vector<std::string>& worktrees, const std::vector<const char*>& key_names, Checkout_report report_kind)
 {
 	const std::string	original_directory(get_current_directory());
 	std::ostringstream	report;
@@ -889,8 +911,8 @@ static bool checkout_encrypted_files (const std::vector<std::string>& worktrees,
 			const std::size_t	first_file = encrypted_files.size();
 			get_encrypted_files(encrypted_files, *key_name);
 
-			if (verbose_action) {
-				report << verbose_action << " with key '" << (*key_name ? *key_name : "default") << "'";
+			if (report_kind != NO_REPORT) {
+				report << (report_kind == REPORT_DECRYPTED_FILES ? "Decrypted" : "Encrypted") << " with key '" << (*key_name ? *key_name : "default") << "'";
 				if (worktrees.size() > 1) {
 					report << " in " << *worktree;
 				}
@@ -1066,23 +1088,29 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		path_builder << keys_path << '/' << (key_name ? key_name : "default") << '/' << key.version << '/' << collab->fingerprint << ".gpg";
 		std::string		path(path_builder.str());
 
-		if (access(path.c_str(), F_OK) == 0) {
-			if (!force) {
-				std::clog << "GPG user " << collab->fingerprint << " has already been added to key '" << (key_name ? key_name : "default") << "' - skipping." << std::endl;
-				std::clog << "To re-encrypt the key to this user (e.g. after they changed encryption subkeys), use --force." << std::endl;
-				continue;
-			}
-			remove_file(path);
+		if (access(path.c_str(), F_OK) == 0 && !force) {
+			std::clog << "GPG user " << collab->fingerprint << " has already been added to key '" << (key_name ? key_name : "default") << "' - skipping." << std::endl;
+			std::clog << "To re-encrypt the key to this user (e.g. after they changed encryption subkeys), use --force." << std::endl;
+			continue;
 		}
 
+		// Encrypt to a temporary file first, so that an existing file is only replaced
+		// (with --force) if encryption succeeds.
+		const std::string	temp_path(path + ".tmp");
 		mkdir_parent(path);
+		remove_file(temp_path);
 		try {
-			gpg_encrypt_to_file(path, collab->recipient, collab->trusted, key_file_data.data(), key_file_data.size());
+			gpg_encrypt_to_file(temp_path, collab->recipient, collab->trusted, key_file_data.data(), key_file_data.size());
 		} catch (const Gpg_error&) {
+			remove_file(temp_path);
 			throw Gpg_error("Failed to encrypt to GPG key " + collab->fingerprint + " (see gpg's message above).\n"
 			                "This usually means GPG considers the key unusable: it may have expired or been\n"
-			                "revoked, or have no encryption subkey.  Check it with 'gpg --list-keys " + collab->fingerprint + "'.\n"
-			                "If it has expired, import an updated copy of the public key from its owner.");
+			                "revoked, or have no encryption subkey, or GPG may not trust it (see --trusted).\n"
+			                "Check it with 'gpg --list-keys " + collab->fingerprint + "'.  If it has expired,\n"
+			                "import an updated copy of the public key from its owner.");
+		}
+		if (util_rename(temp_path.c_str(), path.c_str()) != 0) {
+			throw System_error("rename", path, errno);
 		}
 		new_files->push_back(path);
 		written_collabs->push_back(*collab);
@@ -1479,31 +1507,21 @@ int init (int argc, const char** argv)
 }
 
 // Explains why the given file (which failed to load as a key file) is not a valid key file.
-static void explain_invalid_key_file (const char* path)
+// Explains why a file (which failed to load as a key file) is not a valid key file.
+// `name` is how the user specified it, and `contents` the file's contents.
+static void explain_invalid_key_file (const char* name, const std::string& contents)
 {
-	char		header[12] = { 0 };
-	std::streamsize	header_len = 0;
-	std::streamoff	file_size = -1;
-	if (std::strcmp(path, "-") != 0) {
-		std::ifstream	in(path, std::fstream::binary);
-		in.read(header, sizeof(header));
-		header_len = in.gcount();
-		in.clear();
-		in.seekg(0, std::ios::end);
-		file_size = in.tellg();
-	}
-
-	if (header_len >= 10 && std::memcmp(header, "\0GITCRYPT\0", 10) == 0) {
-		std::clog << "Error: " << path << " is a git-crypt encrypted file, not a key file." << std::endl;
+	if (contents.compare(0, 10, std::string("\0GITCRYPT\0", 10)) == 0) {
+		std::clog << "Error: " << name << " is a git-crypt encrypted file, not a key file." << std::endl;
 		std::clog << "Specify a key file exported with 'git-crypt export-key'." << std::endl;
-	} else if (header_len == 12 && std::memcmp(header, "\0GITCRYPTKEY", 12) == 0) {
-		std::clog << "Error: " << path << ": this git-crypt key file is malformed - it may be corrupted." << std::endl;
-	} else if (file_size == AES_KEY_LEN + HMAC_KEY_LEN) {
-		std::clog << "Error: " << path << ": not a valid git-crypt key file" << std::endl;
+	} else if (contents.compare(0, 12, std::string("\0GITCRYPTKEY", 12)) == 0) {
+		std::clog << "Error: " << name << ": this git-crypt key file is malformed - it may be corrupted." << std::endl;
+	} else if (contents.size() == AES_KEY_LEN + HMAC_KEY_LEN) {
+		std::clog << "Error: " << name << ": not a valid git-crypt key file" << std::endl;
 		std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
 		std::clog << "by running 'git-crypt migrate-key /path/to/old_key /path/to/migrated_key'." << std::endl;
 	} else {
-		std::clog << "Error: " << path << " is not a git-crypt key file." << std::endl;
+		std::clog << "Error: " << name << " is not a git-crypt key file." << std::endl;
 		std::clog << "Specify a key file exported with 'git-crypt export-key'." << std::endl;
 	}
 }
@@ -1524,9 +1542,9 @@ int unlock (int argc, const char** argv)
 	options.push_back(Option_def("-v", &verbose));
 	options.push_back(Option_def("--verbose", &verbose));
 
-	const int	argi = parse_options(options, argc, argv);
-	argc -= argi;
-	argv += argi;
+	const int	first_key_file = parse_options(options, argc, argv);
+	argc -= first_key_file;
+	argv += first_key_file;
 
 	// 1. Make sure every worktree is clean (ignoring untracked files)
 	// We do this because we check out files later, and we don't want the
@@ -1550,9 +1568,15 @@ int unlock (int argc, const char** argv)
 			const char*	symmetric_key_file = argv[argi];
 			Key_file	key_file;
 
+			// The key file's contents, kept to explain a load failure.  (Key files are small.)
+			std::string	contents;
 			try {
 				if (std::strcmp(symmetric_key_file, "-") == 0) {
-					key_file.load(std::cin);
+					std::ostringstream	stdin_contents;
+					stdin_contents << std::cin.rdbuf();
+					contents = stdin_contents.str();
+					std::istringstream	in(contents);
+					key_file.load(in);
 				} else {
 					struct stat	st;
 					if (stat(symmetric_key_file, &st) != 0) {
@@ -1573,7 +1597,13 @@ int unlock (int argc, const char** argv)
 				std::clog << "Please upgrade to a newer version of git-crypt." << std::endl;
 				return 1;
 			} catch (Key_file::Malformed) {
-				explain_invalid_key_file(symmetric_key_file);
+				if (std::strcmp(symmetric_key_file, "-") != 0) {
+					std::ifstream		in(symmetric_key_file, std::fstream::binary);
+					std::ostringstream	file_contents;
+					file_contents << in.rdbuf();
+					contents = file_contents.str();
+				}
+				explain_invalid_key_file(symmetric_key_file, contents);
 				return 1;
 			}
 
@@ -1613,7 +1643,7 @@ int unlock (int argc, const char** argv)
 	}
 
 	// 4. Check out the files that are currently encrypted, in every worktree.
-	if (!checkout_encrypted_files(worktrees, key_names, verbose ? "Decrypted" : 0)) {
+	if (!checkout_encrypted_files(worktrees, key_names, verbose ? REPORT_DECRYPTED_FILES : NO_REPORT)) {
 		std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
 		std::clog << "(if the key is not the right one for this repository, files fail to decrypt)." << std::endl;
 		std::clog << "To return the repository to a locked state, run 'git-crypt lock -a --force'." << std::endl;
@@ -1730,7 +1760,7 @@ int lock (int argc, const char** argv)
 	}
 
 	// 3. Check out the files that are currently decrypted but should be encrypted, in every worktree.
-	if (!checkout_encrypted_files(worktrees, key_names, verbose ? "Encrypted" : 0)) {
+	if (!checkout_encrypted_files(worktrees, key_names, verbose ? REPORT_ENCRYPTED_FILES : NO_REPORT)) {
 		std::clog << "git-crypt has been locked up but existing decrypted files have not been encrypted" << std::endl;
 		return 1;
 	}
@@ -1934,6 +1964,11 @@ static bool is_all_digits (const std::string& str)
 	return !str.empty() && str.find_first_not_of("0123456789") == std::string::npos;
 }
 
+static bool is_not_all_digits (const std::string& str)
+{
+	return !is_all_digits(str);
+}
+
 static bool compare_key_versions (const std::string& a, const std::string& b)
 {
 	return a.size() != b.size() ? a.size() < b.size() : a < b; // numeric order for all-digit strings
@@ -1983,7 +2018,7 @@ int ls_gpg_users (int argc, const char** argv)
 			continue;
 		}
 		std::vector<std::string>	versions(get_directory_contents(key_path.c_str()));
-		versions.erase(std::remove_if(versions.begin(), versions.end(), [](const std::string& v) { return !is_all_digits(v); }), versions.end());
+		versions.erase(std::remove_if(versions.begin(), versions.end(), is_not_all_digits), versions.end());
 		std::sort(versions.begin(), versions.end(), compare_key_versions);
 
 		for (std::vector<std::string>::const_iterator version(versions.begin()); version != versions.end(); ++version) {

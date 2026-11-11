@@ -125,10 +125,6 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 	return fingerprints;
 }
 
-// Returns the UID (e.g. "John Smith <jsmith@example.com>") of every public key in the
-// keyring, keyed by the primary key's fingerprint.  Listing the whole keyring at once
-// (rather than looking up each fingerprint) means unknown fingerprints produce no gpg
-// error output.  Returns an empty map if gpg fails.
 // Looks up the primary key or subkey whose fingerprint is exactly `fingerprint` (40
 // upper-case hex digits).  Returns false if there is no such (sub)key in the keyring.
 // Otherwise, sets *primary_fingerprint to the fingerprint of the primary key it belongs
@@ -185,6 +181,10 @@ bool gpg_lookup_exact_key (const std::string& fingerprint, std::string* primary_
 	return false;
 }
 
+// Returns the UID (e.g. "John Smith <jsmith@example.com>") of every public key in the
+// keyring, keyed by the primary key's fingerprint.  Listing the whole keyring at once
+// (rather than looking up each fingerprint) means unknown fingerprints produce no gpg
+// error output.  Returns an empty map if gpg fails.
 std::map<std::string, std::string> gpg_list_public_key_uids ()
 {
 	// gpg --batch --with-colons --fixed-list-mode --fingerprint --list-keys

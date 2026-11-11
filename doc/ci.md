@@ -40,7 +40,7 @@ Treat the CI key like the most sensitive credential in the repository, and:
 - **Do not leave the key on disk.**  Prefer piping the key to
   `git-crypt unlock -` (nothing is written to a file you have to delete),
   run the job on an ephemeral runner, and lock the repository when you are
-  done (`git-crypt lock --if-unlocked`).  Locking removes the unlocked key
+  done (`git-crypt lock --all --if-unlocked`).  Locking removes the unlocked key
   from `.git/git-crypt/keys/`.
 - **Remember that decrypted files are plaintext on the runner.**  Do not
   upload the working tree as a build artifact or cache entry after
@@ -114,7 +114,7 @@ jobs:
 
       - name: Lock
         if: always()
-        run: git-crypt lock --if-unlocked
+        run: git-crypt lock --all --if-unlocked
 ```
 
 Notes on the example:
@@ -126,8 +126,10 @@ Notes on the example:
 - `ubuntu-latest` uses GNU `base64`, where `-d` decodes.  On a macOS runner
   `base64 -d` also works on current systems (see
   [base64 portability](#base64-portability)).
-- `git-crypt lock --if-unlocked` succeeds even if the unlock step never ran
-  or failed, so it is safe in an `if: always()` step.  On GitHub-hosted
+- `git-crypt lock --all --if-unlocked` succeeds even if the unlock step
+  never ran or failed, so it is safe in an `if: always()` step.  `--all`
+  also locks a dedicated key such as `deploy` (see below); plain
+  `lock --if-unlocked` only handles the default key.  On GitHub-hosted
   runners the VM is discarded anyway; the lock step matters on self-hosted
   or reused runners.
 - The `apt-get` package may be older than this version of git-crypt.
