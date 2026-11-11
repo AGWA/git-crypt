@@ -160,6 +160,37 @@
 								</para>
 							</listitem>
 						</varlistentry>
+						<varlistentry>
+							<term><option>-r</option></term>
+
+							<listitem>
+								<para>
+									Instead of listing files, show whether each key used by
+									the repository is locked or unlocked, one line per key
+									(for example "<literal>default: unlocked</literal>" or
+									"<literal>prod: locked</literal>").  A key is unlocked
+									when its decrypted key is installed and its Git filter is
+									configured.  The exit status is 0 if every key is unlocked
+									(or the repository uses no git-crypt keys) and 1 if any key
+									is locked.  The answer is the same from any worktree or
+									subdirectory of the repository.  This option cannot be
+									combined with <option>-e</option>, <option>-u</option>,
+									<option>-f</option>, or file names.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-q</option></term>
+							<term><option>--quiet</option></term>
+
+							<listitem>
+								<para>
+									Don't write anything to standard output.  The exit status
+									is unchanged, so scripts can test it, e.g.
+									<command>git-crypt status -r -q || git-crypt unlock</command>.
+								</para>
+							</listitem>
+						</varlistentry>
 					</variablelist>
 				</listitem>
 			</varlistentry>

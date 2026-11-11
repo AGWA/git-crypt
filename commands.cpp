@@ -50,6 +50,7 @@
 #include <errno.h>
 #include <exception>
 #include <vector>
+#include <set>
 
 enum {
 	// # of arguments per git checkout call; must be large enough to be efficient but small
@@ -631,7 +632,9 @@ static bool is_git_file_mode (const std::string& mode)
 	return (std::strtoul(mode.c_str(), nullptr, 8) & 0170000) == 0100000;
 }
 
-static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
+// Lists every regular file in the index (of the current worktree), along with the
+// value of its "filter" attribute (empty if unspecified).
+static void get_tracked_files_with_filter (std::vector<std::pair<std::string, std::string> >& files)
 {
 	// git ls-files -cz -- path_to_top
 	std::vector<std::string>	ls_files_command;
@@ -686,9 +689,7 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 				filter_attribute = get_file_attributes(filename).first;
 			}
 
-			if (filter_attribute == attribute_name(key_name)) {
-				files.push_back(filename);
-			}
+			files.push_back(std::make_pair(filename, filter_attribute));
 		}
 	}
 
@@ -702,6 +703,116 @@ static void get_encrypted_files (std::vector<std::string>& files, const char* ke
 			throw Error("'git check-attr' failed - is this a Git repository?");
 		}
 	}
+}
+
+static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
+{
+	std::vector<std::pair<std::string, std::string> >	tracked_files;
+	get_tracked_files_with_filter(tracked_files);
+
+	const std::string	wanted_attribute(attribute_name(key_name));
+	for (std::vector<std::pair<std::string, std::string> >::const_iterator file(tracked_files.begin()); file != tracked_files.end(); ++file) {
+		if (file->second == wanted_attribute) {
+			files.push_back(file->first);
+		}
+	}
+}
+
+// A key is unlocked when its decrypted key is installed in the internal state
+// directory *and* its Git filter is configured.  Anything else (including the
+// half-configured state left by an interrupted lock or unlock) counts as locked.
+static bool is_key_unlocked (const char* key_name)
+{
+	return access(get_internal_key_path(key_name).c_str(), F_OK) == 0 &&
+	       git_has_config("filter." + attribute_name(key_name) + ".smudge");
+}
+
+// Converts a directory entry under a keys directory to a key name ("default" for
+// the default key).  Returns false if the entry is not a valid key name.
+static bool key_dirent_to_name (const std::string& dirent, std::string& key_name)
+{
+	if (dirent == "default" || validate_key_name(dirent.c_str())) {
+		key_name = dirent;
+		return true;
+	}
+	return false;
+}
+
+static void add_key_names_from_directory (std::set<std::string>& key_names, const std::string& path)
+{
+	if (access(path.c_str(), F_OK) != 0) {
+		return;
+	}
+	const std::vector<std::string>	dirents(get_directory_contents(path.c_str()));
+	for (std::vector<std::string>::const_iterator dirent(dirents.begin()); dirent != dirents.end(); ++dirent) {
+		std::string	key_name;
+		if (key_dirent_to_name(*dirent, key_name)) {
+			key_names.insert(key_name);
+		}
+	}
+}
+
+// Adds the key of every git-crypt filter configured in the Git config.
+static void add_key_names_from_filter_config (std::set<std::string>& key_names)
+{
+	// git config --get-regexp '^filter\.git-crypt(-.*)?\.smudge$'
+	std::vector<std::string>	command;
+	command.push_back("git");
+	command.push_back("config");
+	command.push_back("--get-regexp");
+	command.push_back("^filter\\.git-crypt(-.*)?\\.smudge$");
+
+	std::stringstream		output;
+	const int			status = exit_status(exec_command(command, output));
+	if (status != 0 && status != 1) { // 1 means no match
+		throw Error("'git config' failed");
+	}
+
+	std::string			line;
+	while (std::getline(output, line)) {
+		// Example line: filter.git-crypt-KEYNAME.smudge "git-crypt" smudge --key-name=KEYNAME
+		const std::string	name(line.substr(0, line.find(' ')));
+		if (name.size() < 7 + 7) {
+			continue;
+		}
+		const std::string	filter(name.substr(7, name.size() - 7 - 7)); // strip "filter." and ".smudge"
+		if (filter == "git-crypt") {
+			key_names.insert("default");
+		} else if (filter.compare(0, 10, "git-crypt-") == 0 && validate_key_name(filter.c_str() + 10)) {
+			key_names.insert(filter.substr(10));
+		}
+	}
+}
+
+// Returns the names of every key the repository uses ("default" for the default key),
+// with "default" first and the rest in alphabetical order.  A key is in use if it has
+// GPG-encrypted copies committed to the repo state directory, if it is installed in the
+// internal state directory, if its filter is configured, or if a tracked file's filter
+// attribute refers to it.
+static std::vector<std::string> get_repo_key_names ()
+{
+	std::set<std::string>		key_names;
+	add_key_names_from_directory(key_names, get_repo_keys_path());
+	add_key_names_from_directory(key_names, get_internal_keys_path());
+	add_key_names_from_filter_config(key_names);
+
+	std::vector<std::pair<std::string, std::string> >	tracked_files;
+	get_tracked_files_with_filter(tracked_files);
+	for (std::vector<std::pair<std::string, std::string> >::const_iterator file(tracked_files.begin()); file != tracked_files.end(); ++file) {
+		const std::string&	filter(file->second);
+		if (filter == "git-crypt") {
+			key_names.insert("default");
+		} else if (filter.compare(0, 10, "git-crypt-") == 0 && validate_key_name(filter.c_str() + 10)) {
+			key_names.insert(filter.substr(10));
+		}
+	}
+
+	std::vector<std::string>	sorted_key_names;
+	if (key_names.erase("default")) {
+		sorted_key_names.push_back("default");
+	}
+	sorted_key_names.insert(sorted_key_names.end(), key_names.begin(), key_names.end());
+	return sorted_key_names;
 }
 
 // Checks out, in every worktree, the files encrypted with the given keys, so that the
@@ -1668,13 +1779,16 @@ void help_status (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
 	out << "Usage: git-crypt status [OPTIONS] [FILE ...]" << std::endl;
-	//out << "   or: git-crypt status -r [OPTIONS]" << std::endl;
-	//out << "   or: git-crypt status -f" << std::endl;
+	out << "   or: git-crypt status -r [-q]" << std::endl;
+	out << "   or: git-crypt status -f [-q]" << std::endl;
 	out << std::endl;
 	out << "    -e             Show encrypted files only" << std::endl;
 	out << "    -u             Show unencrypted files only" << std::endl;
-	//out << "    -r             Show repository status only" << std::endl;
+	out << "    -r             Show whether each key is locked or unlocked; exit status" << std::endl;
+	out << "                   is 0 if every key is unlocked and 1 if any is locked" << std::endl;
 	out << "    -f, --fix      Fix problems with the repository" << std::endl;
+	out << "    -q, --quiet    Don't write to standard output (the exit status still" << std::endl;
+	out << "                   reports the result)" << std::endl;
 	//out << "    -z             Machine-parseable output" << std::endl;
 	out << std::endl;
 }
@@ -1690,6 +1804,7 @@ int status (int argc, const char** argv)
 	bool		show_unencrypted_only = false;	// -u show unencrypted files only
 	bool		fix_problems = false;		// -f fix problems
 	bool		machine_output = false;		// -z machine-parseable output
+	bool		quiet = false;			// -q don't write to stdout
 
 	Options_list	options;
 	options.push_back(Option_def("-r", &repo_status_only));
@@ -1698,8 +1813,13 @@ int status (int argc, const char** argv)
 	options.push_back(Option_def("-f", &fix_problems));
 	options.push_back(Option_def("--fix", &fix_problems));
 	options.push_back(Option_def("-z", &machine_output));
+	options.push_back(Option_def("-q", &quiet));
+	options.push_back(Option_def("--quiet", &quiet));
 
 	int		argi = parse_options(options, argc, argv);
+
+	// Everything status reports on stdout goes through `out`, which discards it in quiet mode.
+	std::ostream	out(quiet ? nullptr : std::cout.rdbuf());
 
 	if (repo_status_only) {
 		if (show_encrypted_only || show_unencrypted_only) {
@@ -1732,15 +1852,20 @@ int status (int argc, const char** argv)
 		return 2;
 	}
 
-	if (argc - argi == 0) {
-		// TODO: check repo status:
-		//	is it set up for git-crypt?
-		//	which keys are unlocked?
-		//	--> check for filter config (see configure_git_filters()) and corresponding internal key
-
-		if (repo_status_only) {
+	if (repo_status_only) {
+		const std::vector<std::string>	key_names(get_repo_key_names());
+		if (key_names.empty()) {
+			out << "No git-crypt keys found." << std::endl;
 			return 0;
 		}
+
+		bool				any_locked = false;
+		for (std::vector<std::string>::const_iterator key_name(key_names.begin()); key_name != key_names.end(); ++key_name) {
+			const bool		unlocked = is_key_unlocked(normalize_key_name(key_name->c_str()));
+			out << *key_name << ": " << (unlocked ? "unlocked" : "locked") << std::endl;
+			any_locked = any_locked || !unlocked;
+		}
+		return any_locked ? 1 : 0;
 	}
 
 	// git ls-files -cotsz --exclude-standard ...
@@ -1814,7 +1939,7 @@ int status (int argc, const char** argv)
 						throw Error("'git-add' failed");
 					}
 					if (check_if_file_is_encrypted(filename)) {
-						std::cout << filename << ": staged encrypted version" << std::endl;
+						out << filename << ": staged encrypted version" << std::endl;
 						++nbr_of_fixed_blobs;
 					} else {
 						std::clog << "Error: " << filename << ": still unencrypted even after staging" << std::endl;
@@ -1823,23 +1948,23 @@ int status (int argc, const char** argv)
 				}
 			} else if (!fix_problems && !show_unencrypted_only) {
 				// TODO: output the key name used to encrypt this file
-				std::cout << "    encrypted: " << filename;
+				out << "    encrypted: " << filename;
 				if (file_attrs.second != file_attrs.first) {
 					// but diff filter is not properly set
-					std::cout << " *** WARNING: diff=" << file_attrs.first << " attribute not set ***";
+					out << " *** WARNING: diff=" << file_attrs.first << " attribute not set ***";
 					attribute_errors = true;
 				}
 				if (blob_is_unencrypted) {
 					// File not actually encrypted
-					std::cout << " *** WARNING: staged/committed version is NOT ENCRYPTED! ***";
+					out << " *** WARNING: staged/committed version is NOT ENCRYPTED! ***";
 					unencrypted_blob_errors = true;
 				}
-				std::cout << std::endl;
+				out << std::endl;
 			}
 		} else {
 			// File not encrypted
 			if (!fix_problems && !show_encrypted_only) {
-				std::cout << "not encrypted: " << filename << std::endl;
+				out << "not encrypted: " << filename << std::endl;
 			}
 		}
 	}
@@ -1847,26 +1972,26 @@ int status (int argc, const char** argv)
 	int				exit_status = 0;
 
 	if (attribute_errors) {
-		std::cout << std::endl;
-		std::cout << "Warning: one or more files has a git-crypt filter attribute but not a" << std::endl;
-		std::cout << "corresponding git-crypt diff attribute.  For proper 'git diff' operation" << std::endl;
-		std::cout << "you should fix the .gitattributes file to specify the correct diff attribute." << std::endl;
-		std::cout << "Consult the git-crypt documentation for help." << std::endl;
+		out << std::endl;
+		out << "Warning: one or more files has a git-crypt filter attribute but not a" << std::endl;
+		out << "corresponding git-crypt diff attribute.  For proper 'git diff' operation" << std::endl;
+		out << "you should fix the .gitattributes file to specify the correct diff attribute." << std::endl;
+		out << "Consult the git-crypt documentation for help." << std::endl;
 		exit_status = 1;
 	}
 	if (unencrypted_blob_errors) {
-		std::cout << std::endl;
-		std::cout << "Warning: one or more files is marked for encryption via .gitattributes but" << std::endl;
-		std::cout << "was staged and/or committed before the .gitattributes file was in effect." << std::endl;
-		std::cout << "Run 'git-crypt status' with the '-f' option to stage an encrypted version." << std::endl;
+		out << std::endl;
+		out << "Warning: one or more files is marked for encryption via .gitattributes but" << std::endl;
+		out << "was staged and/or committed before the .gitattributes file was in effect." << std::endl;
+		out << "Run 'git-crypt status' with the '-f' option to stage an encrypted version." << std::endl;
 		exit_status = 1;
 	}
 	if (nbr_of_fixed_blobs) {
-		std::cout << "Staged " << nbr_of_fixed_blobs << " encrypted file" << (nbr_of_fixed_blobs != 1 ? "s" : "") << "." << std::endl;
-		std::cout << "Warning: if these files were previously committed, unencrypted versions still exist in the repository's history." << std::endl;
+		out << "Staged " << nbr_of_fixed_blobs << " encrypted file" << (nbr_of_fixed_blobs != 1 ? "s" : "") << "." << std::endl;
+		out << "Warning: if these files were previously committed, unencrypted versions still exist in the repository's history." << std::endl;
 	}
 	if (nbr_of_fix_errors) {
-		std::cout << "Unable to stage " << nbr_of_fix_errors << " file" << (nbr_of_fix_errors != 1 ? "s" : "") << "." << std::endl;
+		out << "Unable to stage " << nbr_of_fix_errors << " file" << (nbr_of_fix_errors != 1 ? "s" : "") << "." << std::endl;
 		exit_status = 1;
 	}
 

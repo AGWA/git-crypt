@@ -71,6 +71,13 @@ That's all you need to do - after git-crypt is set up (either with
 `git-crypt init` or `git-crypt unlock`), you can use git normally -
 encryption and decryption happen transparently.
 
+To check whether the repository is unlocked (for example from a script or
+a shell prompt), use `git-crypt status -r`.  It prints the state of each
+key and exits with status 0 if every key is unlocked, or 1 if any is
+locked; add `-q` to suppress the output:
+
+    git-crypt status -r -q || git-crypt unlock
+
 If the repository has multiple worktrees (`git worktree add`), they all
 share the same keys: `git-crypt unlock` and `git-crypt lock` decrypt or
 encrypt the files in every worktree at once.
