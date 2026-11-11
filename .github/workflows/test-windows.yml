@@ -1,0 +1,32 @@
+name: Windows Regression Tests
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            msys2-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+            openssl-devel
+      - name: Build with static OpenSSL
+        shell: msys2 {0}
+        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
+      - name: Run Windows regression tests
+        shell: msys2 {0}
+        run: make test-windows LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"

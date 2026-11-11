@@ -27,6 +27,10 @@ OBJFILES = \
 OBJFILES += crypto-openssl-11.o
 LDFLAGS += -lcrypto
 
+ifneq (,$(findstring mingw,$(shell $(CXX) -dumpmachine)))
+LDLIBS += -ladvapi32 -lbcrypt
+endif
+
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
 		 --stringparam man.output.base.dir man/ \
@@ -47,10 +51,18 @@ build: $(BUILD_TARGETS)
 build-bin: git-crypt
 
 git-crypt: $(OBJFILES)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJFILES) $(LDFLAGS) $(LDLIBS)
 
 util.o: util.cpp util-unix.cpp util-win32.cpp
 coprocess.o: coprocess.cpp coprocess-unix.cpp coprocess-win32.cpp
+
+WINDOWS_TEST_OBJFILES = key.o crypto.o crypto-openssl-11.o coprocess.o fhstream.o
+
+test/windows-key-management.exe: test/windows-key-management.cpp util.cpp util-win32.cpp util.hpp $(WINDOWS_TEST_OBJFILES)
+	$(CXX) $(CXXFLAGS) -o $@ $< $(WINDOWS_TEST_OBJFILES) $(LDFLAGS) $(LDLIBS)
+
+test-windows: test/windows-key-management.exe
+	./test/windows-key-management.exe
 
 build-man: man/man1/git-crypt.1
 
@@ -67,7 +79,7 @@ CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(ENABLE_MAN))
 clean: $(CLEAN_TARGETS)
 
 clean-bin:
-	rm -f $(OBJFILES) git-crypt
+	rm -f $(OBJFILES) git-crypt git-crypt.exe test/windows-key-management.exe
 
 clean-man:
 	rm -f man/man1/git-crypt.1
@@ -93,3 +105,5 @@ install-man: build-man
 	build build-bin build-man \
 	clean clean-bin clean-man \
 	install install-bin install-man
+
+.PHONY: test-windows

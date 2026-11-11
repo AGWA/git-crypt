@@ -274,6 +274,9 @@ bool		Key_file::load_from_file (const char* key_file_name)
 
 bool		Key_file::store_to_file (const char* key_file_name) const
 {
+#ifdef _WIN32
+	return write_protected_file(key_file_name, store_to_string());
+#else
 	create_protected_file(key_file_name);
 	std::ofstream	key_file_out(key_file_name, std::fstream::binary);
 	if (!key_file_out) {
@@ -285,6 +288,7 @@ bool		Key_file::store_to_file (const char* key_file_name) const
 		return false;
 	}
 	return true;
+#endif
 }
 
 std::string	Key_file::store_to_string () const
