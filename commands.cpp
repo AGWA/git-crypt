@@ -633,15 +633,21 @@ static bool is_git_file_mode (const std::string& mode)
 	return (std::strtoul(mode.c_str(), nullptr, 8) & 0170000) == 0100000;
 }
 
-// Lists every regular file in the index (of the current worktree), along with the
-// value of its "filter" attribute (empty if unspecified).
-static void get_tracked_files_with_filter (std::vector<std::pair<std::string, std::string> >& files)
+// Which index entries get_tracked_files_with_filter() lists
+enum Tracked_files_scope {
+	ALL_TRACKED_FILES,		// every regular file in the index
+	CHECKED_OUT_TRACKED_FILES	// excluding skip-worktree entries (e.g. outside a sparse checkout)
+};
+
+// Lists the regular files in the index (of the current worktree), along with the
+// value of their "filter" attribute (empty if unspecified).
+static void get_tracked_files_with_filter (std::vector<std::pair<std::string, std::string> >& files, Tracked_files_scope scope)
 {
-	// git ls-files -cz -- path_to_top
+	// git ls-files -ctsz -- path_to_top
 	std::vector<std::string>	ls_files_command;
 	ls_files_command.push_back("git");
 	ls_files_command.push_back("ls-files");
-	ls_files_command.push_back("-csz");
+	ls_files_command.push_back("-ctsz");
 	ls_files_command.push_back("--");
 	const std::string		path_to_top(get_path_to_top());
 	if (!path_to_top.empty()) {
@@ -674,12 +680,20 @@ static void get_tracked_files_with_filter (std::vector<std::pair<std::string, st
 	}
 
 	while (ls_files_stdout->peek() != -1) {
+		std::string		tag;
 		std::string		mode;
 		std::string		object_id;
 		std::string		stage;
 		std::string		filename;
-		*ls_files_stdout >> mode >> object_id >> stage >> std::ws;
+		// Example: H 100644 06ec22e5ed0de9280731ef000a10f9c3fbc26338 0\tafile\0
+		*ls_files_stdout >> tag >> mode >> object_id >> stage >> std::ws;
 		std::getline(*ls_files_stdout, filename, '\0');
+
+		// Tag "S" marks a skip-worktree entry: the file is not checked out (for example
+		// because it is outside a sparse checkout), and 'git checkout' must not be given it.
+		if (scope == CHECKED_OUT_TRACKED_FILES && tag == "S") {
+			continue;
+		}
 
 		if (is_git_file_mode(mode)) {
 			std::string	filter_attribute;
@@ -706,10 +720,11 @@ static void get_tracked_files_with_filter (std::vector<std::pair<std::string, st
 	}
 }
 
+// Lists the checked-out files that are encrypted with the given key.
 static void get_encrypted_files (std::vector<std::string>& files, const char* key_name)
 {
 	std::vector<std::pair<std::string, std::string> >	tracked_files;
-	get_tracked_files_with_filter(tracked_files);
+	get_tracked_files_with_filter(tracked_files, CHECKED_OUT_TRACKED_FILES);
 
 	const std::string	wanted_attribute(attribute_name(key_name));
 	for (std::vector<std::pair<std::string, std::string> >::const_iterator file(tracked_files.begin()); file != tracked_files.end(); ++file) {
@@ -798,7 +813,7 @@ static std::vector<std::string> get_repo_key_names ()
 	add_key_names_from_filter_config(key_names);
 
 	std::vector<std::pair<std::string, std::string> >	tracked_files;
-	get_tracked_files_with_filter(tracked_files);
+	get_tracked_files_with_filter(tracked_files, ALL_TRACKED_FILES);
 	for (std::vector<std::pair<std::string, std::string> >::const_iterator file(tracked_files.begin()); file != tracked_files.end(); ++file) {
 		const std::string&	filter(file->second);
 		if (filter == "git-crypt") {
