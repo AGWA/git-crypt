@@ -1,0 +1,175 @@
+# Builds the release binaries and attaches them to a GitHub release, together
+# with a SHA256SUMS file, then checks that every expected binary is attached.
+#
+# Runs when a release is published.  To rebuild binaries for an existing
+# release (e.g. after a failed run), run it manually with the release's tag,
+# for all platforms or just one.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the existing release to build binaries for
+        required: true
+        type: string
+      platform:
+        description: Platform to build
+        required: true
+        type: choice
+        default: all
+        options: [all, linux-x86_64, linux-aarch64, windows-x86_64, macos-arm64, macos-x86_64]
+name: Release
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Look up release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          # Asset names use the release name (e.g. "0.8.0"), as in earlier releases.
+          version=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name --jq .name)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${version:-$TAG}" >> "$GITHUB_OUTPUT"
+      - name: Select platforms
+        id: matrix
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          # Keep the asset suffixes in sync with .github/scripts/release-assets.sh.
+          all='[
+            {"platform": "linux-x86_64",   "runner": "ubuntu-22.04",     "asset": "linux-x86_64"},
+            {"platform": "linux-aarch64",  "runner": "ubuntu-22.04-arm", "asset": "linux-aarch64"},
+            {"platform": "windows-x86_64", "runner": "windows-2022",     "asset": "x86_64.exe"},
+            {"platform": "macos-arm64",    "runner": "macos-15",         "asset": "macos-arm64"},
+            {"platform": "macos-x86_64",   "runner": "macos-15-intel",   "asset": "macos-x86_64"}
+          ]'
+          echo "matrix=$(jq -c --arg p "$PLATFORM" '{include: [.[] | select($p == "all" or .platform == $p)]}' <<< "$all")" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    env:
+      ASSET: git-crypt-${{ needs.prepare.outputs.version }}-${{ matrix.asset }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          persist-credentials: false
+      - name: Build binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev
+          make
+          cp git-crypt "$ASSET"
+      - name: Build binary (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3
+          prefix=$(brew --prefix openssl@3)
+          # Link libcrypto statically so the binary doesn't need Homebrew's OpenSSL.
+          # (LDFLAGS on the command line replaces the Makefile's -lcrypto.)
+          make CPPFLAGS="-I$prefix/include" LDFLAGS="$prefix/lib/libcrypto.a"
+          if otool -L git-crypt | grep -i -e openssl -e libcrypto; then
+            echo "::error::git-crypt is dynamically linked to OpenSSL"
+            exit 1
+          fi
+          cp git-crypt "$ASSET"
+      - name: Setup msys2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        # Link statically so that the .exe runs without MSYS2's DLLs.  The Makefile
+        # adds -lcrypto and the Windows system libraries itself.
+        env:
+          LDFLAGS: -static-libstdc++ -static
+        run: |
+          make
+          cp git-crypt.exe "$ASSET"
+      - name: Smoke test
+        shell: bash
+        run: ./"$ASSET" version
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  publish:
+    name: Upload to release
+    needs: [prepare, build]
+    # Upload whatever was built, even if some platforms failed; verify reports the rest.
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download build artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: git-crypt-*
+          merge-multiple: true
+          path: dist
+      - name: Upload binaries
+        run: |
+          shopt -s nullglob
+          files=(dist/git-crypt-*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no binaries were built"
+            exit 1
+          fi
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+      - name: Update SHA256SUMS
+        run: .github/scripts/release-assets.sh checksums "$TAG" "$VERSION"
+
+  verify:
+    name: Verify release assets
+    needs: [prepare, publish]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that every binary and SHA256SUMS is attached
+        run: .github/scripts/release-assets.sh verify "${{ needs.prepare.outputs.tag }}" "${{ needs.prepare.outputs.version }}"

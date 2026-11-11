@@ -1,0 +1,7 @@
+# Keep the GitHub Actions used by the workflows (pinned by commit SHA) up to date.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
