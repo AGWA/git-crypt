@@ -36,6 +36,7 @@
 #include "parse_options.hpp"
 #include "coprocess.hpp"
 #include <unistd.h>
+#include <sys/stat.h>
 #include <stdint.h>
 #include <algorithm>
 #include <string>
@@ -879,6 +880,29 @@ static bool checkout_encrypted_files (const std::vector<std::string>& worktrees,
 	return true;
 }
 
+// Returns the name of a key for use in messages: the key name, or "default".
+static std::string key_display_name (const char* key_name)
+{
+	return key_name ? key_name : "default";
+}
+
+// Loads the key from `in`, read from `path`, converting format errors into an Error that
+// names the file and the key.
+static void load_key_from_stream (Key_file& key_file, std::istream& in, const std::string& path, const char* key_name, bool legacy)
+{
+	try {
+		if (legacy) {
+			key_file.load_legacy(in);
+		} else {
+			key_file.load(in);
+		}
+	} catch (Key_file::Malformed) {
+		throw Error("The key file for key '" + key_display_name(key_name) + "' (" + path + ") is malformed - it may be corrupted.");
+	} catch (Key_file::Incompatible) {
+		throw Error("The key file for key '" + key_display_name(key_name) + "' (" + path + ") is in an incompatible format - please upgrade git-crypt.");
+	}
+}
+
 static void load_key (Key_file& key_file, const char* key_name, const char* key_path =0, const char* legacy_path =0)
 {
 	if (legacy_path) {
@@ -886,20 +910,20 @@ static void load_key (Key_file& key_file, const char* key_name, const char* key_
 		if (!key_file_in) {
 			throw Error(std::string("Unable to open key file: ") + legacy_path);
 		}
-		key_file.load_legacy(key_file_in);
+		load_key_from_stream(key_file, key_file_in, legacy_path, key_name, true);
 	} else if (key_path) {
 		std::ifstream		key_file_in(key_path, std::fstream::binary);
 		if (!key_file_in) {
 			throw Error(std::string("Unable to open key file: ") + key_path);
 		}
-		key_file.load(key_file_in);
+		load_key_from_stream(key_file, key_file_in, key_path, key_name, false);
 	} else {
-		std::ifstream		key_file_in(get_internal_key_path(key_name).c_str(), std::fstream::binary);
+		const std::string	internal_key_path(get_internal_key_path(key_name));
+		std::ifstream		key_file_in(internal_key_path.c_str(), std::fstream::binary);
 		if (!key_file_in) {
-			// TODO: include key name in error message
-			throw Error("Unable to open key file - have you unlocked/initialized this repository yet?");
+			throw Error("Unable to open the key file for key '" + key_display_name(key_name) + "' (" + internal_key_path + ") - have you unlocked/initialized this repository yet?");
 		}
-		key_file.load(key_file_in);
+		load_key_from_stream(key_file, key_file_in, internal_key_path, key_name, false);
 	}
 }
 
@@ -919,14 +943,22 @@ static bool decrypt_repo_key (Key_file& key_file, const char* key_name, uint32_t
 				gpg_error = std::current_exception();
 				continue;
 			}
+			const std::string	what("The GPG-encrypted key file for key '" + key_display_name(key_name) + "' (" + path + ")");
+			const std::string	fix("Ask a collaborator to re-add you with 'git-crypt add-gpg-user --force'.");
 			Key_file		this_version_key_file;
-			this_version_key_file.load(decrypted_contents);
+			try {
+				this_version_key_file.load(decrypted_contents);
+			} catch (Key_file::Malformed) {
+				throw Error(what + " is malformed - it may be corrupted.\n" + fix);
+			} catch (Key_file::Incompatible) {
+				throw Error(what + " is in an incompatible format - please upgrade git-crypt.");
+			}
 			const Key_file::Entry*	this_version_entry = this_version_key_file.get(key_version);
 			if (!this_version_entry) {
-				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key version");
+				throw Error(what + " is malformed because it does not contain the expected key version.\n" + fix);
 			}
 			if (!same_key_name(key_name, this_version_key_file.get_key_name())) {
-				throw Error("GPG-encrypted keyfile is malformed because it does not contain expected key name");
+				throw Error(what + " is malformed because it does not contain the expected key name.\n" + fix);
 			}
 			key_file.set_key_name(key_name);
 			key_file.add(*this_version_entry);
@@ -1004,7 +1036,14 @@ static void encrypt_repo_key (const char* key_name, const Key_file::Entry& key, 
 		}
 
 		mkdir_parent(path);
-		gpg_encrypt_to_file(path, collab->recipient, collab->trusted, key_file_data.data(), key_file_data.size());
+		try {
+			gpg_encrypt_to_file(path, collab->recipient, collab->trusted, key_file_data.data(), key_file_data.size());
+		} catch (const Gpg_error&) {
+			throw Gpg_error("Failed to encrypt to GPG key " + collab->fingerprint + " (see gpg's message above).\n"
+			                "This usually means GPG considers the key unusable: it may have expired or been\n"
+			                "revoked, or have no encryption subkey.  Check it with 'gpg --list-keys " + collab->fingerprint + "'.\n"
+			                "If it has expired, import an updated copy of the public key from its owner.");
+		}
 		new_files->push_back(path);
 		written_collabs->push_back(*collab);
 	}
@@ -1304,15 +1343,42 @@ void help_init (std::ostream& out)
 	out << "Usage: git-crypt init [OPTIONS]" << std::endl;
 	out << std::endl;
 	out << "    -k, --key-name KEYNAME      Initialize the given key, instead of the default" << std::endl;
+	out << "    -f, --force                 Generate a new key even though the repository already" << std::endl;
+	out << "                                has GPG users or encrypted files for this key" << std::endl;
 	out << std::endl;
+}
+
+// If the repository (as checked out) already uses the given key - it has GPG-encrypted
+// copies of it, or tracked files whose blobs are encrypted with it - returns true and sets
+// `evidence` to a description of what was found.
+static bool repo_already_uses_key (const char* key_name, std::string& evidence)
+{
+	const std::string		repo_key_path(get_repo_keys_path() + "/" + key_display_name(key_name));
+	if (access(repo_key_path.c_str(), F_OK) == 0) {
+		evidence = "it has GPG users in " + repo_key_path;
+		return true;
+	}
+
+	std::vector<std::string>	files;
+	get_encrypted_files(files, key_name);
+	for (std::vector<std::string>::const_iterator file(files.begin()); file != files.end(); ++file) {
+		if (check_if_file_is_encrypted(*file)) {
+			evidence = "it has files encrypted with it, such as " + *file;
+			return true;
+		}
+	}
+	return false;
 }
 
 int init (int argc, const char** argv)
 {
 	const char*	key_name = 0;
+	bool		force = false;
 	Options_list	options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
+	options.push_back(Option_def("-f", &force));
+	options.push_back(Option_def("--force", &force));
 
 	int		argi = parse_options(options, argc, argv);
 	key_name = normalize_key_name(key_name);
@@ -1335,9 +1401,23 @@ int init (int argc, const char** argv)
 
 	std::string		internal_key_path(get_internal_key_path(key_name));
 	if (access(internal_key_path.c_str(), F_OK) == 0) {
-		// TODO: add a -f option to reinitialize the repo anyways (this should probably imply a refresh)
-		// TODO: include key_name in error message
-		std::clog << "Error: this repository has already been initialized with git-crypt." << std::endl;
+		std::clog << "Error: this repository has already been initialized with git-crypt";
+		if (key_name) {
+			std::clog << " key '" << key_name << "'";
+		}
+		std::clog << "." << std::endl;
+		return 1;
+	}
+
+	// A fresh clone of an encrypted repository has no key installed, but generating one
+	// would create a new key unrelated to the one its files are encrypted with.
+	std::string		evidence;
+	if (!force && repo_already_uses_key(key_name, evidence)) {
+		const std::string	k_option(key_name ? std::string(" -k ") + key_name : "");
+		std::clog << "Error: this repository already uses git-crypt key '" << key_display_name(key_name) << "': " << evidence << "." << std::endl;
+		std::clog << "'git-crypt init' would create a new, unrelated key that cannot decrypt those files." << std::endl;
+		std::clog << "To decrypt this repository, run 'git-crypt unlock' (with GPG) or 'git-crypt unlock KEY_FILE'." << std::endl;
+		std::clog << "To create a new key anyway, run 'git-crypt init" << k_option << " --force'." << std::endl;
 		return 1;
 	}
 
@@ -1357,6 +1437,36 @@ int init (int argc, const char** argv)
 	configure_git_filters(key_name);
 
 	return 0;
+}
+
+// Explains why the given file (which failed to load as a key file) is not a valid key file.
+static void explain_invalid_key_file (const char* path)
+{
+	char		header[12] = { 0 };
+	std::streamsize	header_len = 0;
+	std::streamoff	file_size = -1;
+	if (std::strcmp(path, "-") != 0) {
+		std::ifstream	in(path, std::fstream::binary);
+		in.read(header, sizeof(header));
+		header_len = in.gcount();
+		in.clear();
+		in.seekg(0, std::ios::end);
+		file_size = in.tellg();
+	}
+
+	if (header_len >= 10 && std::memcmp(header, "\0GITCRYPT\0", 10) == 0) {
+		std::clog << "Error: " << path << " is a git-crypt encrypted file, not a key file." << std::endl;
+		std::clog << "Specify a key file exported with 'git-crypt export-key'." << std::endl;
+	} else if (header_len == 12 && std::memcmp(header, "\0GITCRYPTKEY", 12) == 0) {
+		std::clog << "Error: " << path << ": this git-crypt key file is malformed - it may be corrupted." << std::endl;
+	} else if (file_size == AES_KEY_LEN + HMAC_KEY_LEN) {
+		std::clog << "Error: " << path << ": not a valid git-crypt key file" << std::endl;
+		std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
+		std::clog << "by running 'git-crypt migrate-key /path/to/old_key /path/to/migrated_key'." << std::endl;
+	} else {
+		std::clog << "Error: " << path << " is not a git-crypt key file." << std::endl;
+		std::clog << "Specify a key file exported with 'git-crypt export-key'." << std::endl;
+	}
 }
 
 void help_unlock (std::ostream& out)
@@ -1405,6 +1515,15 @@ int unlock (int argc, const char** argv)
 				if (std::strcmp(symmetric_key_file, "-") == 0) {
 					key_file.load(std::cin);
 				} else {
+					struct stat	st;
+					if (stat(symmetric_key_file, &st) != 0) {
+						std::clog << "Error: " << symmetric_key_file << ": " << std::strerror(errno) << std::endl;
+						return 1;
+					}
+					if (S_ISDIR(st.st_mode)) {
+						std::clog << "Error: " << symmetric_key_file << " is a directory, not a key file" << std::endl;
+						return 1;
+					}
 					if (!key_file.load_from_file(symmetric_key_file)) {
 						std::clog << "Error: " << symmetric_key_file << ": unable to read key file" << std::endl;
 						return 1;
@@ -1415,9 +1534,7 @@ int unlock (int argc, const char** argv)
 				std::clog << "Please upgrade to a newer version of git-crypt." << std::endl;
 				return 1;
 			} catch (Key_file::Malformed) {
-				std::clog << "Error: " << symmetric_key_file << ": not a valid git-crypt key file" << std::endl;
-				std::clog << "If this key was created prior to git-crypt 0.4, you need to migrate it" << std::endl;
-				std::clog << "by running 'git-crypt migrate-key /path/to/old_key /path/to/migrated_key'." << std::endl;
+				explain_invalid_key_file(symmetric_key_file);
 				return 1;
 			}
 
@@ -1448,6 +1565,7 @@ int unlock (int argc, const char** argv)
 		mkdir_parent(internal_key_path);
 		if (!key_file->store_to_file(internal_key_path.c_str())) {
 			std::clog << "Error: " << internal_key_path << ": unable to write key file" << std::endl;
+			std::clog << "To return the repository to a locked state, run 'git-crypt lock -a --force'." << std::endl;
 			return 1;
 		}
 
@@ -1458,6 +1576,8 @@ int unlock (int argc, const char** argv)
 	// 4. Check out the files that are currently encrypted, in every worktree.
 	if (!checkout_encrypted_files(worktrees, key_names, verbose ? "Decrypted" : 0)) {
 		std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
+		std::clog << "(if the key is not the right one for this repository, files fail to decrypt)." << std::endl;
+		std::clog << "To return the repository to a locked state, run 'git-crypt lock -a --force'." << std::endl;
 		return 1;
 	}
 

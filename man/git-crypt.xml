@@ -116,6 +116,22 @@
 								</para>
 							</listitem>
 						</varlistentry>
+						<varlistentry>
+							<term><option>-f</option></term>
+							<term><option>--force</option></term>
+
+							<listitem>
+								<para>
+									Generate a new key even though the repository already uses
+									this key: it has GPG users for it in the
+									<filename>.git-crypt</filename> directory, or files encrypted
+									with it.  Without this option, <command>init</command> refuses,
+									because in a clone of an encrypted repository you almost certainly
+									want <command>git-crypt unlock</command> instead: a new key cannot
+									decrypt the existing files.
+								</para>
+							</listitem>
+						</varlistentry>
 					</variablelist>
 				</listitem>
 			</varlistentry>
