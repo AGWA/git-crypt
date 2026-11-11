@@ -1,2 +1,3 @@
 *.o
 git-crypt
+tests/crypto-kat

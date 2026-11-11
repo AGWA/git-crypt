@@ -60,7 +60,13 @@ man/man1/git-crypt.1: man/git-crypt.xml
 #
 # Test
 #
-test: build-bin
+TEST_OBJFILES = $(filter-out git-crypt.o,$(OBJFILES))
+
+tests/crypto-kat: tests/crypto-kat.o $(TEST_OBJFILES)
+	$(CXX) $(CXXFLAGS) -o $@ tests/crypto-kat.o $(TEST_OBJFILES) $(LDFLAGS)
+
+test: build-bin tests/crypto-kat
+	./tests/crypto-kat
 	./tests/run.sh
 
 #
@@ -73,7 +79,7 @@ CLEAN_TARGETS := clean-bin $(CLEAN_MAN_TARGETS-$(ENABLE_MAN))
 clean: $(CLEAN_TARGETS)
 
 clean-bin:
-	rm -f $(OBJFILES) git-crypt
+	rm -f $(OBJFILES) git-crypt git-crypt.exe tests/crypto-kat.o tests/crypto-kat tests/crypto-kat.exe
 
 clean-man:
 	rm -f man/man1/git-crypt.1

@@ -8,6 +8,10 @@ To build git-crypt, you need:
 |A C++11 compiler (e.g. gcc 4.9+) | g++                   | gcc-c++            |
 |OpenSSL development files        | libssl-dev            | openssl-devel      |
 
+OpenSSL 1.1.1 or newer is required (OpenSSL 3.x and 4.x are supported).
+git-crypt uses only OpenSSL's EVP interfaces, so it builds without
+deprecation warnings against OpenSSL 3 and later.
+
 
 To use git-crypt, you need:
 

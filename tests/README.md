@@ -6,7 +6,8 @@ involved.
 
 ## Running
 
-    make test                       # build, then run every scenario
+    make test                       # build, run the crypto known-answer tests
+                                    # (tests/crypto-kat), then every scenario
     tests/run.sh                    # run every scenario against ./git-crypt
     tests/run.sh tests/t0001-basic.sh   # run one file
 
