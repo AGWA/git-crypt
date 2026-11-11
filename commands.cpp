@@ -1006,6 +1006,39 @@ static int decrypt_file_to_stdout (const Key_file& key_file, const unsigned char
 	return 0;
 }
 
+enum {
+	ENCRYPTED_FILE_HEADER_LEN = 10 + Aes_ctr_decryptor::NONCE_LEN // "\0GITCRYPT\0" followed by the nonce
+};
+
+// Copies the rest of `in` to stdout.  Unlike `std::cout << in.rdbuf()`, this never
+// puts std::cout into a failed state when `in` has nothing left to read.  (A failed
+// std::cout is never flushed, so the output would silently be lost.)
+static void copy_to_stdout (std::istream& in)
+{
+	char			buffer[1024];
+	while (in) {
+		in.read(buffer, sizeof(buffer));
+		std::cout.write(buffer, in.gcount());
+	}
+}
+
+// Reads the git-crypt header from `in` into `header`, which must hold
+// ENCRYPTED_FILE_HEADER_LEN bytes.  Returns true if `in` is a git-crypt encrypted
+// file.  Otherwise, writes the input to stdout unchanged - both the bytes consumed
+// while probing and the rest of `in` - and returns false.
+static bool read_header_or_pass_through (std::istream& in, unsigned char* header)
+{
+	in.read(reinterpret_cast<char*>(header), ENCRYPTED_FILE_HEADER_LEN);
+	const std::streamsize	header_len = in.gcount();
+	if (header_len == ENCRYPTED_FILE_HEADER_LEN && std::memcmp(header, "\0GITCRYPT\0", 10) == 0) {
+		return true;
+	}
+
+	std::cout.write(reinterpret_cast<char*>(header), header_len);
+	copy_to_stdout(in);
+	return false;
+}
+
 // Decrypt contents of stdin and write to stdout
 int smudge (int argc, const char** argv)
 {
@@ -1025,18 +1058,15 @@ int smudge (int argc, const char** argv)
 	load_key(key_file, key_name, key_path, legacy_key_path);
 
 	// Read the header to get the nonce and make sure it's actually encrypted
-	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
-	std::cin.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (std::cin.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
-		// File not encrypted - just copy it out to stdout
+	unsigned char		header[ENCRYPTED_FILE_HEADER_LEN];
+	if (!read_header_or_pass_through(std::cin, header)) {
+		// File not encrypted - it has been copied out to stdout as-is
 		std::clog << "git-crypt: Warning: file not encrypted" << std::endl;
 		std::clog << "git-crypt: Run 'git-crypt status' to make sure all files are properly encrypted." << std::endl;
 		std::clog << "git-crypt: If 'git-crypt status' reports no problems, then an older version of" << std::endl;
 		std::clog << "git-crypt: this file may be unencrypted in the repository's history.  If this" << std::endl;
 		std::clog << "git-crypt: file contains sensitive information, you can use 'git filter-branch'" << std::endl;
 		std::clog << "git-crypt: to remove its old versions from the history." << std::endl;
-		std::cout.write(reinterpret_cast<char*>(header), std::cin.gcount()); // include the bytes which we already read
-		std::cout << std::cin.rdbuf();
 		return 0;
 	}
 
@@ -1072,12 +1102,9 @@ int diff (int argc, const char** argv)
 	in.exceptions(std::fstream::badbit);
 
 	// Read the header to get the nonce and determine if it's actually encrypted
-	unsigned char		header[10 + Aes_ctr_decryptor::NONCE_LEN];
-	in.read(reinterpret_cast<char*>(header), sizeof(header));
-	if (in.gcount() != sizeof(header) || std::memcmp(header, "\0GITCRYPT\0", 10) != 0) {
-		// File not encrypted - just copy it out to stdout
-		std::cout.write(reinterpret_cast<char*>(header), in.gcount()); // include the bytes which we already read
-		std::cout << in.rdbuf();
+	unsigned char		header[ENCRYPTED_FILE_HEADER_LEN];
+	if (!read_header_or_pass_through(in, header)) {
+		// File not encrypted - it has been copied out to stdout as-is
 		return 0;
 	}
 
