@@ -833,16 +833,34 @@ static std::vector<std::string> get_repo_key_names ()
 
 // Checks out, in every worktree, the files encrypted with the given keys, so that the
 // working tree copies get decrypted or encrypted according to the current filter configuration.
-static bool checkout_encrypted_files (const std::vector<std::string>& worktrees, const std::vector<const char*>& key_names)
+// If verbose_action is non-null (e.g. "Decrypted"), then after a successful checkout, lists
+// the checked out files on stdout, grouped by key (and by worktree, if there are several).
+static bool checkout_encrypted_files (const std::vector<std::string>& worktrees, const std::vector<const char*>& key_names, const char* verbose_action)
 {
 	const std::string	original_directory(get_current_directory());
+	std::ostringstream	report;
 
 	for (std::vector<std::string>::const_iterator worktree(worktrees.begin()); worktree != worktrees.end(); ++worktree) {
 		change_directory(*worktree);
 
 		std::vector<std::string>	encrypted_files;
 		for (std::vector<const char*>::const_iterator key_name(key_names.begin()); key_name != key_names.end(); ++key_name) {
+			const std::size_t	first_file = encrypted_files.size();
 			get_encrypted_files(encrypted_files, *key_name);
+
+			if (verbose_action) {
+				report << verbose_action << " with key '" << (*key_name ? *key_name : "default") << "'";
+				if (worktrees.size() > 1) {
+					report << " in " << *worktree;
+				}
+				report << ":" << std::endl;
+				if (first_file == encrypted_files.size()) {
+					report << "    (no files)" << std::endl;
+				}
+				for (std::size_t i = first_file; i < encrypted_files.size(); ++i) {
+					report << "    " << encrypted_files[i] << std::endl;
+				}
+			}
 		}
 
 		// Git won't check out a file if its mtime hasn't changed, so touch every file first.
@@ -857,6 +875,7 @@ static bool checkout_encrypted_files (const std::vector<std::string>& worktrees,
 	}
 
 	change_directory(original_directory);
+	std::cout << report.str();
 	return true;
 }
 
@@ -1312,11 +1331,23 @@ int init (int argc, const char** argv)
 void help_unlock (std::ostream& out)
 {
 	//     |--------------------------------------------------------------------------------| 80 chars
-	out << "Usage: git-crypt unlock" << std::endl;
-	out << "   or: git-crypt unlock KEY_FILE ..." << std::endl;
+	out << "Usage: git-crypt unlock [OPTIONS]" << std::endl;
+	out << "   or: git-crypt unlock [OPTIONS] KEY_FILE ..." << std::endl;
+	out << std::endl;
+	out << "    -v, --verbose               List the files that were decrypted" << std::endl;
+	out << std::endl;
 }
 int unlock (int argc, const char** argv)
 {
+	bool		verbose = false;
+	Options_list	options;
+	options.push_back(Option_def("-v", &verbose));
+	options.push_back(Option_def("--verbose", &verbose));
+
+	const int	argi = parse_options(options, argc, argv);
+	argc -= argi;
+	argv += argi;
+
 	// 1. Make sure every worktree is clean (ignoring untracked files)
 	// We do this because we check out files later, and we don't want the
 	// user to lose any changes.  (TODO: only care if encrypted files are
@@ -1394,7 +1425,7 @@ int unlock (int argc, const char** argv)
 	}
 
 	// 4. Check out the files that are currently encrypted, in every worktree.
-	if (!checkout_encrypted_files(worktrees, key_names)) {
+	if (!checkout_encrypted_files(worktrees, key_names, verbose ? "Decrypted" : 0)) {
 		std::clog << "git-crypt has been set up but existing encrypted files have not been decrypted" << std::endl;
 		return 1;
 	}
@@ -1411,6 +1442,7 @@ void help_lock (std::ostream& out)
 	out << "    -k, --key-name KEYNAME   Lock the given key, instead of the default" << std::endl;
 	out << "    -f, --force              Lock even if unclean (you may lose uncommited work)" << std::endl;
 	out << "    --if-unlocked            Do nothing (and succeed) if already locked" << std::endl;
+	out << "    -v, --verbose            List the files that were re-encrypted" << std::endl;
 	out << std::endl;
 }
 int lock (int argc, const char** argv)
@@ -1419,6 +1451,7 @@ int lock (int argc, const char** argv)
 	bool		all_keys = false;
 	bool		force = false;
 	bool		if_unlocked = false;
+	bool		verbose = false;
 	Options_list	options;
 	options.push_back(Option_def("-k", &key_name));
 	options.push_back(Option_def("--key-name", &key_name));
@@ -1427,6 +1460,8 @@ int lock (int argc, const char** argv)
 	options.push_back(Option_def("-f", &force));
 	options.push_back(Option_def("--force", &force));
 	options.push_back(Option_def("--if-unlocked", &if_unlocked));
+	options.push_back(Option_def("-v", &verbose));
+	options.push_back(Option_def("--verbose", &verbose));
 
 	int			argi = parse_options(options, argc, argv);
 	key_name = normalize_key_name(key_name);
@@ -1505,7 +1540,7 @@ int lock (int argc, const char** argv)
 	}
 
 	// 3. Check out the files that are currently decrypted but should be encrypted, in every worktree.
-	if (!checkout_encrypted_files(worktrees, key_names)) {
+	if (!checkout_encrypted_files(worktrees, key_names, verbose ? "Encrypted" : 0)) {
 		std::clog << "git-crypt has been locked up but existing decrypted files have not been encrypted" << std::endl;
 		return 1;
 	}

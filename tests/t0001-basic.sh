@@ -70,3 +70,29 @@ scenario_status_flags_plaintext_committed_before_gitattributes ()
 	assert_contains "$stdout" "secret.txt: staged encrypted version"
 	assert_blob_encrypted :secret.txt
 }
+
+scenario_unlock_reads_key_from_stdin ()
+{
+	new_encrypted_repo
+	echo 'top secret' > secret.txt
+	git add secret.txt
+	git commit -q -m 'Add secret'
+	git-crypt export-key - > "$SCENARIO_TMP/key"
+	git-crypt lock
+
+	git-crypt unlock - < "$SCENARIO_TMP/key"
+	assert_file_content secret.txt 'top secret'
+}
+
+scenario_legacy_init_with_key_file_unlocks ()
+{
+	new_encrypted_repo
+	echo 'top secret' > secret.txt
+	git add secret.txt
+	git commit -q -m 'Add secret'
+	git-crypt export-key "$SCENARIO_TMP/key"
+	git-crypt lock
+
+	git-crypt init "$SCENARIO_TMP/key" 2>/dev/null
+	assert_file_content secret.txt 'top secret'
+}

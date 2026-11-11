@@ -274,7 +274,7 @@
 			</varlistentry>
 
 			<varlistentry>
-				<term><option>unlock <!--<arg choice="opt"><replaceable>OPTIONS</replaceable></arg> --><arg choice="opt" rep="repeat"><replaceable>KEY_FILE</replaceable></arg></option></term>
+				<term><option>unlock <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="opt" rep="repeat"><replaceable>KEY_FILE</replaceable></arg></option></term>
 				<listitem>
 					<para>
 						Decrypt the repository.  If one or more key files are specified on the command line,
@@ -290,8 +290,23 @@
 					</para>
 
 					<para>
-						This command takes no options.
+						The following options are understood:
 					</para>
+					<variablelist>
+						<varlistentry>
+							<term><option>-v</option></term>
+							<term><option>--verbose</option></term>
+
+							<listitem>
+								<para>
+									After unlocking, list the files that were decrypted,
+									grouped by key (and by worktree, if the repository has
+									several), for example:
+								</para>
+								<screen>Decrypted with key 'default':&#10;    secret.txt</screen>
+							</listitem>
+						</varlistentry>
+					</variablelist>
 				</listitem>
 			</varlistentry>
 
@@ -352,6 +367,18 @@
 									Otherwise, lock as usual.  This makes
 									<command>git-crypt lock --if-unlocked</command> safe to run
 									from cleanup scripts and CI trap handlers.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-v</option></term>
+							<term><option>--verbose</option></term>
+
+							<listitem>
+								<para>
+									After locking, list the files that were re-encrypted,
+									grouped by key (and by worktree, if the repository has
+									several).
 								</para>
 							</listitem>
 						</varlistentry>
