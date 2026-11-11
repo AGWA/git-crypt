@@ -158,6 +158,13 @@
 									is added before git-crypt is initialized or before
 									the file is added to the gitattributes file.)
 								</para>
+								<para>
+									A file can only be encrypted while its key is unlocked.
+									If the key is locked (for example because the file was
+									staged while the repository was locked), the index entry is
+									left unchanged, an error is printed, and the exit status
+									is non-zero: run <command>git-crypt unlock</command> first.
+								</para>
 							</listitem>
 						</varlistentry>
 						<varlistentry>

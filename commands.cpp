@@ -51,6 +51,7 @@
 #include <exception>
 #include <vector>
 #include <set>
+#include <map>
 
 enum {
 	// # of arguments per git checkout call; must be large enough to be efficient but small
@@ -1900,6 +1901,8 @@ int status (int argc, const char** argv)
 	bool				unencrypted_blob_errors = false;
 	unsigned int			nbr_of_fixed_blobs = 0;
 	unsigned int			nbr_of_fix_errors = 0;
+	std::map<std::string, bool>	key_is_unlocked;	// by filter attribute; filled lazily
+	std::set<std::string>		locked_keys_of_unencrypted_blobs; // key names ("default" for the default key)
 
 	while (output.peek() != -1) {
 		std::string		tag;
@@ -1923,8 +1926,27 @@ int status (int argc, const char** argv)
 		if (file_attrs.first == "git-crypt" || std::strncmp(file_attrs.first.c_str(), "git-crypt-", 10) == 0) {
 			// File is encrypted
 			const bool	blob_is_unencrypted = !object_id.empty() && !check_if_blob_is_encrypted(object_id);
+			const char*	key_name = file_attrs.first == "git-crypt" ? 0 : file_attrs.first.c_str() + 10;
+			bool		key_is_locked = false;
+			if (blob_is_unencrypted) {
+				// Only an unlocked key can encrypt the file, so a locked key can't be fixed by restaging.
+				if (!key_is_unlocked.count(file_attrs.first)) {
+					key_is_unlocked[file_attrs.first] = is_key_unlocked(key_name);
+				}
+				key_is_locked = !key_is_unlocked[file_attrs.first];
+				if (key_is_locked) {
+					locked_keys_of_unencrypted_blobs.insert(key_name ? key_name : "default");
+				}
+			}
 
-			if (fix_problems && blob_is_unencrypted) {
+			if (fix_problems && blob_is_unencrypted && key_is_locked) {
+				std::clog << "Error: " << filename << ": cannot stage encrypted version because the repository is locked";
+				if (key_name) {
+					std::clog << " with key '" << key_name << "'";
+				}
+				std::clog << " - please run 'git-crypt unlock' first" << std::endl;
+				++nbr_of_fix_errors;
+			} else if (fix_problems && blob_is_unencrypted) {
 				if (access(filename.c_str(), F_OK) != 0) {
 					std::clog << "Error: " << filename << ": cannot stage encrypted version because not present in working tree - please 'git rm' or 'git checkout' it" << std::endl;
 					++nbr_of_fix_errors;
@@ -1983,7 +2005,23 @@ int status (int argc, const char** argv)
 		out << std::endl;
 		out << "Warning: one or more files is marked for encryption via .gitattributes but" << std::endl;
 		out << "was staged and/or committed before the .gitattributes file was in effect." << std::endl;
-		out << "Run 'git-crypt status' with the '-f' option to stage an encrypted version." << std::endl;
+		if (locked_keys_of_unencrypted_blobs.empty()) {
+			out << "Run 'git-crypt status' with the '-f' option to stage an encrypted version." << std::endl;
+		} else {
+			out << "The repository is locked";
+			if (locked_keys_of_unencrypted_blobs.size() != 1 || *locked_keys_of_unencrypted_blobs.begin() != "default") {
+				out << " with key";
+				const char*	separator = locked_keys_of_unencrypted_blobs.size() != 1 ? "s " : " ";
+				for (std::set<std::string>::const_iterator key_name(locked_keys_of_unencrypted_blobs.begin()); key_name != locked_keys_of_unencrypted_blobs.end(); ++key_name) {
+					out << separator << "'" << *key_name << "'";
+					separator = ", ";
+				}
+			}
+			out << ", so these files cannot be encrypted yet." << std::endl;
+			out << "Run 'git-crypt unlock' first (if it refuses because of staged changes," << std::endl;
+			out << "'git stash' them before unlocking and 'git stash pop' afterwards), then run" << std::endl;
+			out << "'git-crypt status' with the '-f' option to stage an encrypted version." << std::endl;
+		}
 		exit_status = 1;
 	}
 	if (nbr_of_fixed_blobs) {
