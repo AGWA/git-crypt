@@ -228,7 +228,13 @@ void		Key_file::load_header (std::istream& in)
 				}
 				key_name.assign(&bytes[0], field_len);
 			}
-			if (!validate_key_name(key_name.c_str())) {
+			if (key_name == "default") {
+				// "default" has never been a legal key name, so a key file can only
+				// contain it if it was written by 'add-gpg-user -k default' in git-crypt
+				// 0.8.0 and earlier.  That command stored the default key under this
+				// name, so it is safe to read it as the default key.
+				key_name.clear();
+			} else if (!validate_key_name(key_name.c_str())) {
 				key_name.clear();
 				throw Malformed();
 			}

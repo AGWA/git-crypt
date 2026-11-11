@@ -229,6 +229,13 @@ static bool same_key_name (const char* a, const char* b)
 	return (!a && !b) || (a && b && std::strcmp(a, b) == 0);
 }
 
+// "-k default" names the default key, so it must behave exactly as if -k had been
+// omitted.  Call this on every key name taken from the command line.
+static const char* normalize_key_name (const char* key_name)
+{
+	return key_name && std::strcmp(key_name, "default") == 0 ? 0 : key_name;
+}
+
 static void validate_key_name_or_throw (const char* key_name)
 {
 	std::string			reason;
@@ -849,7 +856,9 @@ static int parse_plumbing_options (const char** key_name, const char** key_file,
 	options.push_back(Option_def("--key-name", key_name));
 	options.push_back(Option_def("--key-file", key_file));
 
-	return parse_options(options, argc, argv);
+	int		argi = parse_options(options, argc, argv);
+	*key_name = normalize_key_name(*key_name);
+	return argi;
 }
 
 // Encrypt contents of stdin and write to stdout
@@ -1129,6 +1138,7 @@ int init (int argc, const char** argv)
 	options.push_back(Option_def("--key-name", &key_name));
 
 	int		argi = parse_options(options, argc, argv);
+	key_name = normalize_key_name(key_name);
 
 	if (!key_name && argc - argi == 1) {
 		std::clog << "Warning: 'git-crypt init' with a key file is deprecated as of git-crypt 0.4" << std::endl;
@@ -1289,6 +1299,7 @@ int lock (int argc, const char** argv)
 	options.push_back(Option_def("--force", &force));
 
 	int			argi = parse_options(options, argc, argv);
+	key_name = normalize_key_name(key_name);
 
 	if (argc - argi != 0) {
 		std::clog << "Error: git-crypt lock takes no arguments" << std::endl;
@@ -1377,6 +1388,7 @@ int add_gpg_user (int argc, const char** argv)
 	options.push_back(Option_def("--trusted", &trusted));
 
 	int			argi = parse_options(options, argc, argv);
+	key_name = normalize_key_name(key_name);
 	if (argc - argi == 0) {
 		std::clog << "Error: no GPG user ID specified" << std::endl;
 		help_add_gpg_user(std::clog);
@@ -1532,6 +1544,7 @@ int export_key (int argc, const char** argv)
 	options.push_back(Option_def("--key-name", &key_name));
 
 	int			argi = parse_options(options, argc, argv);
+	key_name = normalize_key_name(key_name);
 
 	if (argc - argi != 1) {
 		std::clog << "Error: no filename specified" << std::endl;
