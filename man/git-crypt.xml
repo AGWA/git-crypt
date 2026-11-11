@@ -373,7 +373,12 @@
 				<listitem>
 					<para>
 						Decrypt the repository.  If one or more key files are specified on the command line,
-						git-crypt attempts to decrypt using those shared symmetric keys.  If no key files
+						git-crypt attempts to decrypt using those shared symmetric keys.  If a
+						<replaceable>KEY_FILE</replaceable> is <literal>-</literal>, the key is read from
+						standard input instead of a file, which lets a key be supplied by a pipe without
+						writing it to disk, e.g.
+						<literal>echo "$KEY_BASE64" | base64 -d | git-crypt unlock -</literal>.
+						If no key files
 						are specified, git-crypt attempts to decrypt using a GPG-encrypted key stored in
 						the repository's .git-crypt directory.
 					</para>
@@ -485,7 +490,9 @@
 				<term><option>export-key <arg choice="opt"><replaceable>OPTIONS</replaceable></arg> <arg choice="plain"><replaceable>FILENAME</replaceable></arg></option></term>
 				<listitem>
 					<para>
-						Export the repository's shared symmetric key to the given file.
+						Export the repository's shared symmetric key to the given file.  If
+						<replaceable>FILENAME</replaceable> is <literal>-</literal>, the key is written to
+						standard output instead.
 					</para>
 
 					<para>

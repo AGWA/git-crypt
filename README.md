@@ -90,6 +90,9 @@ locked; add `-q` to suppress the output:
 
     git-crypt status -r -q || git-crypt unlock
 
+For unlocking in CI and deployment (including a GitHub Actions example and
+the security cautions that go with it), see [doc/ci.md](doc/ci.md).
+
 If the repository has multiple worktrees (`git worktree add`), they all
 share the same keys: `git-crypt unlock` and `git-crypt lock` decrypt or
 encrypt the files in every worktree at once.
