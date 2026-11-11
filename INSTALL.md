@@ -23,9 +23,9 @@ To use git-crypt, you need:
 Note: Git 1.8.5 or newer is recommended for best performance.
 
 
-### Building git-crypt
+### Building git-crypt on Linux
 
-Run:
+With the distribution's OpenSSL development package installed, run:
 
     make
     make install
@@ -35,6 +35,90 @@ To install to a specific location:
     make install PREFIX=/usr/local
 
 Or, just copy the git-crypt binary to wherever is most convenient for you.
+
+To check the build, run `make test` (see [tests/README.md](tests/README.md)).
+
+*Tested on Debian 12 (bookworm) with OpenSSL 3.0.  The Test workflow also
+runs this recipe on ubuntu-latest.*
+
+
+### Customizing the build
+
+The Makefile honors the usual variables, from the environment or the command
+line:
+
+* `CPPFLAGS`: preprocessor flags, e.g. `-I` options to find OpenSSL's headers.
+* `CXXFLAGS`: compiler flags.  Setting it replaces the default
+  (`-Wall -pedantic -Wno-long-long -O2`), so prefer `CPPFLAGS` for include
+  paths.
+* `LDFLAGS`: linker flags.  When `LDFLAGS` comes from the *environment*, the
+  Makefile appends `-lcrypto` (and, on Windows, the system libraries) to it.
+  When it is given on the make *command line* (`make LDFLAGS=...`), it
+  replaces everything, so you must include `-lcrypto` yourself.  Prefer the
+  environment.
+
+
+### Building on macOS
+
+To install a released version, use Homebrew:
+
+    brew install git-crypt
+
+To build from source, install OpenSSL with Homebrew and point the build at it
+(Homebrew doesn't put OpenSSL on the default search paths):
+
+    brew install openssl
+    CPPFLAGS="-I$(brew --prefix openssl)/include" LDFLAGS="-L$(brew --prefix openssl)/lib" make
+
+*Tested on macOS (Apple Silicon) with Homebrew OpenSSL 4.1.  The Test workflow
+also runs this recipe on macos-latest with Homebrew OpenSSL 3.*
+
+
+### Building on Windows
+
+git-crypt builds with MinGW-w64 in an [MSYS2](https://www.msys2.org/) shell.
+In the "MSYS2 MINGW64" shell, install the toolchain and OpenSSL:
+
+    pacman -S --needed base-devel git mingw-w64-x86_64-toolchain mingw-w64-x86_64-openssl
+
+Then run:
+
+    make
+
+The Makefile detects Windows (MSYS2 sets `OS=Windows_NT`) and links the
+Windows system libraries OpenSSL needs (`-lws2_32 -lcrypt32`).  The resulting
+`git-crypt.exe` depends on MSYS2's DLLs.  To build a stand-alone executable,
+link statically, as the release workflow does:
+
+    LDFLAGS="-static-libstdc++ -static" make
+
+*Not yet tested on a Windows machine.  These are the commands the Test and
+Release workflows run on windows-2022, and the link line was verified by
+cross-compiling with MinGW-w64 on Linux (the executable was not run).*
+
+Cygwin is not tested or supported; use MSYS2.
+
+Windows support is less tested than Unix support.  In particular, it does not
+currently create key files with restrictive permissions, making it unsuitable
+for use on a multi-user system.  Bug reports and patches are most welcome!
+
+
+### Building a static binary on Linux
+
+To build a git-crypt binary with no shared-library dependencies (for example
+to copy it to machines without OpenSSL), link statically against the static
+OpenSSL library (`libcrypto.a`, included in Debian's `libssl-dev`):
+
+    LDFLAGS="-static" make
+
+With glibc, the linker warns that some functions used inside libcrypto
+(`dlopen`, `getaddrinfo`, `gethostbyname`) need glibc's shared libraries at
+run time.  git-crypt doesn't use the OpenSSL features that call them, so the
+binary works, but for a fully self-contained binary build on a musl-based
+distribution such as Alpine Linux instead.
+
+*Tested on Debian 12 (bookworm): `ldd` reports "not a dynamic executable" and
+`make test` passes.  The Alpine variant is untested.*
 
 
 ### Building The Man Page
@@ -46,7 +130,11 @@ To build and install the git-crypt(1) man page, pass `ENABLE_MAN=yes` to make:
 
 xsltproc is required to build the man page.  Note that xsltproc will access
 the Internet to retrieve its stylesheet unless the Docbook stylesheet is
-installed locally and registered in the system's XML catalog.
+installed locally and registered in the system's XML catalog.  To use a local
+copy explicitly, set `DOCBOOK_XSL`, e.g. on Debian with the `docbook-xsl`
+package:
+
+    make ENABLE_MAN=yes DOCBOOK_XSL=/usr/share/xml/docbook/stylesheet/docbook-xsl/manpages/docbook.xsl
 
 
 ### Building A Debian Package
@@ -56,20 +144,3 @@ repository.  The package is built using git-buildpackage as follows:
 
     git checkout debian
     git-buildpackage -uc -us
-
-
-### Installing On Mac OS X
-
-Using the brew package manager, simply run:
-
-    brew install git-crypt
-
-### Experimental Windows Support
-
-git-crypt should build on Windows with MinGW, although the build system
-is not yet finalized so you will need to pass your own CXX, CXXFLAGS, and
-LDFLAGS variables to make.  Additionally, Windows support is less tested
-and does not currently create key files with restrictive permissions,
-making it unsuitable for use on a multi-user system.  Windows support
-will mature in a future version of git-crypt.  Bug reports and patches
-are most welcome!

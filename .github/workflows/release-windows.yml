@@ -24,7 +24,11 @@ jobs:
             openssl-devel
       - name: Build binary
         shell: msys2 {0}
-        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
+        # Link statically so that the .exe runs without MSYS2's DLLs.  The Makefile
+        # adds -lcrypto and the Windows system libraries itself.
+        env:
+          LDFLAGS: -static-libstdc++ -static
+        run: make
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:

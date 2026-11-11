@@ -27,6 +27,12 @@ OBJFILES = \
 OBJFILES += crypto-openssl-11.o
 LDFLAGS += -lcrypto
 
+# On Windows (e.g. MinGW in an MSYS2 shell, where make sees OS=Windows_NT),
+# OpenSSL and git-crypt need these system libraries.  They must come after -lcrypto.
+ifeq ($(OS),Windows_NT)
+LDFLAGS += -lws2_32 -lcrypt32
+endif
+
 XSLTPROC ?= xsltproc
 DOCBOOK_FLAGS += --param man.output.in.separate.dir 1 \
 		 --stringparam man.output.base.dir man/ \

@@ -28,7 +28,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           prefix=$(brew --prefix openssl@3)
-          CXXFLAGS="-I$prefix/include" LDFLAGS="-L$prefix/lib" make test
+          CPPFLAGS="-I$prefix/include" LDFLAGS="-L$prefix/lib" make test
   windows:
     name: Build (windows)
     runs-on: windows-2022
@@ -47,7 +47,7 @@ jobs:
             mingw-w64-x86_64-openssl
       - name: Build binary
         shell: msys2 {0}
-        run: make LDFLAGS="-static-libstdc++ -static -lcrypto -lws2_32 -lcrypt32"
+        run: make
       - name: Smoke test
         shell: msys2 {0}
         run: ./git-crypt.exe version
