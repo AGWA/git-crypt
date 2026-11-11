@@ -22,3 +22,8 @@ as follows:
 
 To unlock a repository with an alternative key, use `git-crypt unlock`
 normally.  git-crypt will automatically determine which key is being used.
+
+Git picks the filter for a file from the `.gitattributes` of the branch
+you are currently on, so reading a single file from a branch that uses a
+different key can fail.  See "Git workflow notes" in the
+[README](../README.md) for the symptoms and workarounds.

@@ -352,6 +352,186 @@ git-crypt does not work reliably with some third-party git GUIs, such
 as [Atlassian SourceTree](https://jira.atlassian.com/browse/SRCTREE-2511)
 and GitHub for Mac.  Files might be left in an unencrypted state.
 
+Git workflow notes
+------------------
+
+Git stores the *encrypted* contents of protected files, and only
+git-crypt's filters turn them back into plaintext.  Git features that
+look at stored file contents directly, or that choose a filter from
+the wrong `.gitattributes`, therefore misbehave in the ways described
+below.  The examples were checked with Git 2.56; the exact wording of
+Git's messages differs between versions.
+
+**Merge, rebase and cherry-pick.**  If an encrypted file changed on
+both sides, Git merges the encrypted blobs, which it treats as binary,
+so the merge conflicts without leaving conflict markers:
+
+    warning: Cannot merge binary files: secret.txt (HEAD vs. other)
+    CONFLICT (content): Merge conflict in secret.txt
+
+The working tree file just holds your side's plaintext.  Locking does
+not help, because the blobs are encrypted either way.  Stay unlocked
+and either pick one side:
+
+    git checkout --theirs secret.txt    # or --ours
+    git add secret.txt
+
+or do a three-way merge of the decrypted versions (`git cat-file
+--textconv` decrypts each conflict stage) and edit any markers that
+remain before staging the result:
+
+    gd=$(git rev-parse --git-dir)
+    git cat-file --textconv :1:secret.txt > $gd/merge-base
+    git cat-file --textconv :3:secret.txt > $gd/merge-theirs
+    git cat-file --textconv :2:secret.txt > secret.txt
+    git merge-file -L ours -L base -L theirs \
+        secret.txt $gd/merge-base $gd/merge-theirs
+    rm $gd/merge-base $gd/merge-theirs
+    git add secret.txt
+    git commit            # or: git rebase --continue
+
+During a rebase or cherry-pick, "ours" and "theirs" are swapped, as
+usual in Git.  git-crypt does not currently provide a merge driver.
+
+**`git add -p`.**  On an encrypted file, `git add -p` prints
+
+    Only binary files changed.
+
+because it builds hunks from the stored (encrypted) contents, which
+Git considers binary.  This can't be fixed within git-crypt.  Stage
+the whole file instead:
+
+    git add secret.txt
+
+**Switching branches.**  Checking out a branch whose encrypted files
+were made with a different key (for example, history fetched from a
+repository that was initialized separately) fails:
+
+    git-crypt: error: encrypted file has been tampered with!
+    error: external filter '"git-crypt" smudge' failed 1
+    error: external filter '"git-crypt" smudge' failed
+    fatal: secret.txt: smudge filter git-crypt failed
+
+The checkout is aborted and leaves the file deleted from the working
+tree (`git restore secret.txt` brings it back).  A branch where a file
+marked for encryption was committed as plaintext prints `git-crypt:
+warning: file not encrypted (run 'git-crypt status' for details)`, and
+afterwards `git status` shows the file as modified and switching away
+fails with "Your local changes to the following files would be
+overwritten by checkout".  In both cases, lock before switching and
+unlock afterwards with the key that belongs to the branch:
+
+    git-crypt lock
+    git checkout other-branch
+    git-crypt unlock /path/to/key
+
+**Multiple keys.**  Git picks the filter for a path from the
+`.gitattributes` of the commit or working tree you are *currently* on.
+Operations that read a single file from another branch therefore use
+the wrong key if the two branches encrypt that file with different
+keys (see [doc/multiple_keys.md](doc/multiple_keys.md)).  With `secret`
+using the default key on `main` and `git-crypt-team` on `moved`:
+
+    $ git checkout moved -- secret
+    git-crypt: error: encrypted file has been tampered with!
+    ...
+    fatal: secret: smudge filter git-crypt failed
+    $ git diff main moved -- secret
+    (same error)
+
+Switching to the branch (`git checkout moved`) works, since the
+attributes switch with it.  To read a file as it is on another branch
+without switching, tell Git to use that branch's attributes (needs Git
+2.40 or later), and compare the two sides yourself:
+
+    git --attr-source=moved cat-file --textconv moved:secret
+    diff -u <(git --attr-source=main cat-file --textconv main:secret) \
+            <(git --attr-source=moved cat-file --textconv moved:secret)
+
+`git diff --no-textconv main moved -- secret` also works, but only
+reports that the binary files differ.
+
+**`git filter-branch` and other history rewrites.**  After a rewrite
+that removes or changes the `.gitattributes` rule for an encrypted
+file, or if a file marked for encryption was committed as plaintext,
+the committed blob no longer matches what the filters produce from the
+working tree, so the tree looks dirty and the next rewrite refuses to
+run:
+
+    Cannot rewrite branches: You have unstaged changes.
+
+Lock before rewriting, so that git-crypt's filters are out of the way,
+and unlock afterwards:
+
+    git-crypt lock
+    git filter-branch ...
+    git-crypt unlock /path/to/key
+
+`git-crypt lock` itself refuses to run on a dirty tree, so if the tree
+is already dirty because of plaintext in history, do the rewrite in a
+fresh clone instead (a clone has no git-crypt filters configured until
+you unlock it).
+
+**Line-ending conversion.**  `core.autocrlf=true` by itself does *not*
+damage encrypted files: git-crypt's output is detected as binary, and
+Git leaves it alone.  Rules that force text handling of a path do
+damage them, because Git then converts line endings inside the
+encrypted data.  Examples are `*.txt text` and `* text eol=crlf`,
+with or without `core.autocrlf=true`.  Signs of trouble are
+warnings like
+
+    warning: in the working copy of 'secret.txt', LF will be replaced
+    by CRLF the next time Git touches it
+
+and, on checkout or `git-crypt unlock`, the "encrypted file has been
+tampered with!" error above.  Mark encrypted paths as not text:
+
+    secret* filter=git-crypt diff=git-crypt -text
+
+`eol=lf` is not a substitute for `-text`.  Make sure the `-text` rule
+comes after any broader rule that sets `text` or `eol` for the same
+path.
+
+**git-lfs.**  A path can have only one `filter` attribute, so combining
+the git-crypt and git-lfs filters on the same path is not supported.
+If two lines of `.gitattributes` both match a path, the last one wins:
+
+    *.bin filter=git-crypt diff=git-crypt
+    *.bin filter=lfs diff=lfs merge=lfs -text
+
+    $ git check-attr filter -- a.bin
+    a.bin: filter: lfs
+
+Here the file is handled by git-lfs and is *not* encrypted.  Use
+different paths for files handled by git-crypt and files handled by
+git-lfs.
+
+**GUI clients that can't find git-crypt.**  git-crypt records the
+command it was started with in `.git/config`.  If you ran
+`git-crypt init` or `git-crypt unlock` as plain `git-crypt`, the
+filter is configured as `"git-crypt" smudge` and is looked up on the
+`PATH` of whoever runs Git.  A GUI that doesn't inherit your shell's
+`PATH` then fails:
+
+    "git-crypt" smudge: git-crypt: command not found
+    error: external filter '"git-crypt" smudge' failed 127
+    error: external filter '"git-crypt" smudge' failed
+    fatal: secret.txt: smudge filter git-crypt failed
+
+Run `git-crypt unlock` once by its absolute path, which makes git-crypt
+record that path (this also works in an already unlocked repository):
+
+    /usr/local/bin/git-crypt unlock /path/to/key
+
+or point the configuration at the binary yourself:
+
+    git config filter.git-crypt.smudge '"/usr/local/bin/git-crypt" smudge'
+    git config filter.git-crypt.clean '"/usr/local/bin/git-crypt" clean'
+    git config diff.git-crypt.textconv '"/usr/local/bin/git-crypt" diff'
+
+For a named key `NAME`, the sections are `filter.git-crypt-NAME` and
+`diff.git-crypt-NAME`, and the commands end in `--key-name=NAME`.
+
 Gitattributes File
 ------------------
 

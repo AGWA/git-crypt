@@ -759,6 +759,227 @@ Binary files a/secrets/api.txt and b/secrets/api.txt differ</screen>
 		</para>
 	</refsect1>
 	<refsect1>
+		<title>Git workflow notes</title>
+
+		<para>
+			Git stores the <emphasis>encrypted</emphasis> contents of protected files, and only
+			git-crypt's filters turn them back into plaintext.  Git features that look at stored
+			file contents directly, or that choose a filter from the wrong
+			<filename>.gitattributes</filename>, therefore misbehave in the ways described below.
+			The examples were checked with Git 2.56; the exact wording of Git's messages differs
+			between versions.
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term>Merge, rebase and cherry-pick</term>
+				<listitem>
+					<para>
+						If an encrypted file changed on both sides, Git merges the encrypted blobs,
+						which it treats as binary, so the merge conflicts without leaving conflict markers:
+					</para>
+					<screen>warning: Cannot merge binary files: secret.txt (HEAD vs. other)&#10;CONFLICT (content): Merge conflict in secret.txt</screen>
+					<para>
+						The working tree file just holds your side's plaintext.  Locking does not help,
+						because the blobs are encrypted either way.  Stay unlocked and either pick one side:
+					</para>
+					<screen>git checkout --theirs secret.txt&#10;git add secret.txt</screen>
+					<para>
+						or do a three-way merge of the decrypted versions
+						(<command>git cat-file --textconv</command> decrypts each conflict stage) and edit any
+						markers that remain before staging the result:
+					</para>
+					<screen>gd=$(git rev-parse --git-dir)
+git cat-file --textconv :1:secret.txt &gt; $gd/merge-base
+git cat-file --textconv :3:secret.txt &gt; $gd/merge-theirs
+git cat-file --textconv :2:secret.txt &gt; secret.txt
+git merge-file -L ours -L base -L theirs \
+    secret.txt $gd/merge-base $gd/merge-theirs
+rm $gd/merge-base $gd/merge-theirs
+git add secret.txt
+git commit</screen>
+					<para>
+						During a rebase, use <command>git rebase --continue</command> instead of
+						<command>git commit</command>.  During a rebase or cherry-pick, "ours" and "theirs"
+						are swapped, as usual in Git.  git-crypt does not currently provide a merge driver.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><command>git add -p</command></term>
+				<listitem>
+					<para>
+						On an encrypted file, <command>git add -p</command> prints
+					</para>
+					<screen>Only binary files changed.</screen>
+					<para>
+						because it builds hunks from the stored (encrypted) contents, which Git considers
+						binary.  This cannot be fixed within git-crypt.  Stage the whole file instead:
+					</para>
+					<screen>git add secret.txt</screen>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term>Switching branches</term>
+				<listitem>
+					<para>
+						Checking out a branch whose encrypted files were made with a different key (for
+						example, history fetched from a repository that was initialized separately) fails:
+					</para>
+					<screen>git-crypt: error: encrypted file has been tampered with!
+error: external filter '"git-crypt" smudge' failed 1
+error: external filter '"git-crypt" smudge' failed
+fatal: secret.txt: smudge filter git-crypt failed</screen>
+					<para>
+						The checkout is aborted and leaves the file deleted from the working tree
+						(<command>git restore secret.txt</command> brings it back).  A branch where a file
+						marked for encryption was committed as plaintext prints
+						"git-crypt: warning: file not encrypted (run 'git-crypt status' for details)", and
+						afterwards <command>git status</command> shows the file as modified and switching away
+						fails with "Your local changes to the following files would be overwritten by
+						checkout".  In both cases, lock before switching and unlock afterwards with the key
+						that belongs to the branch:
+					</para>
+					<screen>git-crypt lock&#10;git checkout other-branch&#10;git-crypt unlock <filename>/path/to/key</filename></screen>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term>Multiple keys</term>
+				<listitem>
+					<para>
+						Git picks the filter for a path from the <filename>.gitattributes</filename> of the
+						commit or working tree you are <emphasis>currently</emphasis> on.  Operations that
+						read a single file from another branch therefore use the wrong key if the two
+						branches encrypt that file with different keys.  With <filename>secret</filename>
+						using the default key on <literal>main</literal> and <literal>git-crypt-team</literal>
+						on <literal>moved</literal>,
+						<command>git checkout moved -- secret</command> and
+						<command>git diff main moved -- secret</command> both fail with the
+						"encrypted file has been tampered with!" error shown above.
+					</para>
+					<para>
+						Switching to the branch (<command>git checkout moved</command>) works, since the
+						attributes switch with it.  To read a file as it is on another branch without
+						switching, tell Git to use that branch's attributes (needs Git 2.40 or later), and
+						compare the two sides yourself:
+					</para>
+					<screen>git --attr-source=moved cat-file --textconv moved:secret
+diff -u &lt;(git --attr-source=main cat-file --textconv main:secret) \
+        &lt;(git --attr-source=moved cat-file --textconv moved:secret)</screen>
+					<para>
+						<command>git diff --no-textconv main moved -- secret</command> also works, but only
+						reports that the binary files differ.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><command>git filter-branch</command> and other history rewrites</term>
+				<listitem>
+					<para>
+						After a rewrite that removes or changes the <filename>.gitattributes</filename> rule
+						for an encrypted file, or if a file marked for encryption was committed as plaintext,
+						the committed blob no longer matches what the filters produce from the working tree,
+						so the tree looks dirty and the next rewrite refuses to run:
+					</para>
+					<screen>Cannot rewrite branches: You have unstaged changes.</screen>
+					<para>
+						Lock before rewriting, so that git-crypt's filters are out of the way, and unlock
+						afterwards:
+					</para>
+					<screen>git-crypt lock&#10;git filter-branch ...&#10;git-crypt unlock <filename>/path/to/key</filename></screen>
+					<para>
+						<command>git-crypt lock</command> itself refuses to run on a dirty tree, so if the
+						tree is already dirty because of plaintext in history, do the rewrite in a fresh
+						clone instead (a clone has no git-crypt filters configured until you unlock it).
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term>Line-ending conversion</term>
+				<listitem>
+					<para>
+						<literal>core.autocrlf=true</literal> by itself does <emphasis>not</emphasis> damage
+						encrypted files: git-crypt's output is detected as binary, and Git leaves it alone.
+						Rules that force text handling of a path do damage them, because Git then converts
+						line endings inside the encrypted data.  Examples are
+						"<literal>*.txt text</literal>" and "<literal>* text eol=crlf</literal>", with or
+						without <literal>core.autocrlf=true</literal>.  Signs of trouble are warnings like
+						"in the working copy of 'secret.txt', LF will be replaced by CRLF the next time Git
+						touches it" and, on checkout or <command>git-crypt unlock</command>, the
+						"encrypted file has been tampered with!" error.  Mark encrypted paths as not text:
+					</para>
+					<screen>secret* filter=git-crypt diff=git-crypt -text</screen>
+					<para>
+						<literal>eol=lf</literal> is not a substitute for <literal>-text</literal>.  Make sure
+						the <literal>-text</literal> rule comes after any broader rule that sets
+						<literal>text</literal> or <literal>eol</literal> for the same path.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term>git-lfs</term>
+				<listitem>
+					<para>
+						A path can have only one <literal>filter</literal> attribute, so combining the
+						git-crypt and git-lfs filters on the same path is not supported.  If two lines of
+						<filename>.gitattributes</filename> both match a path, the last one wins:
+					</para>
+					<screen>*.bin filter=git-crypt diff=git-crypt
+*.bin filter=lfs diff=lfs merge=lfs -text
+
+$ git check-attr filter -- a.bin
+a.bin: filter: lfs</screen>
+					<para>
+						Here the file is handled by git-lfs and is <emphasis>not</emphasis> encrypted.  Use
+						different paths for files handled by git-crypt and files handled by git-lfs.
+					</para>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term>GUI clients that cannot find git-crypt</term>
+				<listitem>
+					<para>
+						git-crypt records the command it was started with in <filename>.git/config</filename>.
+						If you ran <command>git-crypt init</command> or <command>git-crypt unlock</command>
+						as plain <command>git-crypt</command>, the filter is configured as
+						<literal>"git-crypt" smudge</literal> and is looked up on the <envar>PATH</envar> of
+						whoever runs Git.  A GUI that does not inherit your shell's <envar>PATH</envar> then
+						fails:
+					</para>
+					<screen>"git-crypt" smudge: git-crypt: command not found
+error: external filter '"git-crypt" smudge' failed 127
+error: external filter '"git-crypt" smudge' failed
+fatal: secret.txt: smudge filter git-crypt failed</screen>
+					<para>
+						Run <command>git-crypt unlock</command> once by its absolute path, which makes git-crypt
+						record that path (this also works in an already unlocked repository):
+					</para>
+					<screen>/usr/local/bin/git-crypt unlock <filename>/path/to/key</filename></screen>
+					<para>
+						or point the configuration at the binary yourself:
+					</para>
+					<screen>git config filter.git-crypt.smudge '"/usr/local/bin/git-crypt" smudge'
+git config filter.git-crypt.clean '"/usr/local/bin/git-crypt" clean'
+git config diff.git-crypt.textconv '"/usr/local/bin/git-crypt" diff'</screen>
+					<para>
+						For a named key <replaceable>NAME</replaceable>, the sections are
+						<literal>filter.git-crypt-<replaceable>NAME</replaceable></literal> and
+						<literal>diff.git-crypt-<replaceable>NAME</replaceable></literal>, and the commands end in
+						<literal>--key-name=<replaceable>NAME</replaceable></literal>.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+	</refsect1>
+
+	<refsect1>
 		<title>Configuration</title>
 
 		<para>
