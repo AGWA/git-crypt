@@ -151,6 +151,124 @@ with "no GPG secret key available to unlock this repository".  With it,
 unlock finds `sub/.git-crypt/keys/default/0/<FPR>.gpg` and the files
 under `sub/` are decrypted.
 
+Verifying encryption
+--------------------
+
+To check that your files are really stored encrypted, run `git-crypt
+status`.  It lists every file in the repository, tracked or not, and says
+whether git-crypt will encrypt it according to `.gitattributes`:
+
+    $ git-crypt status
+    not encrypted: .gitattributes
+    not encrypted: README
+        encrypted: secrets/api.txt
+
+`git-crypt status -e` shows only the encrypted files, and `git-crypt
+status -u` shows only the unencrypted ones.  You can also give it file
+names to check just those files.  (`-z`, for machine-readable output, is
+not implemented yet.)
+
+For files that are supposed to be encrypted, `status` also looks at what
+Git actually has in the index and in HEAD, and warns if it is plaintext:
+
+    $ git-crypt status
+    not encrypted: .gitattributes
+    not encrypted: README
+        encrypted: early.txt *** WARNING: staged/committed version is NOT ENCRYPTED! ***
+        encrypted: secrets/api.txt
+
+    Warning: one or more files is marked for encryption via .gitattributes but
+    was staged and/or committed before the .gitattributes file was in effect.
+    Run 'git-crypt status' with the '-f' option to stage an encrypted version.
+
+This typically happens when a file was added before git-crypt was set up
+or before the file was covered by `.gitattributes`.  `git-crypt status -f`
+stages an encrypted version of each such file (you still need to commit):
+
+    $ git-crypt status -f
+    early.txt: staged encrypted version
+    Staged 1 encrypted file.
+    Warning: if these files were previously committed, unencrypted versions still exist in the repository's history.
+
+`-f` can only encrypt a file while the repository is unlocked.  If it is
+locked, `git-crypt status -f` refuses and tells you to run `git-crypt
+unlock` first.  (If `unlock` complains that the working directory is not
+clean, `git stash` your changes before unlocking and `git stash pop` them
+afterwards.)
+
+A second warning, "diff=git-crypt attribute not set", means a file has
+`filter=git-crypt` but not `diff=git-crypt` in `.gitattributes`.  The
+file is still encrypted when committed, but `git diff` will not be able
+to show readable changes; add `diff=git-crypt` to the pattern.
+
+`git-crypt status` exits with status 1 if it printed either warning.
+
+### Checking without git-crypt
+
+Encrypted blobs begin with the 10 bytes `\0GITCRYPT\0`.  You can check
+what Git has stored, without relying on git-crypt at all, by reading the
+blob directly.  For the committed version of a file:
+
+    $ git cat-file -p HEAD:secrets/api.txt | head -c 10 | xxd
+    00000000: 0047 4954 4352 5950 5400                 .GITCRYPT.
+
+(`od -c` works too and shows the NUL bytes as `\0`.)  For the version in
+the index, i.e. what you have staged and is about to be committed, use
+`:path` instead of `HEAD:path`:
+
+    $ git cat-file -p :secrets/api.txt | head -c 10 | xxd
+    00000000: 0047 4954 4352 5950 5400                 .GITCRYPT.
+
+A plaintext file shows its own contents instead:
+
+    $ git cat-file -p HEAD:README | head -c 10 | xxd
+    00000000: 6865 6c6c 6f0a                           hello.
+
+### Do not use git diff or git show to check
+
+When the repository is unlocked, `git diff` and `git show` display files
+as plaintext, so they cannot tell you whether a file is encrypted.  The
+`diff=git-crypt` attribute makes Git run a "textconv" filter that
+decrypts the stored blob before comparing it:
+
+    $ git show HEAD -- secrets/api.txt
+    ...
+    diff --git a/secrets/api.txt b/secrets/api.txt
+    index 5150825..9df0775 100644
+    --- a/secrets/api.txt
+    +++ b/secrets/api.txt
+    @@ -1 +1 @@
+    -api key: hunter2
+    +api key: new
+
+Pass `--no-textconv` to see the stored (encrypted) data as Git sees it:
+
+    $ git show --no-textconv HEAD -- secrets/api.txt
+    ...
+    diff --git a/secrets/api.txt b/secrets/api.txt
+    index 5150825..9df0775 100644
+    Binary files a/secrets/api.txt and b/secrets/api.txt differ
+
+When the repository is locked, `git diff`, `git diff --cached` and `git
+show` print "Binary files ... differ" for these files whether or not
+they are encrypted: a plaintext file staged while the repository was
+locked looks exactly the same.  Use `git-crypt status` or `git cat-file`
+as shown above.
+
+### History
+
+`git-crypt status` checks the files as they are now, in the index and in
+HEAD.  It does not look at older commits.  If a file was committed
+unencrypted at some point, fixing it with `status -f` only protects new
+commits; the plaintext is still in the history, and anyone with a copy of
+the repository can read it:
+
+    $ git cat-file -p HEAD~2:early.txt
+    secret before attrs
+
+Removing it requires rewriting history (and rotating any secrets that
+were exposed).  A separate document on rewriting history is planned.
+
 Current Status
 --------------
 

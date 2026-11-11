@@ -622,6 +622,97 @@
 	</refsect1>
 
 	<refsect1>
+		<title>Verifying encryption</title>
+
+		<para>
+			To check that files are stored encrypted, run <command>git-crypt status</command>.
+			It lists every file, with "<literal>encrypted</literal>" or "<literal>not encrypted</literal>"
+			according to <filename>.gitattributes</filename>:
+		</para>
+
+		<screen>$ git-crypt status
+not encrypted: .gitattributes
+not encrypted: README
+    encrypted: secrets/api.txt</screen>
+
+		<para>
+			For files that should be encrypted, <command>status</command> also checks the
+			version stored in the index and in HEAD, and warns if it is plaintext:
+		</para>
+
+		<screen>$ git-crypt status
+not encrypted: .gitattributes
+not encrypted: README
+    encrypted: early.txt *** WARNING: staged/committed version is NOT ENCRYPTED! ***
+    encrypted: secrets/api.txt
+
+Warning: one or more files is marked for encryption via .gitattributes but
+was staged and/or committed before the .gitattributes file was in effect.
+Run 'git-crypt status' with the '-f' option to stage an encrypted version.</screen>
+
+		<para>
+			This happens when a file was staged or committed before git-crypt was set up or
+			before the file was covered by <filename>.gitattributes</filename>.
+			<command>git-crypt status -f</command> stages an encrypted version (commit it afterwards).
+			It can only do so while the key is unlocked; if the repository is locked it fails
+			and asks you to run <command>git-crypt unlock</command> first.
+		</para>
+
+		<screen>$ git-crypt status -f
+early.txt: staged encrypted version
+Staged 1 encrypted file.
+Warning: if these files were previously committed, unencrypted versions still exist in the repository's history.</screen>
+
+		<para>
+			The warning "<literal>diff=git-crypt attribute not set</literal>" means a file has
+			<literal>filter=git-crypt</literal> but no <literal>diff=git-crypt</literal> in
+			<filename>.gitattributes</filename>.  The file is still encrypted, but
+			<command>git diff</command> cannot show readable changes.
+			<command>git-crypt status</command> exits with status 1 if it prints either warning.
+		</para>
+
+		<para>
+			To check without relying on git-crypt, read the stored blob directly.  Encrypted blobs
+			begin with the 10 bytes <literal>\0GITCRYPT\0</literal> (a NUL byte, the string
+			"GITCRYPT", and another NUL byte).  Use <literal>HEAD:path</literal> for the committed
+			version and <literal>:path</literal> for the staged version:
+		</para>
+
+		<screen>$ git cat-file -p HEAD:secrets/api.txt | head -c 10 | xxd
+00000000: 0047 4954 4352 5950 5400                 .GITCRYPT.
+$ git cat-file -p :secrets/api.txt | head -c 10 | od -c
+0000000   \0   G   I   T   C   R   Y   P   T  \0</screen>
+
+		<para>
+			Do <emphasis>not</emphasis> use <command>git diff</command> or <command>git show</command>
+			to verify encryption.  While the repository is unlocked, the
+			<literal>diff=git-crypt</literal> attribute makes Git decrypt blobs (via textconv) for
+			display, so they show plaintext even though the stored data is encrypted.  Use
+			<option>--no-textconv</option> to see what is stored:
+		</para>
+
+		<screen>$ git show --no-textconv HEAD -- secrets/api.txt
+...
+diff --git a/secrets/api.txt b/secrets/api.txt
+index 5150825..9df0775 100644
+Binary files a/secrets/api.txt and b/secrets/api.txt differ</screen>
+
+		<para>
+			While the repository is locked, <command>git diff</command>,
+			<command>git diff --cached</command> and <command>git show</command> print
+			"Binary files ... differ" for these files whether or not they are encrypted
+			(a plaintext file staged while locked looks the same), so they are not a check either.
+		</para>
+
+		<para>
+			<command>git-crypt status</command> examines the current index and HEAD only, not
+			history.  A file committed unencrypted earlier remains readable in older commits
+			even after it is fixed; removing it requires rewriting history.  A separate document on
+			rewriting history is planned.
+		</para>
+	</refsect1>
+
+	<refsect1>
 		<title>Multiple Key Support</title>
 
 		<para>
