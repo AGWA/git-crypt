@@ -293,6 +293,10 @@ it leaks no information beyond whether two files are identical or not.
 Other proposals for transparent git encryption use ECB or CBC with a
 fixed IV.  These systems are not semantically secure and leak information.
 
+For the encrypted file format, the crypto design, the key file format, and
+recipes for decrypting a blob or a collaborator's `.gpg` key file by hand,
+see [doc/how-it-works.md](doc/how-it-works.md).
+
 Limitations
 -----------
 
