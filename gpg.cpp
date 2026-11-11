@@ -129,6 +129,62 @@ std::vector<std::string> gpg_lookup_key (const std::string& query)
 // keyring, keyed by the primary key's fingerprint.  Listing the whole keyring at once
 // (rather than looking up each fingerprint) means unknown fingerprints produce no gpg
 // error output.  Returns an empty map if gpg fails.
+// Looks up the primary key or subkey whose fingerprint is exactly `fingerprint` (40
+// upper-case hex digits).  Returns false if there is no such (sub)key in the keyring.
+// Otherwise, sets *primary_fingerprint to the fingerprint of the primary key it belongs
+// to, and *can_encrypt to whether that very (sub)key is a usable encryption key (has
+// encryption capability and is neither expired nor revoked).
+bool gpg_lookup_exact_key (const std::string& fingerprint, std::string* primary_fingerprint, bool* can_encrypt)
+{
+	// gpg --batch --with-colons --fixed-list-mode --fingerprint --list-keys 0xFINGERPRINT
+	std::vector<std::string>	command;
+	command.push_back(gpg_get_executable());
+	command.push_back("--batch");
+	command.push_back("--with-colons");
+	command.push_back("--fixed-list-mode");
+	command.push_back("--fingerprint");
+	command.push_back("--list-keys");
+	command.push_back("0x" + fingerprint);
+	std::stringstream		command_output;
+	if (!successful_exit(exec_command(command, command_output))) {
+		return false;
+	}
+
+	// pub:u:255:22:4EFF79D8FA4E9C59:1794366719:::u:::scESC:::::ed25519:::0:
+	// fpr:::::::::B3DE3BDFDBE79919CA4FB22D4EFF79D8FA4E9C59:
+	// sub:u:255:18:928A04A1479EDD06:1794366719::::::e:::::cv25519::
+	// fpr:::::::::08E1C52060E273C858E45268928A04A1479EDD06:
+	// Column 1 is the validity (e = expired, r = revoked) and column 11 the key's
+	// capabilities (lower case: of this (sub)key; upper case: of the key as a whole).
+	std::string			current_primary;
+	std::string			record_type;	// "pub" or "sub": the record the next fpr line belongs to
+	std::string			record_validity;
+	std::string			record_capabilities;
+	while (command_output.peek() != -1) {
+		std::string		line;
+		std::getline(command_output, line);
+		const std::string	type(line.substr(0, 4));
+		if (type == "pub:" || type == "sub:") {
+			record_type = line.substr(0, 3);
+			record_validity = gpg_nth_column(line, 1);
+			record_capabilities = gpg_nth_column(line, 11);
+		} else if (type == "fpr:" && !record_type.empty()) {
+			const std::string	this_fingerprint(gpg_nth_column(line, 9));
+			if (record_type == "pub") {
+				current_primary = this_fingerprint;
+			}
+			if (this_fingerprint == fingerprint && !current_primary.empty()) {
+				*primary_fingerprint = current_primary;
+				*can_encrypt = record_capabilities.find('e') != std::string::npos &&
+				               record_validity != "e" && record_validity != "r";
+				return true;
+			}
+			record_type.clear();
+		}
+	}
+	return false;
+}
+
 std::map<std::string, std::string> gpg_list_public_key_uids ()
 {
 	// gpg --batch --with-colons --fixed-list-mode --fingerprint --list-keys

@@ -139,3 +139,22 @@ gpg_fingerprint ()
 {
 	gpg --batch --with-colons --fingerprint --list-keys "$1" | awk -F: '/^pub:/ { want = 1; next } want && /^fpr:/ { print $10; exit }'
 }
+
+# new_gnupghome: creates an additional, empty GNUPGHOME and prints its path.
+# tests/run.sh stops its gpg-agent and removes it after the scenario.
+new_gnupghome ()
+{
+	local home
+	home=$(mktemp -d /tmp/gcg.XXXXXX)
+	chmod 700 "$home"
+	echo "$home" >> "$SCENARIO_TMP/extra-gnupghomes"
+	echo "$home"
+}
+
+# gpg_add_subkey FPR ALGO USAGE: adds a subkey to the key FPR and prints the
+# new subkey's fingerprint.
+gpg_add_subkey ()
+{
+	gpg --batch --quiet --passphrase '' --quick-add-key "$1" "$2" "$3" never 2>/dev/null
+	gpg --batch --with-colons --fingerprint --list-keys "$1" | awk -F: '/^fpr:/ { last = $10 } END { print last }'
+}

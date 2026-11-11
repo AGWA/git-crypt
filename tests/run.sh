@@ -83,6 +83,13 @@ for file in "${files[@]}"; do
 		rc=$?
 
 		GNUPGHOME=$gnupghome gpgconf --kill all >/dev/null 2>&1 || true
+		extra_gnupghomes=
+		if [ -f "$tmp/extra-gnupghomes" ]; then
+			extra_gnupghomes=$(cat "$tmp/extra-gnupghomes")
+			for home in $extra_gnupghomes; do
+				GNUPGHOME=$home gpgconf --kill all >/dev/null 2>&1 || true
+			done
+		fi
 
 		case "$fn:$rc" in
 			scenario_*:0)
@@ -104,7 +111,7 @@ for file in "${files[@]}"; do
 				failures+=("$name") ;;
 		esac
 
-		rm -rf "$tmp" "$tmp.log" "$gnupghome"
+		rm -rf "$tmp" "$tmp.log" "$gnupghome" $extra_gnupghomes
 	done
 done
 

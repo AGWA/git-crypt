@@ -224,6 +224,26 @@
 					</para>
 
 					<para>
+						To encrypt to one particular subkey (for example a new encryption
+						subkey, while an older one is still valid), give the subkey's full
+						fingerprint followed by an exclamation mark, optionally prefixed with
+						<literal>0x</literal>, e.g. <literal>0x08E1C52060E273C858E45268928A04A1479EDD06!</literal>.
+						The subkey must be able to encrypt and must not be expired or revoked.
+						The collaborator's file is still named after their primary key's fingerprint.
+					</para>
+
+					<para>
+						A full fingerprint prefixed with <literal>0x</literal> (with or without the
+						trailing exclamation mark) identifies a key unambiguously, so it is
+						treated as trusted, as with <option>--trusted</option>.
+					</para>
+
+					<para>
+						If a user has already been added to the key, they are skipped with a
+						message, unless <option>--force</option> is given.
+					</para>
+
+					<para>
 						The following options are understood:
 					</para>
 					<variablelist>
@@ -269,6 +289,18 @@
 									<citerefentry><refentrytitle>gpg</refentrytitle><manvolnum>1</manvolnum></citerefentry>),
 									or use the <option>--trusted</option> option to <command>add-gpg-user</command>
 									on a case-by-case basis.
+								</para>
+							</listitem>
+						</varlistentry>
+						<varlistentry>
+							<term><option>-f</option></term>
+							<term><option>--force</option></term>
+
+							<listitem>
+								<para>
+									Re-encrypt the key to users who have already been added,
+									replacing their existing file.  Use this after a user
+									changes encryption subkeys.
 								</para>
 							</listitem>
 						</varlistentry>

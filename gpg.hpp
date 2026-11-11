@@ -44,6 +44,7 @@ struct Gpg_error {
 
 std::string			gpg_get_uid (const std::string& fingerprint);
 std::vector<std::string>	gpg_lookup_key (const std::string& query);
+bool				gpg_lookup_exact_key (const std::string& fingerprint, std::string* primary_fingerprint, bool* can_encrypt);
 std::vector<std::string>	gpg_list_secret_keys ();
 std::map<std::string, std::string> gpg_list_public_key_uids (); // primary key fingerprint => primary UID
 void				gpg_encrypt_to_file (const std::string& filename, const std::string& recipient_fingerprint, bool key_is_trusted, const char* p, size_t len);
