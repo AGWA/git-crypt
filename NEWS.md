@@ -1,5 +1,16 @@
 # Change Log
 
+## Unreleased
+* Filter commands now always run `git-crypt` by its bare name, even if
+  git-crypt was run by an absolute path, so repositories keep working
+  after git-crypt is upgraded or moved.
+* Add the `git-crypt.program` git config option to make the filter
+  commands run a specific git-crypt binary (e.g. for GUI clients that
+  don't inherit the shell's `PATH`).
+* Add `git-crypt refresh-filters` to rewrite the filter commands of an
+  unlocked repository after changing `git-crypt.program` or moving
+  git-crypt.
+
 ## v0.8.0 (2025-09-23)
 * Remove OpenSSL 1.0 support, fix compilation with OpenSSL 3.
 * Avoid use of problematic short GPG key IDs.

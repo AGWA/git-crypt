@@ -177,25 +177,90 @@ static void git_deconfig (const std::string& name)
 	}
 }
 
-static void configure_git_filters (const char* key_name)
+static bool is_absolute_program_path (const std::string& program)
 {
-	std::string	escaped_git_crypt_path(escape_shell_arg(our_exe_path()));
-
-	if (key_name) {
-		// Note: key_name contains only shell-safe characters so it need not be escaped.
-		git_config(std::string("filter.git-crypt-") + key_name + ".smudge",
-		           escaped_git_crypt_path + " smudge --key-name=" + key_name);
-		git_config(std::string("filter.git-crypt-") + key_name + ".clean",
-		           escaped_git_crypt_path + " clean --key-name=" + key_name);
-		git_config(std::string("filter.git-crypt-") + key_name + ".required", "true");
-		git_config(std::string("diff.git-crypt-") + key_name + ".textconv",
-		           escaped_git_crypt_path + " diff --key-name=" + key_name);
-	} else {
-		git_config("filter.git-crypt.smudge", escaped_git_crypt_path + " smudge");
-		git_config("filter.git-crypt.clean", escaped_git_crypt_path + " clean");
-		git_config("filter.git-crypt.required", "true");
-		git_config("diff.git-crypt.textconv", escaped_git_crypt_path + " diff");
+	if (!program.empty() && (program[0] == '/' || program[0] == '\\')) {
+		return true;
 	}
+	// A Windows path with a drive letter, such as C:/Program Files/git-crypt.exe
+	return program.size() >= 3 && std::isalpha(static_cast<unsigned char>(program[0])) &&
+	       program[1] == ':' && (program[2] == '/' || program[2] == '\\');
+}
+
+// Returns the program the filter commands run, shell-escaped: the git-crypt.program
+// option, or the bare name "git-crypt" (looked up on PATH when Git runs the filter).
+// See docs/adr/0001-filter-commands-use-bare-git-crypt-name.md.
+static std::string get_filter_program ()
+{
+	if (!git_has_config("git-crypt.program")) {
+		return escape_shell_arg("git-crypt");
+	}
+	const std::string	program(get_git_config("git-crypt.program"));
+	if (program.empty()) {
+		throw Error("the git-crypt.program option is empty; set it to an absolute path or a command name, or unset it");
+	}
+	if (program.find('/') != std::string::npos && !is_absolute_program_path(program)) {
+		throw Error("the git-crypt.program option is a relative path ('" + program + "'); set it to an absolute path or a command name found on PATH");
+	}
+	return escape_shell_arg(program);
+}
+
+static bool contains_path_separator (const std::string& program)
+{
+	return program.find_first_of("/\\") != std::string::npos;
+}
+
+// Writes the filter and textconv commands for the given key, running `program` (as
+// returned by get_filter_program).  If they were already configured with different
+// commands, prints an "old -> new" notice to stderr.  Returns true if commands that ran
+// a path were replaced with commands that run a bare command name.
+static bool configure_git_filters (const char* key_name, const std::string& program)
+{
+	// Note: key_name contains only shell-safe characters so it need not be escaped.
+	const std::string	key_option(key_name ? std::string(" --key-name=") + key_name : "");
+	const std::string	filter_section("filter." + attribute_name(key_name));
+	const std::string	diff_section("diff." + attribute_name(key_name));
+
+	struct Command { std::string name; std::string arguments; };
+	const Command		commands[] = {
+		{ filter_section + ".smudge", " smudge" + key_option },
+		{ filter_section + ".clean", " clean" + key_option },
+		{ diff_section + ".textconv", " diff" + key_option },
+	};
+
+	bool			changed = false;
+	std::string		old_program; // what the first changed command ran
+	for (const Command& command : commands) {
+		const std::string	new_value(program + command.arguments);
+		if (!changed && git_has_config(command.name)) {
+			const std::string	old_value(get_git_config(command.name));
+			if (old_value != new_value) {
+				changed = true;
+				// Strip the arguments, unless the command was edited by hand
+				const std::string::size_type	program_len(old_value.size() - command.arguments.size());
+				const bool			has_arguments(old_value.size() > command.arguments.size() &&
+				                                              old_value.compare(program_len, std::string::npos, command.arguments) == 0);
+				old_program = has_arguments ? old_value.substr(0, program_len) : old_value;
+			}
+		}
+		git_config(command.name, new_value);
+	}
+	git_config(filter_section + ".required", "true");
+
+	if (changed) {
+		std::clog << "Updated filter commands for key '" << (key_name ? key_name : "default") << "': "
+		          << old_program << " -> " << program << std::endl;
+	}
+	return changed && contains_path_separator(old_program) && !contains_path_separator(program);
+}
+
+// Call after configure_git_filters returned true: explains how to keep running git-crypt by path.
+static void print_filter_program_hint (const std::string& program)
+{
+	std::clog << "The filter commands now find " << program << " on the PATH of whoever runs Git." << std::endl;
+	std::clog << "If a Git client can't find it (e.g. a GUI without your shell's PATH), run:" << std::endl;
+	std::clog << "    git config --global git-crypt.program /absolute/path/to/git-crypt" << std::endl;
+	std::clog << "    git-crypt refresh-filters" << std::endl;
 }
 
 static void deconfigure_git_filters (const char* key_name)
@@ -1488,6 +1553,8 @@ int init (int argc, const char** argv)
 		return 1;
 	}
 
+	const std::string	filter_program(get_filter_program());
+
 	// 1. Generate a key and install it
 	std::clog << "Generating key..." << std::endl;
 	Key_file		key_file;
@@ -1501,7 +1568,9 @@ int init (int argc, const char** argv)
 	}
 
 	// 2. Configure git for git-crypt
-	configure_git_filters(key_name);
+	if (configure_git_filters(key_name, filter_program)) {
+		print_filter_program_hint(filter_program);
+	}
 
 	return 0;
 }
@@ -1545,6 +1614,8 @@ int unlock (int argc, const char** argv)
 	const int	first_key_file = parse_options(options, argc, argv);
 	argc -= first_key_file;
 	argv += first_key_file;
+
+	const std::string	filter_program(get_filter_program());
 
 	// 1. Make sure every worktree is clean (ignoring untracked files)
 	// We do this because we check out files later, and we don't want the
@@ -1628,6 +1699,7 @@ int unlock (int argc, const char** argv)
 
 	// 3. Install the key(s) and configure the git filters
 	std::vector<const char*>	key_names;
+	bool				program_path_replaced = false;
 	for (std::vector<Key_file>::iterator key_file(key_files.begin()); key_file != key_files.end(); ++key_file) {
 		std::string		internal_key_path(get_internal_key_path(key_file->get_key_name()));
 		// TODO: croak if internal_key_path already exists???
@@ -1638,8 +1710,13 @@ int unlock (int argc, const char** argv)
 			return 1;
 		}
 
-		configure_git_filters(key_file->get_key_name());
+		if (configure_git_filters(key_file->get_key_name(), filter_program)) {
+			program_path_replaced = true;
+		}
 		key_names.push_back(key_file->get_key_name());
+	}
+	if (program_path_replaced) {
+		print_filter_program_hint(filter_program);
 	}
 
 	// 4. Check out the files that are currently encrypted, in every worktree.
@@ -2200,6 +2277,48 @@ int refresh (int argc, const char** argv) // TODO: do a force checkout, much lik
 {
 	std::clog << "Error: refresh is not yet implemented." << std::endl;
 	return 1;
+}
+
+void help_refresh_filters (std::ostream& out)
+{
+	//     |--------------------------------------------------------------------------------| 80 chars
+	out << "Usage: git-crypt refresh-filters" << std::endl;
+	out << std::endl;
+	out << "Rewrite the Git filter commands of every unlocked key, so that they run the" << std::endl;
+	out << "git-crypt.program option if it is set, and the bare name git-crypt otherwise." << std::endl;
+	out << "Run it after changing git-crypt.program, or if git-crypt was moved." << std::endl;
+	out << std::endl;
+}
+int refresh_filters (int argc, const char** argv)
+{
+	Options_list	options;
+	const int	argi = parse_options(options, argc, argv);
+	if (argc - argi != 0) {
+		std::clog << "Error: git-crypt refresh-filters takes no arguments" << std::endl;
+		help_refresh_filters(std::clog);
+		return 2;
+	}
+
+	get_internal_state_path(); // fails if this is not a Git repository
+
+	// The keys whose filters are configured, i.e. the unlocked keys
+	std::set<std::string>	key_names;
+	add_key_names_from_filter_config(key_names);
+	if (key_names.empty()) {
+		return 0; // locked: nothing to rewrite
+	}
+	const std::string	filter_program(get_filter_program());
+
+	bool			program_path_replaced = false;
+	for (std::set<std::string>::const_iterator key_name(key_names.begin()); key_name != key_names.end(); ++key_name) {
+		if (configure_git_filters(*key_name == "default" ? 0 : key_name->c_str(), filter_program)) {
+			program_path_replaced = true;
+		}
+	}
+	if (program_path_replaced) {
+		print_filter_program_hint(filter_program);
+	}
+	return 0;
 }
 
 void help_status (std::ostream& out)

@@ -109,22 +109,6 @@ void	mkdir_parent (const std::string& path)
 	}
 }
 
-std::string our_exe_path ()
-{
-	std::vector<char>	buffer(128);
-	size_t			len;
-
-	while ((len = GetModuleFileNameA(nullptr, &buffer[0], buffer.size())) == buffer.size()) {
-		// buffer may have been truncated - grow and try again
-		buffer.resize(buffer.size() * 2);
-	}
-	if (len == 0) {
-		throw System_error("GetModuleFileNameA", "", GetLastError());
-	}
-
-	return std::string(buffer.begin(), buffer.begin() + len);
-}
-
 int exit_status (int status)
 {
 	return status;

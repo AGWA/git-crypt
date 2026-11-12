@@ -125,23 +125,6 @@ void	mkdir_parent (const std::string& path)
 	}
 }
 
-std::string our_exe_path ()
-{
-	if (argv0[0] == '/') {
-		// argv[0] starts with / => it's an absolute path
-		return argv0;
-	} else if (std::strchr(argv0, '/')) {
-		// argv[0] contains / => it a relative path that should be resolved
-		char*		resolved_path_p = realpath(argv0, nullptr);
-		std::string	resolved_path(resolved_path_p);
-		free(resolved_path_p);
-		return resolved_path;
-	} else {
-		// argv[0] is just a bare filename => not much we can do
-		return argv0;
-	}
-}
-
 int	exit_status (int wait_status)
 {
 	return wait_status != -1 && WIFEXITED(wait_status) ? WEXITSTATUS(wait_status) : -1;

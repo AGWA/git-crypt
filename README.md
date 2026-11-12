@@ -157,6 +157,61 @@ with "no GPG secret key available to unlock this repository".  With it,
 unlock finds `sub/.git-crypt/keys/default/0/<FPR>.gpg` and the files
 under `sub/` are decrypted.
 
+How Git finds git-crypt: git-crypt.program
+------------------------------------------
+
+`git-crypt init` and `git-crypt unlock` write Git filter commands into
+`.git/config` that run `git-crypt` by its bare name, for example:
+
+    [filter "git-crypt"]
+        smudge = \"git-crypt\" smudge
+        clean = \"git-crypt\" clean
+        required = true
+    [diff "git-crypt"]
+        textconv = \"git-crypt\" diff
+
+This is so even if you ran git-crypt by an absolute path.  Git looks the
+name up on the `PATH` of whoever runs it, so the repository keeps working
+when git-crypt is upgraded or moved.
+
+To run a specific binary instead, for example for a Git GUI client that
+doesn't inherit your shell's `PATH`, set `git-crypt.program` to its
+absolute path.  It is read with the usual `git config` lookup, so it can
+be set once for all your repositories:
+
+    git config --global git-crypt.program /usr/local/bin/git-crypt
+
+The value must be an absolute path or a bare command name; an empty value
+or a relative path containing `/` is rejected.  It is read when the
+filters are written, and its value is copied into the filter commands,
+so after setting or changing it, rewrite the filters of an unlocked
+repository with:
+
+    git-crypt refresh-filters
+
+`git-crypt refresh-filters` is also the one-step repair if the filters
+name a binary that no longer exists (for example after an upgrade moved
+git-crypt), which fails with:
+
+    error: external filter '"/old/path/git-crypt" smudge' failed 127
+
+It needs neither a key nor a clean work tree, rewrites the filters of
+every unlocked key, prints an `old -> new` line for each key whose
+commands changed, and does nothing in a locked repository.  (Running
+`git-crypt unlock` again also rewrites the filters, but only works while
+the old binary still exists, because it first runs `git status`, which
+runs the clean filter.)  Repositories set up by older versions of
+git-crypt by an absolute path keep that path until you run
+`git-crypt refresh-filters`.
+
+**Security.**  Running `git-crypt` by name means that a malicious
+directory on your `PATH` could run its own `git-crypt` and see your
+plaintext.  This is not a new risk: such a directory could equally
+shadow `git`, `gpg` or your shell, which see the same data.  Pinning an
+absolute path with `git-crypt.program` is an explicit opt-in, and it has
+the opposite trade-off: the repository breaks if that file is moved.
+See [docs/adr/0001-filter-commands-use-bare-git-crypt-name.md](docs/adr/0001-filter-commands-use-bare-git-crypt-name.md).
+
 Verifying encryption
 --------------------
 
@@ -506,31 +561,24 @@ Here the file is handled by git-lfs and is *not* encrypted.  Use
 different paths for files handled by git-crypt and files handled by
 git-lfs.
 
-**GUI clients that can't find git-crypt.**  git-crypt records the
-command it was started with in `.git/config`.  If you ran
-`git-crypt init` or `git-crypt unlock` as plain `git-crypt`, the
-filter is configured as `"git-crypt" smudge` and is looked up on the
-`PATH` of whoever runs Git.  A GUI that doesn't inherit your shell's
-`PATH` then fails:
+**GUI clients that can't find git-crypt.**  The filter commands run
+`git-crypt` by its bare name, which is looked up on the `PATH` of
+whoever runs Git.  A GUI that doesn't inherit your shell's `PATH` then
+fails:
 
     "git-crypt" smudge: git-crypt: command not found
     error: external filter '"git-crypt" smudge' failed 127
     error: external filter '"git-crypt" smudge' failed
     fatal: secret.txt: smudge filter git-crypt failed
 
-Run `git-crypt unlock` once by its absolute path, which makes git-crypt
-record that path (this also works in an already unlocked repository):
+Point git-crypt at its absolute path and rewrite the filters (see
+[How Git finds git-crypt](#how-git-finds-git-crypt-git-cryptprogram)):
 
-    /usr/local/bin/git-crypt unlock /path/to/key
+    git config --global git-crypt.program /usr/local/bin/git-crypt
+    git-crypt refresh-filters
 
-or point the configuration at the binary yourself:
-
-    git config filter.git-crypt.smudge '"/usr/local/bin/git-crypt" smudge'
-    git config filter.git-crypt.clean '"/usr/local/bin/git-crypt" clean'
-    git config diff.git-crypt.textconv '"/usr/local/bin/git-crypt" diff'
-
-For a named key `NAME`, the sections are `filter.git-crypt-NAME` and
-`diff.git-crypt-NAME`, and the commands end in `--key-name=NAME`.
+Run `git-crypt refresh-filters` in each repository that is already
+unlocked; repositories unlocked later pick the option up automatically.
 
 Gitattributes File
 ------------------

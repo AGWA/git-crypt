@@ -74,11 +74,13 @@ scenario_smudge_rejects_tampered_input ()
 {
 	new_encrypted_repo
 	printf 'top secret\n' | git-crypt clean > "$SCENARIO_TMP/enc"
-	# Flip the last byte of the ciphertext.
-	local size
+	# Change the last byte of the ciphertext (to Z, or to Y if it already is Z).
+	local size last
 	size=$(wc -c < "$SCENARIO_TMP/enc" | tr -d ' ')
+	last=$(tail -c 1 "$SCENARIO_TMP/enc" 2>/dev/null)
 	head -c $((size - 1)) "$SCENARIO_TMP/enc" > "$SCENARIO_TMP/tampered"
-	printf 'Z' >> "$SCENARIO_TMP/tampered"
+	if [ "$last" = Z ]; then printf 'Y'; else printf 'Z'; fi >> "$SCENARIO_TMP/tampered"
+	! cmp -s "$SCENARIO_TMP/enc" "$SCENARIO_TMP/tampered" || fail "tampering left the file unchanged"
 
 	run sh -c "git-crypt smudge < '$SCENARIO_TMP/tampered'"
 	assert_status 1

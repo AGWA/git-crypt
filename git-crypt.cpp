@@ -52,6 +52,7 @@ static void print_usage (std::ostream& out)
 	out << "  status               display which files are encrypted" << std::endl;
 	//out << "  refresh              ensure all files in the repo are properly decrypted" << std::endl;
 	out << "  lock                 de-configure git-crypt and re-encrypt files in work tree" << std::endl;
+	out << "  refresh-filters      rewrite the filter commands (after moving git-crypt)" << std::endl;
 	out << std::endl;
 	out << "GPG commands:" << std::endl;
 	out << "  add-gpg-user USERID  add the user with the given GPG user ID as a collaborator" << std::endl;
@@ -105,6 +106,8 @@ static bool help_for_command (const char* command, std::ostream& out)
 		help_migrate_key(out);
 	} else if (std::strcmp(command, "refresh") == 0) {
 		help_refresh(out);
+	} else if (std::strcmp(command, "refresh-filters") == 0) {
+		help_refresh_filters(out);
 	} else if (std::strcmp(command, "status") == 0) {
 		help_status(out);
 	} else {
@@ -217,6 +220,9 @@ try {
 		}
 		if (std::strcmp(command, "refresh") == 0) {
 			return refresh(argc, argv);
+		}
+		if (std::strcmp(command, "refresh-filters") == 0) {
+			return refresh_filters(argc, argv);
 		}
 		if (std::strcmp(command, "status") == 0) {
 			return status(argc, argv);

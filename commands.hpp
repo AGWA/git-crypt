@@ -55,6 +55,7 @@ int export_key (int argc, const char** argv);
 int keygen (int argc, const char** argv);
 int migrate_key (int argc, const char** argv);
 int refresh (int argc, const char** argv);
+int refresh_filters (int argc, const char** argv);
 int status (int argc, const char** argv);
 
 // Help messages:
@@ -68,6 +69,7 @@ void help_export_key (std::ostream&);
 void help_keygen (std::ostream&);
 void help_migrate_key (std::ostream&);
 void help_refresh (std::ostream&);
+void help_refresh_filters (std::ostream&);
 void help_status (std::ostream&);
 
 // other

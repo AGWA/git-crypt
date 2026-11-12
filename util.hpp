@@ -59,7 +59,6 @@ public:
 };
 
 void		mkdir_parent (const std::string& path); // Create parent directories of path, __but not path itself__
-std::string	our_exe_path ();
 int		exec_command (const std::vector<std::string>&);
 int		exec_command (const std::vector<std::string>&, std::ostream& output);
 int		exec_command_with_input (const std::vector<std::string>&, const char* p, size_t len);

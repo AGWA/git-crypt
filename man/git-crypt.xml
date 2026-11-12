@@ -45,6 +45,9 @@
 		<cmdsynopsis>
 			<command>git-crypt lock</command>
 		</cmdsynopsis>
+		<cmdsynopsis>
+			<command>git-crypt refresh-filters</command>
+		</cmdsynopsis>
 	</refsynopsisdiv>
 	<refsynopsisdiv>
 		<title>GPG commands</title>
@@ -483,6 +486,23 @@
 							</listitem>
 						</varlistentry>
 					</variablelist>
+				</listitem>
+			</varlistentry>
+
+			<varlistentry>
+				<term><option>refresh-filters</option></term>
+				<listitem>
+					<para>
+						Rewrite the Git filter and textconv commands of every unlocked key, so that
+						they run the program named by <varname>git-crypt.program</varname> if it is
+						set, and the bare name <command>git-crypt</command> otherwise (see
+						<emphasis>Configuration</emphasis>).  Run it after setting or changing
+						<varname>git-crypt.program</varname>, or when the filter commands name a
+						git-crypt binary that no longer exists.  It needs neither a key nor a clean
+						working tree, prints an <literal>old -&gt; new</literal> line on standard error
+						for each key whose commands changed, and does nothing in a locked repository.
+						It takes no options.
+					</para>
 				</listitem>
 			</varlistentry>
 
@@ -946,34 +966,21 @@ a.bin: filter: lfs</screen>
 				<term>GUI clients that cannot find git-crypt</term>
 				<listitem>
 					<para>
-						git-crypt records the command it was started with in <filename>.git/config</filename>.
-						If you ran <command>git-crypt init</command> or <command>git-crypt unlock</command>
-						as plain <command>git-crypt</command>, the filter is configured as
-						<literal>"git-crypt" smudge</literal> and is looked up on the <envar>PATH</envar> of
-						whoever runs Git.  A GUI that does not inherit your shell's <envar>PATH</envar> then
-						fails:
+						The filter commands run <command>git-crypt</command> by its bare name, which is
+						looked up on the <envar>PATH</envar> of whoever runs Git.  A GUI that does not
+						inherit your shell's <envar>PATH</envar> then fails:
 					</para>
 					<screen>"git-crypt" smudge: git-crypt: command not found
 error: external filter '"git-crypt" smudge' failed 127
 error: external filter '"git-crypt" smudge' failed
 fatal: secret.txt: smudge filter git-crypt failed</screen>
 					<para>
-						Run <command>git-crypt unlock</command> once by its absolute path, which makes git-crypt
-						record that path (this also works in an already unlocked repository):
+						Point git-crypt at its absolute path with <varname>git-crypt.program</varname>
+						(see <emphasis>Configuration</emphasis>) and rewrite the filters of each
+						repository that is already unlocked:
 					</para>
-					<screen>/usr/local/bin/git-crypt unlock <filename>/path/to/key</filename></screen>
-					<para>
-						or point the configuration at the binary yourself:
-					</para>
-					<screen>git config filter.git-crypt.smudge '"/usr/local/bin/git-crypt" smudge'
-git config filter.git-crypt.clean '"/usr/local/bin/git-crypt" clean'
-git config diff.git-crypt.textconv '"/usr/local/bin/git-crypt" diff'</screen>
-					<para>
-						For a named key <replaceable>NAME</replaceable>, the sections are
-						<literal>filter.git-crypt-<replaceable>NAME</replaceable></literal> and
-						<literal>diff.git-crypt-<replaceable>NAME</replaceable></literal>, and the commands end in
-						<literal>--key-name=<replaceable>NAME</replaceable></literal>.
-					</para>
+					<screen>git config --global git-crypt.program /usr/local/bin/git-crypt
+git-crypt refresh-filters</screen>
 				</listitem>
 			</varlistentry>
 		</variablelist>
@@ -1026,6 +1033,36 @@ git config diff.git-crypt.textconv '"/usr/local/bin/git-crypt" diff'</screen>
 						<command>git subtree add --prefix=sub <replaceable>REPOSITORY</replaceable> <replaceable>BRANCH</replaceable></command>:
 					</para>
 					<screen>git config git-crypt.repoStateDir sub/.git-crypt&#10;git-crypt unlock</screen>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><varname>git-crypt.program</varname></term>
+				<listitem>
+					<para>
+						The program that the Git filter and textconv commands run.  By default they run
+						the bare name <command>git-crypt</command>, looked up on the <envar>PATH</envar>
+						of whoever runs Git, even if you ran git-crypt by an absolute path, so the
+						repository keeps working when git-crypt is upgraded or moved.  Set this option
+						to an absolute path to run a specific binary, for example for a Git GUI client
+						that does not inherit your shell's <envar>PATH</envar>.  The value must be an
+						absolute path or a bare command name; an empty value or a relative path
+						containing <literal>/</literal> is rejected.  It is read with the usual
+						<command>git config</command> lookup (system, global, then local).
+					</para>
+					<para>
+						The value is copied into the filter commands when they are written, by
+						<command>git-crypt init</command>, <command>git-crypt unlock</command> and
+						<command>git-crypt refresh-filters</command>, so after setting or changing it,
+						run <command>git-crypt refresh-filters</command> in each unlocked repository:
+					</para>
+					<screen>git config --global git-crypt.program /usr/local/bin/git-crypt&#10;git-crypt refresh-filters</screen>
+					<para>
+						A malicious directory on your <envar>PATH</envar> could run its own
+						<command>git-crypt</command> and see your plaintext, but it could equally shadow
+						<command>git</command> or <command>gpg</command>, so the bare name adds no new
+						risk.  An absolute path has the opposite trade-off: the repository breaks if
+						that file is moved.
+					</para>
 				</listitem>
 			</varlistentry>
 		</variablelist>
