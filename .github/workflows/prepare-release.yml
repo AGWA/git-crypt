@@ -1,0 +1,81 @@
+# Opens a pull request that bumps the version for a new release:
+#
+#     gh workflow run prepare-release.yml -f bump=minor
+#
+# It increments the VERSION in git-crypt.hpp (0.8.0 becomes 0.8.1, 0.9.0 or
+# 1.0.0 for a patch, minor or major bump), turns the "## Unreleased" section
+# of NEWS.md into the new version's release notes, and updates the version
+# in the man page and README.md (see .github/scripts/bump-version.sh).
+# Merging the pull request makes the release: release.yml then tags the
+# merge commit, builds and attaches the binaries, and publishes the release.
+#
+# Opening the pull request needs "Allow GitHub Actions to create and approve
+# pull requests" (Settings > Actions > General).  Without it, the workflow
+# pushes the branch and prints a link to open the pull request by hand.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Part of the version to increment (MAJOR.MINOR.PATCH)
+        required: true
+        type: choice
+        default: patch
+        options: [patch, minor, major]
+name: Prepare release
+permissions:
+  contents: read
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+jobs:
+  pull-request:
+    name: Open release pull request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release branch
+      pull-requests: write
+    steps:
+      - name: Check branch
+        if: github.ref_name != github.event.repository.default_branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          echo "::error::run this workflow on $DEFAULT_BRANCH, not $GITHUB_REF_NAME"
+          exit 1
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Bump version
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: echo "version=$(.github/scripts/bump-version.sh "$BUMP")" >> "$GITHUB_OUTPUT"
+      - name: Push release branch
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "release/$VERSION"
+          git commit -a -m "Release $VERSION"
+          git push origin "release/$VERSION"
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          BASE: ${{ github.ref_name }}
+        run: |
+          body="Bumps the version to $VERSION.  The release notes are the
+          \`## v$VERSION\` section of NEWS.md in this diff; edit them here
+          before merging if needed.
+
+          Merging this pull request tags the merge commit \`$VERSION\`, builds
+          the Linux, macOS and Windows binaries, attaches them to a new
+          GitHub release with a SHA256SUMS file, and publishes the release.
+
+          The Test workflow doesn't run on pull requests opened by GitHub
+          Actions."
+          if ! gh pr create --repo "$GITHUB_REPOSITORY" --base "$BASE" --head "release/$VERSION" \
+              --title "Release $VERSION" --body "$body"; then
+            echo "::warning::couldn't open the pull request; open it at https://github.com/$GITHUB_REPOSITORY/compare/$BASE...release/$VERSION?expand=1"
+            exit 1
+          fi

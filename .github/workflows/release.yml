@@ -1,16 +1,29 @@
 # Builds the release binaries and attaches them to a GitHub release, together
 # with a SHA256SUMS file, then checks that every expected binary is attached.
 #
-# Runs when a release is published.  To rebuild binaries for an existing
-# release (e.g. after a failed run), run it manually with the release's tag,
-# for all platforms or just one.
+# It makes a release when a push to main changes the VERSION in
+# git-crypt.hpp, which is what merging the pull request opened by
+# prepare-release.yml does: it tags the pushed commit with the new version
+# and creates a draft release with the notes from NEWS.md (see
+# .github/scripts/create-release.sh), builds and attaches the binaries, and
+# publishes the release once every binary is attached.
+#
+# It also runs when a release is published by hand.  To rebuild binaries for
+# an existing release (e.g. after a failed run), run it manually with the
+# release's tag, for all platforms or just one; a draft release is then
+# published once every binary is attached.  Run manually with a tag that has
+# no release yet, it creates the release as above, from the head of the
+# branch it runs on.
 on:
+  push:
+    branches: [main]
+    paths: [git-crypt.hpp]
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag of the existing release to build binaries for
+        description: Tag of the release to rebuild (or to create, from this branch)
         required: true
         type: string
       platform:
@@ -23,25 +36,55 @@ name: Release
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.sha }}
   cancel-in-progress: false
 jobs:
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and release, and see draft releases
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - name: Look up release
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # to compare VERSION with the commit before a push
+          persist-credentials: false
+      - name: Look up or create release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          PLATFORM: ${{ inputs.platform || 'all' }}
+          BEFORE: ${{ github.event.before }}
         run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            read_version () { sed -n 's/^#define VERSION "\(.*\)"$/\1/p'; }
+            TAG=$(read_version < git-crypt.hpp)
+            if [ "$(git show "$BEFORE:git-crypt.hpp" | read_version)" = "$TAG" ]; then
+              echo "VERSION is still $TAG; nothing to release."
+              exit 0
+            fi
+            echo "VERSION changed to $TAG; releasing it."
+          fi
           # Asset names use the release name (e.g. "0.8.0"), as in earlier releases.
-          version=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name --jq .name)
+          if version=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name --jq .name 2> "$RUNNER_TEMP/view.err"); then
+            echo "Building binaries for the existing release $TAG."
+          elif grep -q 'release not found' "$RUNNER_TEMP/view.err"; then
+            if [ "$PLATFORM" != all ]; then
+              echo "::error::release $TAG doesn't exist; to create it, build all platforms"
+              exit 1
+            fi
+            .github/scripts/create-release.sh "$TAG" "$GITHUB_SHA"
+            version=$TAG
+          else
+            cat "$RUNNER_TEMP/view.err" >&2
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${version:-$TAG}" >> "$GITHUB_OUTPUT"
       - name: Select platforms
@@ -62,6 +105,7 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     needs: prepare
+    if: needs.prepare.outputs.tag != ''
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
@@ -128,7 +172,7 @@ jobs:
     name: Upload to release
     needs: [prepare, build]
     # Upload whatever was built, even if some platforms failed; verify reports the rest.
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.tag != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,8 +206,10 @@ jobs:
   verify:
     name: Verify release assets
     needs: [prepare, publish]
-    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.tag != '' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # see draft releases
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -173,3 +219,23 @@ jobs:
           persist-credentials: false
       - name: Check that every binary and SHA256SUMS is attached
         run: .github/scripts/release-assets.sh verify "${{ needs.prepare.outputs.tag }}" "${{ needs.prepare.outputs.version }}"
+
+  release:
+    name: Publish release
+    needs: [prepare, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - name: Publish the draft release
+        # Publishing with GITHUB_TOKEN doesn't trigger this workflow again.
+        run: |
+          if [ "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+            echo "Published release $TAG."
+          else
+            echo "Release $TAG is already published."
+          fi
